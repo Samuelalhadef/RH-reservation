@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { userAPI, leaveAPI } from '../services/api';
 import Navbar from '../components/Navbar';
+import DashboardRH from '../components/DashboardRH';
 import { formatDateFR, formatStatus, getStatusColor } from '../utils/dateUtils';
 import toast from 'react-hot-toast';
 
 const RHPage = () => {
-  const [activeTab, setActiveTab] = useState('pending'); // pending, all, users
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, pending, all, users
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [allLeaves, setAllLeaves] = useState([]);
   const [users, setUsers] = useState([]);
@@ -19,6 +20,11 @@ const RHPage = () => {
   }, [activeTab]);
 
   const fetchData = async () => {
+    if (activeTab === 'dashboard') {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       if (activeTab === 'pending') {
@@ -63,6 +69,20 @@ const RHPage = () => {
     }
   };
 
+  const handleDeleteLeave = async (leaveId) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette demande de congés ? Le solde de l\'employé sera restauré si la demande était validée.')) {
+      return;
+    }
+
+    try {
+      await leaveAPI.deleteLeaveRequestByRH(leaveId);
+      toast.success('Demande supprimée avec succès');
+      fetchData();
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -74,10 +94,21 @@ const RHPage = () => {
 
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b">
+          <div className="flex border-b overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'dashboard'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              📊 Tableau de bord
+            </button>
+
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'pending'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -93,7 +124,7 @@ const RHPage = () => {
 
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'all'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -104,7 +135,7 @@ const RHPage = () => {
 
             <button
               onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'users'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -120,6 +151,11 @@ const RHPage = () => {
           <p className="text-center">Chargement...</p>
         ) : (
           <>
+            {/* Tableau de bord */}
+            {activeTab === 'dashboard' && (
+              <DashboardRH />
+            )}
+
             {/* Demandes en attente */}
             {activeTab === 'pending' && (
               <div className="bg-white rounded-lg shadow p-6">
@@ -235,6 +271,9 @@ const RHPage = () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                           Validateur
                         </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -255,6 +294,15 @@ const RHPage = () => {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {leave.validateur_nom ? `${leave.validateur_prenom} ${leave.validateur_nom}` : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDeleteLeave(leave.id)}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                              title="Supprimer cette demande"
+                            >
+                              Supprimer
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -296,6 +344,9 @@ const RHPage = () => {
                           Solde
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Fractionnement
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                           Statut
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -316,6 +367,13 @@ const RHPage = () => {
                               {user.jours_restants || 25}
                             </span>
                             <span className="text-gray-400 text-sm"> / {user.jours_acquis || 25}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`font-semibold ${
+                              user.jours_fractionnement > 0 ? 'text-purple-600' : 'text-gray-400'
+                            }`}>
+                              {user.jours_fractionnement || 0}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs font-semibold rounded ${
@@ -364,12 +422,17 @@ const UserFormModal = ({ onClose, onSuccess }) => {
     setLoading(true);
 
     try {
-      await userAPI.createUser(formData);
-      toast.success('Utilisateur créé avec succès');
+      const response = await userAPI.createUser(formData);
+      const message = response.data.tempPassword
+        ? `Utilisateur créé avec succès. Mot de passe temporaire: ${response.data.tempPassword}`
+        : 'Utilisateur créé avec succès';
+      toast.success(message, { duration: 8000 });
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error('Erreur lors de la création');
+      const errorMessage = error.response?.data?.message || 'Erreur lors de la création de l\'utilisateur';
+      console.error('Erreur complète:', error);
+      toast.error(errorMessage, { duration: 5000 });
     } finally {
       setLoading(false);
     }

@@ -14,19 +14,23 @@ export async function GET(request) {
 
     const userId = user.userId || user.id;
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') || new Date().getFullYear();
+    const year = searchParams.get('year');
     const month = searchParams.get('month');
 
     let sql = `
-      SELECT dc.id, dc.date_debut, dc.date_fin, dc.nombre_jours_ouvres,
+      SELECT dc.id, dc.date_debut, dc.date_fin, dc.nombre_jours_ouvres, dc.statut,
              u.id as user_id, u.nom, u.prenom, u.type_utilisateur
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id
-      WHERE dc.statut = 'validee'
+      WHERE dc.statut IN ('validee', 'en_attente')
       AND dc.user_id = ?
-      AND strftime('%Y', dc.date_debut) = ?
     `;
-    const args = [userId, year.toString()];
+    const args = [userId];
+
+    if (year) {
+      sql += ' AND strftime("%Y", dc.date_debut) = ?';
+      args.push(year.toString());
+    }
 
     if (month) {
       sql += ' AND strftime("%m", dc.date_debut) = ?';

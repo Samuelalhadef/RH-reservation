@@ -1,7 +1,7 @@
 import { db } from '../config/database.js';
 
 /**
- * Jours fériés français 2024-2026
+ * Jours fériés français 2024-2030
  */
 const FRENCH_HOLIDAYS = [
   // 2024
@@ -42,6 +42,58 @@ const FRENCH_HOLIDAYS = [
   { date: '2026-11-01', nom: 'Toussaint', annee: 2026 },
   { date: '2026-11-11', nom: 'Armistice 1918', annee: 2026 },
   { date: '2026-12-25', nom: 'Noël', annee: 2026 },
+
+  // 2027
+  { date: '2027-01-01', nom: 'Jour de l\'An', annee: 2027 },
+  { date: '2027-03-29', nom: 'Lundi de Pâques', annee: 2027 },
+  { date: '2027-05-01', nom: 'Fête du Travail', annee: 2027 },
+  { date: '2027-05-08', nom: 'Victoire 1945', annee: 2027 },
+  { date: '2027-05-06', nom: 'Ascension', annee: 2027 },
+  { date: '2027-05-17', nom: 'Lundi de Pentecôte', annee: 2027 },
+  { date: '2027-07-14', nom: 'Fête Nationale', annee: 2027 },
+  { date: '2027-08-15', nom: 'Assomption', annee: 2027 },
+  { date: '2027-11-01', nom: 'Toussaint', annee: 2027 },
+  { date: '2027-11-11', nom: 'Armistice 1918', annee: 2027 },
+  { date: '2027-12-25', nom: 'Noël', annee: 2027 },
+
+  // 2028
+  { date: '2028-01-01', nom: 'Jour de l\'An', annee: 2028 },
+  { date: '2028-04-17', nom: 'Lundi de Pâques', annee: 2028 },
+  { date: '2028-05-01', nom: 'Fête du Travail', annee: 2028 },
+  { date: '2028-05-08', nom: 'Victoire 1945', annee: 2028 },
+  { date: '2028-05-25', nom: 'Ascension', annee: 2028 },
+  { date: '2028-06-05', nom: 'Lundi de Pentecôte', annee: 2028 },
+  { date: '2028-07-14', nom: 'Fête Nationale', annee: 2028 },
+  { date: '2028-08-15', nom: 'Assomption', annee: 2028 },
+  { date: '2028-11-01', nom: 'Toussaint', annee: 2028 },
+  { date: '2028-11-11', nom: 'Armistice 1918', annee: 2028 },
+  { date: '2028-12-25', nom: 'Noël', annee: 2028 },
+
+  // 2029
+  { date: '2029-01-01', nom: 'Jour de l\'An', annee: 2029 },
+  { date: '2029-04-02', nom: 'Lundi de Pâques', annee: 2029 },
+  { date: '2029-05-01', nom: 'Fête du Travail', annee: 2029 },
+  { date: '2029-05-08', nom: 'Victoire 1945', annee: 2029 },
+  { date: '2029-05-10', nom: 'Ascension', annee: 2029 },
+  { date: '2029-05-21', nom: 'Lundi de Pentecôte', annee: 2029 },
+  { date: '2029-07-14', nom: 'Fête Nationale', annee: 2029 },
+  { date: '2029-08-15', nom: 'Assomption', annee: 2029 },
+  { date: '2029-11-01', nom: 'Toussaint', annee: 2029 },
+  { date: '2029-11-11', nom: 'Armistice 1918', annee: 2029 },
+  { date: '2029-12-25', nom: 'Noël', annee: 2029 },
+
+  // 2030
+  { date: '2030-01-01', nom: 'Jour de l\'An', annee: 2030 },
+  { date: '2030-04-22', nom: 'Lundi de Pâques', annee: 2030 },
+  { date: '2030-05-01', nom: 'Fête du Travail', annee: 2030 },
+  { date: '2030-05-08', nom: 'Victoire 1945', annee: 2030 },
+  { date: '2030-05-30', nom: 'Ascension', annee: 2030 },
+  { date: '2030-06-10', nom: 'Lundi de Pentecôte', annee: 2030 },
+  { date: '2030-07-14', nom: 'Fête Nationale', annee: 2030 },
+  { date: '2030-08-15', nom: 'Assomption', annee: 2030 },
+  { date: '2030-11-01', nom: 'Toussaint', annee: 2030 },
+  { date: '2030-11-11', nom: 'Armistice 1918', annee: 2030 },
+  { date: '2030-12-25', nom: 'Noël', annee: 2030 },
 ];
 
 /**

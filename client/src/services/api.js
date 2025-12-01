@@ -61,6 +61,8 @@ export const leaveAPI = {
   updateLeaveStatus: (id, status, commentaire_rh) =>
     api.put(`/leaves/${id}/status`, { statut: status, commentaire_rh }),
   getCalendar: (params) => api.get('/leaves/calendar', { params }),
+  deleteLeaveRequestByRH: (id) => api.delete(`/leaves/${id}/rh`),
+  getDashboardStats: (params) => api.get('/leaves/dashboard-stats', { params }),
 };
 
 // Holidays

@@ -16,7 +16,6 @@ const Navbar = () => {
     { label: 'Tableau de bord', path: '/dashboard' },
     { label: 'Mes demandes', path: '/mes-demandes' },
     { label: 'Calendrier équipe', path: '/calendrier' },
-    { label: 'Profil', path: '/profil' },
   ];
 
   if (isRH()) {

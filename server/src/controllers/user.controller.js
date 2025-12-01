@@ -12,7 +12,7 @@ export const getProfile = async (req, res) => {
     const result = await db.execute({
       sql: `
         SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur,
-               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes
+               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement
         FROM users u
         LEFT JOIN soldes_conges sc ON u.id = sc.user_id AND sc.annee = ?
         WHERE u.id = ?
@@ -50,7 +50,7 @@ export const getAllUsersWithBalances = async (req, res) => {
     const result = await db.execute({
       sql: `
         SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.actif,
-               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes
+               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement
         FROM users u
         LEFT JOIN soldes_conges sc ON u.id = sc.user_id AND sc.annee = ?
         ORDER BY u.nom, u.prenom
@@ -117,14 +117,19 @@ export const createUser = async (req, res) => {
     const currentYear = new Date().getFullYear();
     await db.execute({
       sql: `
-        INSERT INTO soldes_conges (user_id, annee, jours_acquis, jours_pris, jours_restants, jours_reportes)
-        VALUES (?, ?, 25, 0, 25, 0)
+        INSERT INTO soldes_conges (user_id, annee, jours_acquis, jours_pris, jours_restants, jours_reportes, jours_fractionnement)
+        VALUES (?, ?, 25, 0, 25, 0, 0)
       `,
       args: [userId, currentYear]
     });
 
-    // Envoyer l'email avec le mot de passe temporaire
-    await sendTemporaryPasswordEmail(email, `${prenom} ${nom}`, tempPassword);
+    // Envoyer l'email avec le mot de passe temporaire (ne pas bloquer si l'envoi échoue)
+    try {
+      await sendTemporaryPasswordEmail(email, `${prenom} ${nom}`, tempPassword);
+      console.log(`Email envoyé à ${email} avec le mot de passe temporaire`);
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de l\'email, mais l\'utilisateur est créé:', emailError);
+    }
 
     res.status(201).json({
       success: true,
@@ -136,13 +141,15 @@ export const createUser = async (req, res) => {
         email,
         type_utilisateur
       },
-      tempPassword // À retirer en production, juste pour le développement
+      tempPassword
     });
   } catch (error) {
     console.error('Error creating user:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de la création de l\'utilisateur'
+      message: `Erreur lors de la création de l'utilisateur: ${error.message}`
     });
   }
 };

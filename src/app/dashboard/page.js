@@ -40,10 +40,13 @@ export default function DashboardPage() {
         fetch('/api/leaves/my-leaves').then(r => r.json()),
       ]);
 
-      setProfile(profileRes.user);
-      setMyLeaves(leavesRes.leaves);
+      setProfile(profileRes.user || null);
+      setMyLeaves(leavesRes.leaves || []);
     } catch (error) {
+      console.error('Error fetching dashboard data:', error);
       toast.error('Erreur lors du chargement des données');
+      setProfile(null);
+      setMyLeaves([]);
     } finally {
       setLoading(false);
     }
@@ -125,7 +128,7 @@ export default function DashboardPage() {
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="font-bold text-gray-800 mb-3">Mes prochains congés</h3>
-              {myLeaves.filter(l => new Date(l.date_debut) >= new Date()).length === 0 ? (
+              {!myLeaves || myLeaves.filter(l => new Date(l.date_debut) >= new Date()).length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">Aucun congé prévu</p>
               ) : (
                 <div className="space-y-2">

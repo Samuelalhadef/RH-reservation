@@ -35,6 +35,7 @@ export const initDatabase = async () => {
         jours_pris REAL DEFAULT 0,
         jours_restants REAL DEFAULT 25,
         jours_reportes REAL DEFAULT 0,
+        jours_fractionnement REAL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(user_id, annee)
       )

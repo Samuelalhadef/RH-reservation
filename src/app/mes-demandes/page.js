@@ -39,6 +39,39 @@ export default function MesDemandesPage() {
     }
   };
 
+  const handleDeleteLeave = async (id, dateDebut) => {
+    // Vérifier que la date n'est pas passée
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(dateDebut);
+
+    if (startDate < today) {
+      toast.error('Vous ne pouvez pas supprimer une demande dont la date est déjà passée');
+      return;
+    }
+
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette demande de congé ?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/leaves/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Demande supprimée avec succès');
+        fetchLeaves();
+      } else {
+        toast.error(data.message || 'Erreur lors de la suppression');
+      }
+    } catch (error) {
+      toast.error('Erreur lors de la suppression de la demande');
+    }
+  };
+
   const filteredLeaves = leaves.filter(leave => {
     if (filterStatus === 'all') return true;
     return leave.statut === filterStatus;
@@ -219,6 +252,9 @@ export default function MesDemandesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Validateur
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -269,6 +305,22 @@ export default function MesDemandesPage() {
                           </div>
                         ) : (
                           <span className="text-gray-400 italic">En attente</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {leave.statut === 'en_attente' && new Date(leave.date_debut) >= new Date(new Date().setHours(0,0,0,0)) ? (
+                          <button
+                            onClick={() => handleDeleteLeave(leave.id, leave.date_debut)}
+                            className="text-red-600 hover:text-red-800 font-medium transition flex items-center gap-1"
+                            title="Supprimer la demande"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Supprimer
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 italic">-</span>
                         )}
                       </td>
                     </tr>

@@ -17,7 +17,8 @@ export async function GET() {
     const result = await db.execute({
       sql: `
         SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.actif,
-               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes
+               u.type_contrat, u.date_debut_contrat, u.date_fin_contrat,
+               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement
         FROM users u
         LEFT JOIN soldes_conges sc ON u.id = sc.user_id AND sc.annee = ?
         ORDER BY u.nom, u.prenom
@@ -25,14 +26,17 @@ export async function GET() {
       args: [currentYear]
     });
 
+    console.log('Users fetched:', result.rows.length);
+
     return NextResponse.json({
       success: true,
-      users: result.rows
+      users: result.rows || []
     });
   } catch (error) {
     console.error('Error fetching users with balances:', error);
+    console.error('Error details:', error.message);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors de la récupération des utilisateurs' },
+      { success: false, message: `Erreur lors de la récupération des utilisateurs: ${error.message}`, users: [] },
       { status: 500 }
     );
   }

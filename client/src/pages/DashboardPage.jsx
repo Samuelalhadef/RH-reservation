@@ -78,8 +78,19 @@ const DashboardPage = () => {
           </div>
         )}
 
+        {/* Alerte jours de fractionnement */}
+        {profile?.jours_fractionnement > 0 && (
+          <div className="bg-purple-100 border border-purple-400 text-purple-700 px-4 py-3 rounded mb-6">
+            <p className="font-semibold">📅 Rappel : Jours de fractionnement disponibles</p>
+            <p className="text-sm">
+              Vous avez <span className="font-bold">{profile.jours_fractionnement}</span> jour(s) de fractionnement à prendre.
+              N'oubliez pas de les poser avant la fin de l'année !
+            </p>
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <p className="text-sm text-gray-600">Jours acquis</p>
             <p className="text-3xl font-bold text-primary-600">
@@ -105,6 +116,13 @@ const DashboardPage = () => {
             <p className="text-sm text-gray-600">Jours reportés</p>
             <p className="text-3xl font-bold text-blue-600">
               {profile?.jours_reportes || 0}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm text-gray-600">Jours fractionnement</p>
+            <p className="text-3xl font-bold text-purple-600">
+              {profile?.jours_fractionnement || 0}
             </p>
           </div>
         </div>

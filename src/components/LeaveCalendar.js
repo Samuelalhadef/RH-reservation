@@ -34,8 +34,8 @@ const LeaveCalendar = () => {
         fetch('/api/holidays/all').then(r => r.json()),
       ]);
 
-      setLeaves(leavesRes.events);
-      setHolidays(holidaysRes.holidays);
+      setLeaves(leavesRes.events || []);
+      setHolidays(holidaysRes.holidays || []);
     } catch (error) {
       console.error('Error fetching calendar data:', error);
     }
@@ -84,12 +84,43 @@ const LeaveCalendar = () => {
     return day === 0 || day === 6; // 0 = Dimanche, 6 = Samedi
   };
 
+  const isDateSelectable = (date) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+
+    // Les week-ends ne sont pas sélectionnables
+    if (isWeekend(date)) {
+      return false;
+    }
+
+    // Les jours fériés ne sont pas sélectionnables
+    const isHoliday = holidays.some(h => h.date === dateStr);
+    if (isHoliday) {
+      return false;
+    }
+
+    // Seules les dates avec des congés VALIDÉS ne sont pas sélectionnables
+    // Les dates en attente peuvent être sélectionnées (elles seront remplacées)
+    const hasValidatedLeave = leaves.some(leave => {
+      if (leave.statut !== 'validee') return false;
+      const startStr = leave.date_debut.split('T')[0];
+      const endStr = leave.date_fin.split('T')[0];
+      return dateStr >= startStr && dateStr <= endStr;
+    });
+
+    if (hasValidatedLeave) {
+      return false;
+    }
+
+    return true;
+  };
+
   const getDayClassName = (date, isCurrentMonth) => {
     const dateStr = formatDateToYYYYMMDD(date);
     const today = new Date();
     const isToday = date.getDate() === today.getDate() &&
                     date.getMonth() === today.getMonth() &&
                     date.getFullYear() === today.getFullYear();
+    const isWednesday = date.getDay() === 3 && isCurrentMonth && !isWeekend(date);
 
     // Vérifier si la date fait partie de la plage sélectionnée
     const isInRange = startDate && endDate && date >= startDate && date <= endDate;
@@ -106,17 +137,27 @@ const LeaveCalendar = () => {
     } else {
       const isHoliday = holidays.some(h => h.date === dateStr);
       if (isHoliday) {
-        classes += 'bg-purple-100 text-purple-800 font-semibold border-2 border-purple-300 ';
+        classes += 'bg-purple-100 text-purple-800 font-semibold border-2 border-purple-300 cursor-not-allowed ';
       } else {
-        // Ne pas afficher les congés sur les week-ends
-        const hasLeave = leaves.some(leave => {
+        // Vérifier si un congé existe pour cette date
+        const leaveOnDate = leaves.find(leave => {
           const startStr = leave.date_debut.split('T')[0];
           const endStr = leave.date_fin.split('T')[0];
           return dateStr >= startStr && dateStr <= endStr;
         });
 
-        if (hasLeave) {
-          classes += 'bg-orange-100 text-orange-800 border-2 border-orange-300 ';
+        if (leaveOnDate) {
+          // Colorier selon le statut (sans bordure pour les mercredis)
+          if (leaveOnDate.statut === 'validee') {
+            // Les congés validés ne sont pas modifiables
+            classes += `bg-green-100 text-green-800 ${isWednesday ? '' : 'border-2 border-green-300'} font-semibold cursor-not-allowed `;
+          } else if (leaveOnDate.statut === 'en_attente') {
+            // Les congés en attente peuvent être modifiés (cliquables)
+            classes += `bg-orange-100 text-orange-800 ${isWednesday ? '' : 'border-2 border-orange-300'} font-semibold cursor-pointer hover:bg-orange-200 `;
+          } else {
+            // refusée ou autre statut
+            classes += 'bg-gray-100 text-gray-500 border-2 border-gray-300 cursor-not-allowed ';
+          }
         } else if (isInRange) {
           classes += 'bg-blue-100 text-blue-800 ';
         } else {
@@ -137,8 +178,8 @@ const LeaveCalendar = () => {
   };
 
   const handleDateClick = (date) => {
-    // Ne pas permettre de sélectionner des week-ends
-    if (isWeekend(date)) {
+    // Vérifier si la date est sélectionnable
+    if (!isDateSelectable(date)) {
       return;
     }
 
@@ -202,7 +243,7 @@ const LeaveCalendar = () => {
         setReason('');
         // Recharger les données
         fetchData();
-        alert(`Demande de congé envoyée avec succès! (${data.businessDays} jour(s) ouvrés)`);
+        alert(data.message || `Demande de congé envoyée avec succès! (${data.businessDays} jour(s) ouvrés)`);
       } else {
         console.error('Erreur API:', data);
         alert(data.message || 'Erreur lors de l\'envoi de la demande');
@@ -252,6 +293,36 @@ const LeaveCalendar = () => {
         </div>
       </div>
 
+      {/* Légende */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <p className="text-xs font-semibold text-gray-700 mb-2">Légende :</p>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded"></div>
+            <span className="text-gray-600">Validé</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-orange-100 border-2 border-orange-300 rounded"></div>
+            <span className="text-gray-600">En attente</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-purple-100 border-2 border-purple-300 rounded"></div>
+            <span className="text-gray-600">Jour férié</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-gray-100 rounded"></div>
+            <span className="text-gray-600">Week-end</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 rounded relative overflow-hidden border border-gray-300">
+              <div className="absolute inset-0 bg-white"></div>
+              <div className="absolute inset-0" style={{background: 'linear-gradient(to bottom, transparent 50%, #f3f4f6 50%)'}}></div>
+            </div>
+            <span className="text-gray-600">Mercredi (après-midi libre)</span>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-4">
         {/* En-têtes des jours */}
         <div className="grid grid-cols-7 mb-4">
@@ -267,15 +338,37 @@ const LeaveCalendar = () => {
 
         {/* Grille des jours */}
         <div className="grid grid-cols-7 gap-2">
-          {days.map((day, index) => (
-            <button
-              key={index}
-              onClick={() => handleDateClick(day.date)}
-              className={getDayClassName(day.date, day.isCurrentMonth)}
-            >
-              {day.date.getDate()}
-            </button>
-          ))}
+          {days.map((day, index) => {
+            const isWednesday = day.date.getDay() === 3 && day.isCurrentMonth && !isWeekend(day.date);
+            const dayClasses = getDayClassName(day.date, day.isCurrentMonth);
+
+            return (
+              <div key={index} className="relative">
+                <button
+                  onClick={() => handleDateClick(day.date)}
+                  disabled={!isDateSelectable(day.date) || !day.isCurrentMonth}
+                  className={`${dayClasses} ${isWednesday ? 'items-start pt-2' : ''}`}
+                  style={isWednesday ? (() => {
+                    const dateStr = formatDateToYYYYMMDD(day.date);
+                    const leaveOnDate = leaves.find(leave => {
+                      const startStr = leave.date_debut.split('T')[0];
+                      const endStr = leave.date_fin.split('T')[0];
+                      return dateStr >= startStr && dateStr <= endStr;
+                    });
+
+                    if (leaveOnDate?.statut === 'validee') {
+                      return { background: 'linear-gradient(to bottom, #dcfce7 50%, #f3f4f6 50%)' };
+                    } else if (leaveOnDate?.statut === 'en_attente') {
+                      return { background: 'linear-gradient(to bottom, #fed7aa 50%, #f3f4f6 50%)' };
+                    }
+                    return { background: 'linear-gradient(to bottom, transparent 50%, #f3f4f6 50%)' };
+                  })() : {}}
+                >
+                  {day.date.getDate()}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 

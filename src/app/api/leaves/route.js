@@ -191,7 +191,8 @@ export async function POST(request) {
       );
     }
 
-    const overlapResult = await db.execute({
+    // Vérifier les chevauchements avec d'autres demandes VALIDÉES uniquement
+    const validatedOverlapResult = await db.execute({
       sql: `
         SELECT COUNT(*) as count FROM demandes_conges
         WHERE user_id = ? AND statut = 'validee'
@@ -202,11 +203,36 @@ export async function POST(request) {
       args: [userId, date_fin, date_debut, date_debut, date_debut, date_debut, date_fin]
     });
 
-    if (overlapResult.rows[0].count > 0) {
+    if (validatedOverlapResult.rows[0].count > 0) {
       return NextResponse.json(
-        { success: false, message: 'Cette période chevauche une demande déjà validée' },
+        { success: false, message: 'Vous avez déjà une demande validée sur cette période. Vous ne pouvez pas la modifier.' },
         { status: 400 }
       );
+    }
+
+    // Supprimer automatiquement les demandes EN ATTENTE qui chevauchent
+    const pendingOverlapResult = await db.execute({
+      sql: `
+        SELECT id, date_debut, date_fin FROM demandes_conges
+        WHERE user_id = ? AND statut = 'en_attente'
+        AND ((date_debut <= ? AND date_fin >= ?)
+             OR (date_debut <= ? AND date_fin >= ?)
+             OR (date_debut >= ? AND date_fin <= ?))
+      `,
+      args: [userId, date_fin, date_debut, date_debut, date_debut, date_debut, date_fin]
+    });
+
+    // Supprimer les demandes en attente qui chevauchent
+    let deletedCount = 0;
+    if (pendingOverlapResult.rows && pendingOverlapResult.rows.length > 0) {
+      for (const pendingLeave of pendingOverlapResult.rows) {
+        await db.execute({
+          sql: 'DELETE FROM demandes_conges WHERE id = ?',
+          args: [pendingLeave.id]
+        });
+        deletedCount++;
+      }
+      console.log(`Supprimé ${deletedCount} demande(s) en attente qui chevauchaient`);
     }
 
     const result = await db.execute({
@@ -264,11 +290,17 @@ export async function POST(request) {
       // Ne pas bloquer la création de la demande si l'email échoue
     }
 
+    let successMessage = 'Demande de congés créée avec succès';
+    if (deletedCount > 0) {
+      successMessage += ` (${deletedCount} demande(s) en attente remplacée(s))`;
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Demande de congés créée avec succès',
+      message: successMessage,
       leaveId: Number(result.lastInsertRowid),
-      businessDays
+      businessDays,
+      replacedRequests: deletedCount
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating leave request:', error);

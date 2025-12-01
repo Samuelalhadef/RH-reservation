@@ -38,10 +38,24 @@ export const initDatabase = async () => {
         jours_pris REAL DEFAULT 0,
         jours_restants REAL DEFAULT 25,
         jours_reportes REAL DEFAULT 0,
+        jours_fractionnement REAL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(user_id, annee)
       )
     `);
+
+    // Migration: Ajouter la colonne jours_fractionnement si elle n'existe pas
+    try {
+      await db.execute(`
+        ALTER TABLE soldes_conges ADD COLUMN jours_fractionnement REAL DEFAULT 0
+      `);
+      console.log('✅ Column jours_fractionnement added to soldes_conges');
+    } catch (error) {
+      // La colonne existe déjà ou erreur, on ignore
+      if (!error.message.includes('duplicate column name')) {
+        console.log('ℹ️ Column jours_fractionnement already exists or table just created');
+      }
+    }
 
     // Table demandes_conges
     await db.execute(`
