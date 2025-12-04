@@ -21,10 +21,15 @@ export const initDatabase = async () => {
         prenom TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         mot_de_passe TEXT NOT NULL,
-        type_utilisateur TEXT NOT NULL CHECK(type_utilisateur IN ('Employé', 'DG', 'Service Technique', 'Alternant', 'RH')),
+        type_utilisateur TEXT NOT NULL,
         mot_de_passe_temporaire INTEGER DEFAULT 0,
         date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
-        actif INTEGER DEFAULT 1
+        actif INTEGER DEFAULT 1,
+        type_contrat TEXT,
+        date_debut_contrat DATE,
+        date_fin_contrat DATE,
+        service TEXT,
+        poste TEXT
       )
     `);
 
@@ -44,16 +49,26 @@ export const initDatabase = async () => {
       )
     `);
 
-    // Migration: Ajouter la colonne jours_fractionnement si elle n'existe pas
-    try {
-      await db.execute(`
-        ALTER TABLE soldes_conges ADD COLUMN jours_fractionnement REAL DEFAULT 0
-      `);
-      console.log('✅ Column jours_fractionnement added to soldes_conges');
-    } catch (error) {
-      // La colonne existe déjà ou erreur, on ignore
-      if (!error.message.includes('duplicate column name')) {
-        console.log('ℹ️ Column jours_fractionnement already exists or table just created');
+    // Migrations: Ajouter les colonnes manquantes si elles n'existent pas
+    const migrations = [
+      { table: 'soldes_conges', column: 'jours_fractionnement', type: 'REAL DEFAULT 0' },
+      { table: 'users', column: 'type_contrat', type: 'TEXT' },
+      { table: 'users', column: 'date_debut_contrat', type: 'DATE' },
+      { table: 'users', column: 'date_fin_contrat', type: 'DATE' },
+      { table: 'users', column: 'service', type: 'TEXT' },
+      { table: 'users', column: 'poste', type: 'TEXT' }
+    ];
+
+    for (const migration of migrations) {
+      try {
+        await db.execute(`
+          ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.type}
+        `);
+        console.log(`✅ Column ${migration.column} added to ${migration.table}`);
+      } catch (error) {
+        if (!error.message.includes('duplicate column')) {
+          console.log(`ℹ️  Column ${migration.column} already exists in ${migration.table}`);
+        }
       }
     }
 

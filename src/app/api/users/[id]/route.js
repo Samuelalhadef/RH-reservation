@@ -14,7 +14,7 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    const { nom, prenom, email, type_utilisateur, actif, type_contrat, date_debut_contrat, date_fin_contrat } = await request.json();
+    const { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat } = await request.json();
 
     if (!nom || !prenom || !email || !type_utilisateur) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function PUT(request, { params }) {
     await db.execute({
       sql: `
         UPDATE users
-        SET nom = ?, prenom = ?, email = ?, type_utilisateur = ?, actif = ?,
+        SET nom = ?, prenom = ?, email = ?, type_utilisateur = ?, service = ?, poste = ?, actif = ?,
             type_contrat = ?, date_debut_contrat = ?, date_fin_contrat = ?
         WHERE id = ?
       `,
@@ -62,6 +62,8 @@ export async function PUT(request, { params }) {
         prenom,
         email,
         type_utilisateur,
+        service || null,
+        poste || null,
         actif ? 1 : 0,
         type_contrat || 'CDI',
         date_debut_contrat || null,

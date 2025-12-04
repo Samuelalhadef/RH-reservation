@@ -35,9 +35,9 @@ RH-reservation/
 ├── .env.example           # Variables d'environnement exemple
 └── package.json           # Dépendances
 
-# Anciens dossiers (à supprimer)
-├── client/                # ❌ Ancien client React/Vite
-└── server/               # ❌ Ancien serveur Express
+# Ancien dossier (à garder pour l'API Express)
+└── server/               # ✅ Serveur Express pour l'API
+                          # Note: Le dossier client/ a été supprimé
 ```
 
 ## Installation et Configuration
@@ -161,15 +161,9 @@ Après avoir exécuté `npm run seed`:
 
 ## Migration des Anciens Dossiers
 
-Une fois que vous avez vérifié que tout fonctionne correctement:
+✅ **Migration terminée** : Le dossier `client/` a été supprimé car l'application React a été migrée vers Next.js.
 
-1. Vous pouvez supprimer les anciens dossiers:
-```bash
-rm -rf client/
-rm -rf server/
-```
-
-2. Nettoyez les fichiers de configuration obsolètes si nécessaires
+⚠️ **Note importante** : Le dossier `server/` est conservé car il contient l'API Express qui est toujours utilisée en parallèle de l'application Next.js.
 
 ## Notes de Sécurité
 

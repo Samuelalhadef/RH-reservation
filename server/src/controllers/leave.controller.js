@@ -17,7 +17,6 @@ import {
 export const getAllLeaves = async (req, res) => {
   try {
     const { userId, status, year } = req.query;
-    const currentYear = year || new Date().getFullYear();
 
     let sql = `
       SELECT dc.*, u.nom, u.prenom, u.email, u.type_utilisateur,
@@ -25,9 +24,15 @@ export const getAllLeaves = async (req, res) => {
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id
       LEFT JOIN users v ON dc.validateur_id = v.id
-      WHERE strftime('%Y', dc.date_debut) = ?
+      WHERE 1=1
     `;
-    const args = [currentYear.toString()];
+    const args = [];
+
+    // Filtrer par année seulement si spécifié
+    if (year) {
+      sql += ' AND strftime(\'%Y\', dc.date_debut) = ?';
+      args.push(year.toString());
+    }
 
     if (userId) {
       sql += ' AND dc.user_id = ?';
@@ -666,6 +671,94 @@ export const getDashboardStats = async (req, res) => {
       args: [currentYear.toString()]
     });
 
+    // Statistiques par trimestre
+    const quarterlyResult = await db.execute({
+      sql: `
+        SELECT
+          CASE
+            WHEN CAST(strftime('%m', date_debut) AS INTEGER) BETWEEN 1 AND 3 THEN 'T1'
+            WHEN CAST(strftime('%m', date_debut) AS INTEGER) BETWEEN 4 AND 6 THEN 'T2'
+            WHEN CAST(strftime('%m', date_debut) AS INTEGER) BETWEEN 7 AND 9 THEN 'T3'
+            ELSE 'T4'
+          END as trimestre,
+          COUNT(*) as total_demandes,
+          SUM(CASE WHEN statut = 'validee' THEN nombre_jours_ouvres ELSE 0 END) as jours_valides
+        FROM demandes_conges
+        WHERE strftime('%Y', date_debut) = ?
+        GROUP BY trimestre
+        ORDER BY
+          CASE trimestre
+            WHEN 'T1' THEN 1
+            WHEN 'T2' THEN 2
+            WHEN 'T3' THEN 3
+            ELSE 4
+          END
+      `,
+      args: [currentYear.toString()]
+    });
+
+    // Durée moyenne des congés par type d'utilisateur
+    const avgDurationResult = await db.execute({
+      sql: `
+        SELECT
+          u.type_utilisateur,
+          ROUND(AVG(dc.nombre_jours_ouvres), 2) as duree_moyenne,
+          COUNT(*) as nombre_demandes
+        FROM demandes_conges dc
+        JOIN users u ON dc.user_id = u.id
+        WHERE strftime('%Y', dc.date_debut) = ? AND dc.statut = 'validee'
+        GROUP BY u.type_utilisateur
+      `,
+      args: [currentYear.toString()]
+    });
+
+    // Délai moyen de validation (en jours)
+    const avgValidationTimeResult = await db.execute({
+      sql: `
+        SELECT
+          ROUND(AVG(julianday(date_validation) - julianday(date_demande)), 1) as delai_moyen_jours
+        FROM demandes_conges
+        WHERE strftime('%Y', date_debut) = ? AND statut != 'en_attente' AND date_validation IS NOT NULL
+      `,
+      args: [currentYear.toString()]
+    });
+
+    // Congés par jour de la semaine (début de congé)
+    const weekdayResult = await db.execute({
+      sql: `
+        SELECT
+          CASE CAST(strftime('%w', date_debut) AS INTEGER)
+            WHEN 0 THEN 'Dimanche'
+            WHEN 1 THEN 'Lundi'
+            WHEN 2 THEN 'Mardi'
+            WHEN 3 THEN 'Mercredi'
+            WHEN 4 THEN 'Jeudi'
+            WHEN 5 THEN 'Vendredi'
+            WHEN 6 THEN 'Samedi'
+          END as jour_semaine,
+          COUNT(*) as nombre_demandes
+        FROM demandes_conges
+        WHERE strftime('%Y', date_debut) = ? AND statut = 'validee'
+        GROUP BY CAST(strftime('%w', date_debut) AS INTEGER)
+        ORDER BY CAST(strftime('%w', date_debut) AS INTEGER)
+      `,
+      args: [currentYear.toString()]
+    });
+
+    // Taux d'utilisation des congés par utilisateur
+    const utilizationResult = await db.execute({
+      sql: `
+        SELECT
+          u.type_utilisateur,
+          ROUND(AVG(CAST(sc.jours_pris AS FLOAT) / sc.jours_acquis * 100), 1) as taux_utilisation
+        FROM soldes_conges sc
+        JOIN users u ON sc.user_id = u.id
+        WHERE sc.annee = ? AND sc.jours_acquis > 0 AND u.actif = 1
+        GROUP BY u.type_utilisateur
+      `,
+      args: [currentYear.toString()]
+    });
+
     res.json({
       success: true,
       stats: {
@@ -675,7 +768,12 @@ export const getDashboardStats = async (req, res) => {
         topUsers: topUsersResult.rows,
         balances: balancesResult.rows[0],
         balanceDistribution: balanceDistributionResult.rows,
-        approvalRate: approvalRateResult.rows
+        approvalRate: approvalRateResult.rows,
+        quarterly: quarterlyResult.rows,
+        avgDuration: avgDurationResult.rows,
+        avgValidationTime: avgValidationTimeResult.rows[0],
+        weekday: weekdayResult.rows,
+        utilization: utilizationResult.rows
       }
     });
   } catch (error) {

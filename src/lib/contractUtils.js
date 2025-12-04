@@ -60,6 +60,51 @@ export function calculateCDDLeaveBalance(dateDebut, dateFin, annee) {
 }
 
 /**
+ * Calcule le nombre total de jours de congés pour toute la durée d'un CDD
+ * (sans limitation à une année spécifique)
+ * Formule : 2.08 jours ouvrables par mois travaillé
+ * Maximum : 25 jours pour une année complète
+ *
+ * @param {string} dateDebut - Date de début du contrat
+ * @param {string} dateFin - Date de fin du contrat
+ * @returns {number} - Nombre de jours acquis sur toute la durée (arrondi à 2 décimales)
+ */
+export function calculateCDDTotalLeaveBalance(dateDebut, dateFin) {
+  if (!dateDebut || !dateFin) {
+    return 0;
+  }
+
+  const debut = new Date(dateDebut);
+  const fin = new Date(dateFin);
+
+  // Calculer le nombre de jours travaillés (inclure le premier et dernier jour)
+  const diffInMs = fin - debut + (1000 * 60 * 60 * 24); // +1 jour pour inclure le dernier jour
+  const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+
+  // Calculer les mois avec plus de précision
+  let monthsWorked;
+
+  // Si le contrat couvre une année complète ou plus (365 ou 366 jours), on donne 12 mois
+  if (diffInDays >= 365) {
+    monthsWorked = 12;
+  } else {
+    // Sinon, calcul basé sur le nombre de jours réels
+    monthsWorked = diffInDays / 30.44; // Moyenne de jours par mois
+  }
+
+  // 2.08 jours ouvrables par mois
+  let joursAcquis = monthsWorked * 2.08;
+
+  // Si on dépasse 25 jours ou si le contrat fait 12 mois ou plus, plafonner à 25
+  if (joursAcquis > 25 || monthsWorked >= 12) {
+    joursAcquis = 25;
+  }
+
+  // Arrondir à 2 décimales
+  return Math.round(joursAcquis * 100) / 100;
+}
+
+/**
  * Calcule le nombre total de jours acquis selon le type de contrat
  *
  * @param {string} typeContrat - 'CDI' ou 'CDD'

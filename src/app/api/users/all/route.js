@@ -16,7 +16,7 @@ export async function GET() {
 
     const result = await db.execute({
       sql: `
-        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.actif,
+        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.service, u.poste, u.actif,
                u.type_contrat, u.date_debut_contrat, u.date_fin_contrat,
                sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement
         FROM users u

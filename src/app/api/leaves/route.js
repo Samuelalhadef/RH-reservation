@@ -21,7 +21,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const status = searchParams.get('status');
-    const year = searchParams.get('year') || new Date().getFullYear();
+    const year = searchParams.get('year');
 
     let sql = `
       SELECT dc.*, u.nom, u.prenom, u.email, u.type_utilisateur,
@@ -29,9 +29,15 @@ export async function GET(request) {
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id
       LEFT JOIN users v ON dc.validateur_id = v.id
-      WHERE strftime('%Y', dc.date_debut) = ?
+      WHERE 1=1
     `;
-    const args = [year.toString()];
+    const args = [];
+
+    // Filtrer par année seulement si spécifié
+    if (year) {
+      sql += ' AND strftime(\'%Y\', dc.date_debut) = ?';
+      args.push(year.toString());
+    }
 
     if (userId) {
       sql += ' AND dc.user_id = ?';
@@ -261,27 +267,61 @@ export async function POST(request) {
     const userData = userResult.rows[0];
     console.log('User data:', userData);
 
-    // Essayer d'envoyer les emails aux RH, mais ne pas échouer si ça ne marche pas
+    // Envoyer notification au bon validateur selon la hiérarchie
     try {
-      const rhResult = await db.execute({
-        sql: 'SELECT email FROM users WHERE type_utilisateur = "RH" AND actif = 1'
+      // Récupérer les infos complètes de l'utilisateur (avec responsable_id)
+      const fullUserResult = await db.execute({
+        sql: 'SELECT responsable_id FROM users WHERE id = ?',
+        args: [userId]
       });
 
-      console.log('RH found:', rhResult.rows?.length || 0);
+      const hasResponsable = fullUserResult.rows[0]?.responsable_id;
 
-      if (rhResult.rows && rhResult.rows.length > 0) {
-        for (const rh of rhResult.rows) {
+      if (hasResponsable) {
+        // L'utilisateur a un responsable direct, lui envoyer la notification
+        const responsableResult = await db.execute({
+          sql: 'SELECT email, nom, prenom FROM users WHERE id = ?',
+          args: [hasResponsable]
+        });
+
+        console.log('Responsable found:', responsableResult.rows?.length || 0);
+
+        if (responsableResult.rows && responsableResult.rows.length > 0) {
+          const responsable = responsableResult.rows[0];
           try {
             await sendNewLeaveRequestEmail(
-              rh.email,
+              responsable.email,
               `${userData.prenom} ${userData.nom}`,
               formatDateFR(date_debut),
               formatDateFR(date_fin),
               businessDays
             );
+            console.log(`Email envoyé au responsable: ${responsable.prenom} ${responsable.nom}`);
           } catch (emailError) {
-            console.error('Error sending email to RH:', emailError);
-            // Ne pas bloquer la création de la demande si l'email échoue
+            console.error('Error sending email to responsable:', emailError);
+          }
+        }
+      } else {
+        // Pas de responsable direct, envoyer à la RH
+        const rhResult = await db.execute({
+          sql: 'SELECT email FROM users WHERE type_utilisateur = "RH" AND actif = 1'
+        });
+
+        console.log('RH found:', rhResult.rows?.length || 0);
+
+        if (rhResult.rows && rhResult.rows.length > 0) {
+          for (const rh of rhResult.rows) {
+            try {
+              await sendNewLeaveRequestEmail(
+                rh.email,
+                `${userData.prenom} ${userData.nom}`,
+                formatDateFR(date_debut),
+                formatDateFR(date_fin),
+                businessDays
+              );
+            } catch (emailError) {
+              console.error('Error sending email to RH:', emailError);
+            }
           }
         }
       }

@@ -1,19 +1,31 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireRH } from '@/lib/auth';
+import { verifyToken } from '@/lib/auth';
 import { formatDateFR } from '@/lib/dateUtils';
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from '@/lib/email';
+import { validateLeaveAtLevel } from '@/lib/hierarchy';
 
 export async function PUT(request, { params }) {
   try {
-    const { authorized, user } = await requireRH();
-    if (!authorized) {
+    // Vérification de l'authentification
+    const token = request.cookies.get('auth_token')?.value;
+
+    if (!token) {
       return NextResponse.json(
-        { success: false, message: 'Accès refusé' },
-        { status: 403 }
+        { success: false, message: 'Non authentifié' },
+        { status: 401 }
       );
     }
 
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json(
+        { success: false, message: 'Token invalide' },
+        { status: 401 }
+      );
+    }
+
+    const validatorId = decoded.userId;
     const { id } = await params;
     const { statut, commentaire_rh } = await request.json();
 
@@ -24,6 +36,7 @@ export async function PUT(request, { params }) {
       );
     }
 
+    // Récupérer la demande
     const leaveResult = await db.execute({
       sql: `
         SELECT dc.*, u.nom, u.prenom, u.email
@@ -50,48 +63,48 @@ export async function PUT(request, { params }) {
       );
     }
 
-    await db.execute({
-      sql: `
-        UPDATE demandes_conges
-        SET statut = ?, date_validation = CURRENT_TIMESTAMP, validateur_id = ?, commentaire_rh = ?
-        WHERE id = ?
-      `,
-      args: [statut, user.userId, commentaire_rh || null, id]
-    });
-
-    if (statut === 'validee') {
-      const currentYear = new Date(leave.date_debut).getFullYear();
-      await db.execute({
-        sql: `
-          UPDATE soldes_conges
-          SET jours_pris = jours_pris + ?,
-              jours_restants = jours_restants - ?
-          WHERE user_id = ? AND annee = ?
-        `,
-        args: [leave.nombre_jours_ouvres, leave.nombre_jours_ouvres, leave.user_id, currentYear]
-      });
-
-      await sendLeaveApprovedEmail(
-        leave.email,
-        `${leave.prenom} ${leave.nom}`,
-        formatDateFR(leave.date_debut),
-        formatDateFR(leave.date_fin),
-        leave.nombre_jours_ouvres
+    // Utiliser le système de validation hiérarchique
+    try {
+      const result = await validateLeaveAtLevel(
+        id,
+        validatorId,
+        statut,
+        commentaire_rh || ''
       );
-    } else {
-      await sendLeaveRejectedEmail(
-        leave.email,
-        `${leave.prenom} ${leave.nom}`,
-        formatDateFR(leave.date_debut),
-        formatDateFR(leave.date_fin),
-        commentaire_rh
+
+      // Envoyer les emails appropriés
+      if (result.isFinal) {
+        if (statut === 'validee') {
+          await sendLeaveApprovedEmail(
+            leave.email,
+            `${leave.prenom} ${leave.nom}`,
+            formatDateFR(leave.date_debut),
+            formatDateFR(leave.date_fin),
+            leave.nombre_jours_ouvres
+          );
+        } else {
+          await sendLeaveRejectedEmail(
+            leave.email,
+            `${leave.prenom} ${leave.nom}`,
+            formatDateFR(leave.date_debut),
+            formatDateFR(leave.date_fin),
+            commentaire_rh
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: result.message,
+        isFinal: result.isFinal,
+        nextLevel: result.nextLevel
+      });
+    } catch (validationError) {
+      return NextResponse.json(
+        { success: false, message: validationError.message },
+        { status: 403 }
       );
     }
-
-    return NextResponse.json({
-      success: true,
-      message: `Demande ${statut === 'validee' ? 'validée' : 'refusée'} avec succès`
-    });
   } catch (error) {
     console.error('Error updating leave status:', error);
     return NextResponse.json(

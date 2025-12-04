@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
+import AdvancedStatsRH from '@/components/AdvancedStatsRH';
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,8 @@ export default function RHPage() {
     prenom: '',
     email: '',
     type_utilisateur: 'Employé',
+    service: '',
+    poste: '',
     type_contrat: 'CDI',
     date_debut_contrat: '',
     date_fin_contrat: ''
@@ -41,6 +44,11 @@ export default function RHPage() {
   }, [activeTab, isAuthenticated, isRH, router]);
 
   const fetchData = async () => {
+    if (activeTab === 'stats') {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       if (activeTab === 'pending') {
@@ -141,7 +149,7 @@ export default function RHPage() {
 
       toast.success(`Utilisateur créé avec succès ! Mot de passe temporaire: ${data.tempPassword}`, { duration: 8000 });
       setShowCreateUserModal(false);
-      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
+      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -227,10 +235,10 @@ export default function RHPage() {
         </h1>
 
         <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b">
+          <div className="flex border-b overflow-x-auto">
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'pending'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -246,7 +254,7 @@ export default function RHPage() {
 
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'all'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -256,8 +264,19 @@ export default function RHPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              📊 Statistiques avancées
+            </button>
+
+            <button
               onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 font-medium ${
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'users'
                   ? 'border-b-2 border-primary-600 text-primary-600'
                   : 'text-gray-600 hover:text-gray-800'
@@ -267,6 +286,12 @@ export default function RHPage() {
             </button>
           </div>
         </div>
+
+        {activeTab === 'stats' && (
+          <div>
+            <AdvancedStatsRH />
+          </div>
+        )}
 
         {activeTab === 'pending' && (
           <div className="bg-white rounded-lg shadow p-6">
@@ -433,6 +458,8 @@ export default function RHPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrat</th>
@@ -445,6 +472,12 @@ export default function RHPage() {
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">
                           {user.prenom} {user.nom}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="font-medium text-gray-900">{user.poste || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="text-gray-600">{user.service || '-'}</span>
                         </td>
                         <td className="px-4 py-3 text-sm">{user.email}</td>
                         <td className="px-4 py-3 text-sm">{user.type_utilisateur}</td>
@@ -556,6 +589,32 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Service
+                </label>
+                <input
+                  type="text"
+                  value={newUser.service}
+                  onChange={(e) => setNewUser({ ...newUser, service: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: ADMIN. GÉNÉRALE, C.L.S.H., SERVICES TECH."
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Poste
+                </label>
+                <input
+                  type="text"
+                  value={newUser.poste}
+                  onChange={(e) => setNewUser({ ...newUser, poste: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Resp. RH, Agent technique, DGS"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type d'utilisateur *
                 </label>
                 <select
@@ -564,9 +623,15 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Employé">Employé</option>
+                  <option value="Direction">Direction</option>
                   <option value="RH">RH</option>
-                  <option value="DG">DG</option>
+                  <option value="Responsable">Responsable</option>
+                  <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
+                  <option value="Animateur">Animateur</option>
+                  <option value="ATSEM/Animation">ATSEM/Animation</option>
+                  <option value="Police Municipale">Police Municipale</option>
+                  <option value="Entretien">Entretien</option>
                   <option value="Alternant">Alternant</option>
                 </select>
               </div>
@@ -620,7 +685,7 @@ export default function RHPage() {
                   type="button"
                   onClick={() => {
                     setShowCreateUserModal(false);
-                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
+                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
@@ -688,6 +753,32 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Service
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.service || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, service: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: ADMIN. GÉNÉRALE, C.L.S.H., SERVICES TECH."
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Poste
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.poste || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, poste: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Resp. RH, Agent technique, DGS"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type d'utilisateur *
                 </label>
                 <select
@@ -696,9 +787,15 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Employé">Employé</option>
+                  <option value="Direction">Direction</option>
                   <option value="RH">RH</option>
-                  <option value="DG">DG</option>
+                  <option value="Responsable">Responsable</option>
+                  <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
+                  <option value="Animateur">Animateur</option>
+                  <option value="ATSEM/Animation">ATSEM/Animation</option>
+                  <option value="Police Municipale">Police Municipale</option>
+                  <option value="Entretien">Entretien</option>
                   <option value="Alternant">Alternant</option>
                 </select>
               </div>

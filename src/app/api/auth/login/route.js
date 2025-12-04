@@ -40,7 +40,7 @@ export async function POST(request) {
     const token = generateToken(user.id, user.type_utilisateur);
 
     const cookieStore = await cookies();
-    cookieStore.set('token', token, {
+    cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -56,6 +56,7 @@ export async function POST(request) {
         prenom: user.prenom,
         email: user.email,
         type: user.type_utilisateur,
+        niveau_validation: user.niveau_validation || 0,
         requirePasswordChange: user.mot_de_passe_temporaire === 1
       }
     });

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Statistiques Avancées</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            text-align: center;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .success {
+            color: #16a34a;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Test des Statistiques Avancées RH</h1>
+        <p style="text-align: center; color: #666;">Cliquez sur le bouton pour charger les statistiques</p>
+
+        <button onclick="fetchStats()">Charger les statistiques</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p style="text-align: center;">Chargement...</p>';
+
+            try {
+                const response = await fetch('http://localhost:3001/api/leaves/dashboard-stats?year=2025', {
+                    headers: {
+                        'Authorization': 'Bearer YOUR_TOKEN_HERE' // Remplacez par votre token
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                let html = '<h2 class="success">✅ Statistiques chargées avec succès !</h2>';
+
+                // Statistiques globales
+                html += '<h3>📈 Statistiques Globales</h3>';
+                html += '<pre>' + JSON.stringify(data.stats.global, null, 2) + '</pre>';
+
+                // Statistiques trimestrielles
+                if (data.stats.quarterly && data.stats.quarterly.length > 0) {
+                    html += '<h3>📊 Par Trimestre</h3>';
+                    html += '<pre>' + JSON.stringify(data.stats.quarterly, null, 2) + '</pre>';
+                }
+
+                // Durée moyenne
+                if (data.stats.avgDuration && data.stats.avgDuration.length > 0) {
+                    html += '<h3>⏳ Durée Moyenne</h3>';
+                    html += '<pre>' + JSON.stringify(data.stats.avgDuration, null, 2) + '</pre>';
+                }
+
+                // Délai de validation
+                if (data.stats.avgValidationTime) {
+                    html += '<h3>⏱️ Délai Moyen de Validation</h3>';
+                    html += '<pre>' + JSON.stringify(data.stats.avgValidationTime, null, 2) + '</pre>';
+                }
+
+                // Jours de la semaine
+                if (data.stats.weekday && data.stats.weekday.length > 0) {
+                    html += '<h3>📆 Jours de Départ</h3>';
+                    html += '<pre>' + JSON.stringify(data.stats.weekday, null, 2) + '</pre>';
+                }
+
+                // Taux d'utilisation
+                if (data.stats.utilization && data.stats.utilization.length > 0) {
+                    html += '<h3>🎯 Taux d\'Utilisation</h3>';
+                    html += '<pre>' + JSON.stringify(data.stats.utilization, null, 2) + '</pre>';
+                }
+
+                resultDiv.innerHTML = html;
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h2 class="error">❌ Erreur lors du chargement</h2>
+                    <pre>${error.message}</pre>
+                    <p><strong>Note:</strong> Vous devez être connecté en tant que RH pour accéder à ces statistiques.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

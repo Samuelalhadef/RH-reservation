@@ -18,8 +18,13 @@ const Navbar = () => {
     { label: 'Calendrier équipe', path: '/calendrier' },
   ];
 
+  // Ajouter l'item de validation pour les responsables et la RH
+  if (user && (user.niveau_validation > 0 || isRH())) {
+    navItems.splice(2, 0, { label: 'Validation', path: '/validation' });
+  }
+
   if (isRH()) {
-    navItems.splice(2, 0, { label: 'Interface RH', path: '/rh' });
+    navItems.push({ label: 'Interface RH', path: '/rh' });
   }
 
   return (

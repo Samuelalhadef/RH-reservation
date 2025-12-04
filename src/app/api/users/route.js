@@ -22,7 +22,7 @@ export async function POST(request) {
     const body = await request.json();
     console.log('Request body:', body);
 
-    const { nom, prenom, email, type_utilisateur, type_contrat, date_debut_contrat, date_fin_contrat } = body;
+    const { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat } = body;
 
     if (!nom || !prenom || !email || !type_utilisateur) {
       return NextResponse.json(
@@ -59,10 +59,10 @@ export async function POST(request) {
     console.log('Creating user in database...');
     const result = await db.execute({
       sql: `
-        INSERT INTO users (nom, prenom, email, mot_de_passe, type_utilisateur, mot_de_passe_temporaire, type_contrat, date_debut_contrat, date_fin_contrat)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+        INSERT INTO users (nom, prenom, email, mot_de_passe, type_utilisateur, service, poste, mot_de_passe_temporaire, type_contrat, date_debut_contrat, date_fin_contrat)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
       `,
-      args: [nom, prenom, email, hashedPassword, type_utilisateur, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null]
+      args: [nom, prenom, email, hashedPassword, type_utilisateur, service || null, poste || null, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null]
     });
 
     const userId = Number(result.lastInsertRowid);

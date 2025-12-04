@@ -21,7 +21,11 @@
       "Bash(node src/utils/seed.js:*)",
       "Bash(node src/utils/import-users.js:*)",
       "Bash(node:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(turso db:*)",
+      "Bash(where:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []
