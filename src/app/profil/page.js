@@ -159,13 +159,13 @@ export default function ProfilPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="container mx-auto px-6 py-6">
+      <div className="container mx-auto px-4 sm:px-6 py-6 overflow-x-hidden">
         {/* Header avec photo */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center gap-6">
-            <div className="relative group">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="relative group flex-shrink-0">
               <div
-                className="w-24 h-24 rounded-full flex items-center justify-center overflow-hidden cursor-pointer border-4 border-white shadow-lg"
+                className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center overflow-hidden cursor-pointer border-4 border-white shadow-lg"
                 style={{
                   background: profileImage ? 'transparent' : 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)'
                 }}
@@ -202,7 +202,7 @@ export default function ProfilPage() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">{user?.prenom} {user?.nom}</h1>
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-800">{user?.prenom} {user?.nom}</h1>
               <p className="text-gray-500">{profile?.type_utilisateur}</p>
               {profile?.service && <p className="text-sm text-gray-400">{profile.service}</p>}
             </div>
@@ -211,18 +211,18 @@ export default function ProfilPage() {
 
         {/* Onglets */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="flex border-b border-gray-200">
+          <div className="flex overflow-x-auto border-b border-gray-200 -mb-px">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium transition whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600 -mb-px'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                 </svg>
                 {tab.label}
@@ -417,16 +417,16 @@ export default function ProfilPage() {
                 </ul>
 
                 <h4 className="text-lg font-semibold text-gray-800 mt-6 mb-3">Avantages</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div className="p-4 bg-indigo-50 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
+                  <div className="p-3 sm:p-4 bg-indigo-50 rounded-lg">
                     <div className="font-semibold text-indigo-800 mb-1">Flexibilité</div>
                     <p className="text-sm text-indigo-700">Utilisez vos jours quand vous le souhaitez</p>
                   </div>
-                  <div className="p-4 bg-indigo-50 rounded-lg">
+                  <div className="p-3 sm:p-4 bg-indigo-50 rounded-lg">
                     <div className="font-semibold text-indigo-800 mb-1">Sécurité</div>
                     <p className="text-sm text-indigo-700">Vos jours ne sont jamais perdus</p>
                   </div>
-                  <div className="p-4 bg-indigo-50 rounded-lg">
+                  <div className="p-3 sm:p-4 bg-indigo-50 rounded-lg">
                     <div className="font-semibold text-indigo-800 mb-1">Projets</div>
                     <p className="text-sm text-indigo-700">Planifiez des congés plus longs</p>
                   </div>
@@ -451,11 +451,11 @@ export default function ProfilPage() {
                 </p>
 
                 <h4 className="text-lg font-semibold text-gray-800 mt-6 mb-3">Comment les obtenir ?</h4>
-                <div className="bg-green-50 rounded-xl p-4 mb-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-green-50 rounded-xl p-3 sm:p-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-                        <span className="text-2xl font-bold text-green-700">1</span>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-green-200 rounded-full flex items-center justify-center">
+                        <span className="text-xl sm:text-2xl font-bold text-green-700">1</span>
                       </div>
                       <div>
                         <p className="font-semibold text-green-800">+1 jour</p>
@@ -463,8 +463,8 @@ export default function ProfilPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-                        <span className="text-2xl font-bold text-green-700">2</span>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-green-200 rounded-full flex items-center justify-center">
+                        <span className="text-xl sm:text-2xl font-bold text-green-700">2</span>
                       </div>
                       <div>
                         <p className="font-semibold text-green-800">+2 jours</p>
@@ -475,15 +475,15 @@ export default function ProfilPage() {
                 </div>
 
                 <h4 className="text-lg font-semibold text-gray-800 mt-6 mb-3">Période principale vs Fractionnement</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-orange-50 rounded-lg border-2 border-orange-200">
-                    <div className="font-semibold text-orange-800 mb-2">Période principale</div>
-                    <p className="text-sm text-orange-700 mb-2">Du 1er mai au 31 octobre</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="p-3 sm:p-4 bg-orange-50 rounded-lg border-2 border-orange-200">
+                    <div className="font-semibold text-orange-800 mb-1 sm:mb-2">Période principale</div>
+                    <p className="text-sm text-orange-700 mb-1">Du 1er mai au 31 octobre</p>
                     <p className="text-xs text-orange-600">Période estivale classique pour les congés</p>
                   </div>
-                  <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-                    <div className="font-semibold text-blue-800 mb-2">Période de fractionnement</div>
-                    <p className="text-sm text-blue-700 mb-2">Du 1er novembre au 30 avril</p>
+                  <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                    <div className="font-semibold text-blue-800 mb-1 sm:mb-2">Période de fractionnement</div>
+                    <p className="text-sm text-blue-700 mb-1">Du 1er novembre au 30 avril</p>
                     <p className="text-xs text-blue-600">Congés pris ici donnent droit à des jours bonus</p>
                   </div>
                 </div>
@@ -515,10 +515,10 @@ export default function ProfilPage() {
                 <h3 className="text-xl font-bold text-gray-800">Règles de demande de congés</h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="font-semibold text-gray-800">Délai de demande</span>
@@ -526,9 +526,9 @@ export default function ProfilPage() {
                   <p className="text-sm text-gray-600">Les demandes doivent être faites au moins 7 jours à l'avance</p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     <span className="font-semibold text-gray-800">Circuit de validation</span>
@@ -536,9 +536,9 @@ export default function ProfilPage() {
                   <p className="text-sm text-gray-600">Votre demande passe par votre responsable puis la RH</p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span className="font-semibold text-gray-800">Jours ouvrés</span>
@@ -546,9 +546,9 @@ export default function ProfilPage() {
                   <p className="text-sm text-gray-600">Seuls les jours ouvrés sont décomptés (hors weekends et fériés)</p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>

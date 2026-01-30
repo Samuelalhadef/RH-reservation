@@ -77,8 +77,8 @@ export default function ValidationPage() {
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">
-            Validation des demandes de congés
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">
+            Validation des demandes
           </h1>
           <p className="text-gray-600 mt-2">
             {validatorInfo?.isRH
@@ -254,19 +254,19 @@ export default function ValidationPage() {
       {selectedLeave && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">
                 Demande de congés
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Employé</label>
-                  <p className="text-lg font-semibold">{selectedLeave.prenom} {selectedLeave.nom}</p>
+                  <p className="text-base sm:text-lg font-semibold">{selectedLeave.prenom} {selectedLeave.nom}</p>
                   <p className="text-sm text-gray-500">{selectedLeave.type_utilisateur}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Date de début</label>
                     <p className="font-semibold">{formatDateFR(selectedLeave.date_debut)}</p>
@@ -290,7 +290,7 @@ export default function ValidationPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nombre de jours</label>
-                  <p className="text-2xl font-bold text-blue-600">{selectedLeave.nombre_jours_ouvres}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{selectedLeave.nombre_jours_ouvres}</p>
                 </div>
 
                 {selectedLeave.motif && (

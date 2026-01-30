@@ -157,7 +157,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isStartDate = startDate && date.getTime() === startDate.getTime();
     const isEndDate = endDate && date.getTime() === endDate.getTime();
 
-    let classes = 'w-full aspect-square flex items-center justify-center rounded-xl cursor-pointer transition-all font-medium text-lg ';
+    let classes = 'w-full aspect-square flex items-center justify-center rounded-lg sm:rounded-xl cursor-pointer transition-all font-medium text-sm sm:text-lg ';
 
     // Vérifier si un congé existe pour cette date (pour toutes les dates du mois en cours)
     const leaveOnDate = isCurrentMonth ? leaves.find(leave => {
@@ -311,7 +311,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
   const currentMonthName = monthNames[currentMonth.getMonth()];
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Jours de congés {currentYear}</h2>
@@ -374,7 +374,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         </div>
 
         {/* Grille des jours */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {days.map((day, index) => {
             const dayClasses = getDayClassName(day.date, day.isCurrentMonth);
 
@@ -395,8 +395,8 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
       {/* Boutons Annuler et Continuer */}
       {startDate && endDate && (
-        <div className="mt-4 flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex-1">
+        <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex-1 mb-1 sm:mb-0">
             <p className="text-sm font-semibold text-gray-800">
               Du {formatDateFR(startDate)} au {formatDateFR(endDate)}
             </p>
@@ -404,18 +404,20 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
               {Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1} jour(s)
             </p>
           </div>
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleContinue}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
-          >
-            Continuer
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              className="flex-1 sm:flex-none px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleContinue}
+              className="flex-1 sm:flex-none px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
+            >
+              Continuer
+            </button>
+          </div>
         </div>
       )}
 
@@ -450,18 +452,18 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
               />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                className="flex-1 px-3 py-2 text-sm sm:text-base bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
               >
                 Annuler
               </button>
               <button
                 onClick={handleSubmitRequest}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
+                className="flex-1 px-3 py-2 text-sm sm:text-base bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium"
               >
-                Envoyer la demande
+                Envoyer
               </button>
             </div>
           </div>
