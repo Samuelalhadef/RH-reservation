@@ -119,7 +119,44 @@ export default function ValidationPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <>
+          {/* Vue mobile : cartes */}
+          <div className="md:hidden space-y-3">
+            {pendingLeaves.map((leave) => (
+              <div key={leave.id} className="bg-white rounded-lg shadow p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">{leave.prenom} {leave.nom}</p>
+                    <p className="text-xs text-gray-500">{leave.type_utilisateur}</p>
+                  </div>
+                  {leave.validation_info?.isFinal ? (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded">
+                      Finale
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
+                      Niv. {leave.validation_info?.level}
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-gray-700 mb-1">
+                  {formatDateFR(leave.date_debut)} - {formatDateFR(leave.date_fin)}
+                </div>
+                <div className="flex justify-between items-center mt-3">
+                  <span className="text-sm font-semibold text-gray-800">{leave.nombre_jours_ouvres} jour{leave.nombre_jours_ouvres > 1 ? 's' : ''}</span>
+                  <button
+                    onClick={() => setSelectedLeave(leave)}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+                  >
+                    Examiner
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Vue desktop : tableau */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -209,6 +246,7 @@ export default function ValidationPage() {
               </table>
             </div>
           </div>
+          </>
         )}
       </div>
 
@@ -298,25 +336,25 @@ export default function ValidationPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-2 sm:gap-3 mt-6">
                 <button
                   onClick={() => {
                     setSelectedLeave(null);
                     setCommentaire('');
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                  className="flex-1 px-3 py-2 text-sm sm:text-base bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={() => handleValidate(selectedLeave.id, 'refusee')}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                  className="flex-1 px-3 py-2 text-sm sm:text-base bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
                 >
                   Refuser
                 </button>
                 <button
                   onClick={() => handleValidate(selectedLeave.id, 'validee')}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+                  className="flex-1 px-3 py-2 text-sm sm:text-base bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
                 >
                   Valider
                 </button>

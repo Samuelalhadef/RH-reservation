@@ -383,105 +383,146 @@ export default function MesDemandesPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date de demande
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Période
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Durée
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Motif
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Circuit de validation
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statut
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredLeaves.map((leave) => (
-                    <tr key={leave.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDateFR(leave.date_demande)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatDateFR(leave.date_debut)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          au {formatDateFR(leave.date_fin)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">
+            <>
+              {/* Vue mobile : cartes */}
+              <div className="md:hidden divide-y divide-gray-200">
+                {filteredLeaves.map((leave) => (
+                  <div key={leave.id} className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatDateFR(leave.date_debut)} — {formatDateFR(leave.date_fin)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
                           {leave.nombre_jours_ouvres} jour{leave.nombre_jours_ouvres > 1 ? 's' : ''}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs">
-                          {leave.motif || <span className="text-gray-400 italic">Non précisé</span>}
-                        </div>
-                        {leave.commentaire_rh && (
-                          <div className="text-xs text-gray-500 mt-1 p-2 bg-yellow-50 rounded border border-yellow-200">
-                            <span className="font-semibold">Commentaire RH:</span> {leave.commentaire_rh}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <ValidationCircuit leave={leave} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(leave.statut)}`}>
-                          {formatStatus(leave.statut)}
-                        </span>
-                        {leave.statut === 'en_attente' ? (
-                          <div className="text-xs text-gray-500 mt-1">
-                            En attente de validation
-                          </div>
-                        ) : (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {leave.validateur_nom && (
-                              <span>Par {leave.validateur_prenom} {leave.validateur_nom}</span>
-                            )}
-                            {leave.date_validation && (
-                              <span className="block">Le {formatDateFR(leave.date_validation)}</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {leave.statut === 'en_attente' && new Date(leave.date_debut) >= new Date(new Date().setHours(0,0,0,0)) ? (
-                          <button
-                            onClick={() => handleDeleteLeave(leave.id, leave.date_debut)}
-                            className="text-red-600 hover:text-red-800 font-medium transition flex items-center gap-1"
-                            title="Supprimer la demande"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Supprimer
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 italic">-</span>
-                        )}
-                      </td>
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(leave.statut)}`}>
+                        {formatStatus(leave.statut)}
+                      </span>
+                    </div>
+                    {leave.motif && (
+                      <p className="text-xs text-gray-600 mb-2">{leave.motif}</p>
+                    )}
+                    <div className="flex justify-between items-center">
+                      <ValidationCircuit leave={leave} />
+                      {leave.statut === 'en_attente' && new Date(leave.date_debut) >= new Date(new Date().setHours(0,0,0,0)) && (
+                        <button
+                          onClick={() => handleDeleteLeave(leave.id, leave.date_debut)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Supprimer"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vue desktop : tableau */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date de demande
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Période
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durée
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Motif
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Circuit de validation
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredLeaves.map((leave) => (
+                      <tr key={leave.id} className="hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateFR(leave.date_demande)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatDateFR(leave.date_debut)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            au {formatDateFR(leave.date_fin)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {leave.nombre_jours_ouvres} jour{leave.nombre_jours_ouvres > 1 ? 's' : ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 max-w-xs">
+                            {leave.motif || <span className="text-gray-400 italic">Non précisé</span>}
+                          </div>
+                          {leave.commentaire_rh && (
+                            <div className="text-xs text-gray-500 mt-1 p-2 bg-yellow-50 rounded border border-yellow-200">
+                              <span className="font-semibold">Commentaire RH:</span> {leave.commentaire_rh}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <ValidationCircuit leave={leave} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(leave.statut)}`}>
+                            {formatStatus(leave.statut)}
+                          </span>
+                          {leave.statut === 'en_attente' ? (
+                            <div className="text-xs text-gray-500 mt-1">
+                              En attente de validation
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {leave.validateur_nom && (
+                                <span>Par {leave.validateur_prenom} {leave.validateur_nom}</span>
+                              )}
+                              {leave.date_validation && (
+                                <span className="block">Le {formatDateFR(leave.date_validation)}</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {leave.statut === 'en_attente' && new Date(leave.date_debut) >= new Date(new Date().setHours(0,0,0,0)) ? (
+                            <button
+                              onClick={() => handleDeleteLeave(leave.id, leave.date_debut)}
+                              className="text-red-600 hover:text-red-800 font-medium transition flex items-center gap-1"
+                              title="Supprimer la demande"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Supprimer
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 italic">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
