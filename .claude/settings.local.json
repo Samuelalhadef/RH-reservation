@@ -29,7 +29,9 @@
       "Bash(npm cache clean:*)",
       "Bash(identify:*)",
       "Bash(sips:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm info:*)",
+      "Bash(npm view:*)"
     ],
     "deny": [],
     "ask": []
