@@ -8,11 +8,24 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata = {
   title: 'Mon Portail Agent - Chartrettes',
   description: 'Portail agent pour la gestion des congés - Mairie de Chartrettes',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Portail Agent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="fr">
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <meta name="theme-color" content="#0ea5e9" />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
           {children}

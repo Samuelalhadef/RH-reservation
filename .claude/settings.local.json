@@ -26,7 +26,10 @@
       "Bash(turso db:*)",
       "Bash(where:*)",
       "Bash(del:*)",
-      "Bash(npm cache clean:*)"
+      "Bash(npm cache clean:*)",
+      "Bash(identify:*)",
+      "Bash(sips:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

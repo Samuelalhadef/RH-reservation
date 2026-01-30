@@ -1,14 +1,27 @@
 import { createClient } from '@libsql/client';
-import dotenv from 'dotenv';
 
-// Load environment variables if not in Next.js context
-if (!process.env.TURSO_DATABASE_URL) {
-  dotenv.config({ path: '.env.local' });
+let _db = null;
+
+export function getDb() {
+  if (!_db) {
+    _db = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+  }
+  return _db;
 }
 
-export const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+// Backward-compatible named export using lazy proxy
+export const db = new Proxy({}, {
+  get(_, prop) {
+    const client = getDb();
+    const value = client[prop];
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  }
 });
 
 export const initDatabase = async () => {
