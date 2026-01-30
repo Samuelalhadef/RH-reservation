@@ -60,7 +60,7 @@ export function exportToPDF(users, year) {
 
   // En-tête
   doc.setFontSize(18);
-  doc.text('Mairie de Chartrettes', 14, 15);
+  doc.text('Mon Portail Agent - Chartrettes', 14, 15);
   doc.setFontSize(14);
   doc.text(`Récapitulatif des Congés - Année ${year}`, 14, 25);
   doc.setFontSize(10);
@@ -158,7 +158,7 @@ export function exportUserLeavesToPDF(user, leaves, year) {
 
   // En-tête
   doc.setFontSize(18);
-  doc.text('Mairie de Chartrettes', 14, 15);
+  doc.text('Mon Portail Agent - Chartrettes', 14, 15);
   doc.setFontSize(14);
   doc.text(`Fiche de Congés ${year}`, 14, 25);
 

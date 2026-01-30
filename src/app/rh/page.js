@@ -11,13 +11,10 @@ import toast from 'react-hot-toast';
 export default function RHPage() {
   const { isRH, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('pending');
-  const [pendingLeaves, setPendingLeaves] = useState([]);
+  const [activeTab, setActiveTab] = useState('all');
   const [allLeaves, setAllLeaves] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLeave, setSelectedLeave] = useState(null);
-  const [commentaire, setCommentaire] = useState('');
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [newUser, setNewUser] = useState({
     nom: '',
@@ -32,6 +29,14 @@ export default function RHPage() {
   });
   const [editingUser, setEditingUser] = useState(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [rhLeaveForm, setRhLeaveForm] = useState({
+    user_id: '',
+    date_debut: '',
+    date_fin: '',
+    motif: ''
+  });
+  const [rhLeaveLoading, setRhLeaveLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -51,11 +56,7 @@ export default function RHPage() {
 
     setLoading(true);
     try {
-      if (activeTab === 'pending') {
-        const response = await fetch('/api/leaves?status=en_attente');
-        const data = await response.json();
-        setPendingLeaves(data.leaves || []);
-      } else if (activeTab === 'all') {
+      if (activeTab === 'all') {
         const response = await fetch('/api/leaves');
         const data = await response.json();
         setAllLeaves(data.leaves || []);
@@ -64,39 +65,19 @@ export default function RHPage() {
         const data = await response.json();
         console.log('Users data:', data);
         setUsers(data.users || []);
+      } else if (activeTab === 'create-leave') {
+        const response = await fetch('/api/users/all');
+        const data = await response.json();
+        setAllUsers(data.users || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erreur lors du chargement des données');
-      // Initialiser avec des tableaux vides en cas d'erreur
-      if (activeTab === 'pending') setPendingLeaves([]);
       if (activeTab === 'all') setAllLeaves([]);
       if (activeTab === 'users') setUsers([]);
+      if (activeTab === 'create-leave') setAllUsers([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleValidate = async (leaveId, status) => {
-    try {
-      const response = await fetch(`/api/leaves/${leaveId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: status, commentaire_rh: commentaire }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
-
-      toast.success(`Demande ${status === 'validee' ? 'validée' : 'refusée'} avec succès`);
-      setSelectedLeave(null);
-      setCommentaire('');
-      fetchData();
-    } catch (error) {
-      toast.error(error.message);
     }
   };
 
@@ -237,22 +218,6 @@ export default function RHPage() {
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="flex border-b overflow-x-auto">
             <button
-              onClick={() => setActiveTab('pending')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'pending'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Demandes en attente
-              {pendingLeaves.length > 0 && (
-                <span className="ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs">
-                  {pendingLeaves.length}
-                </span>
-              )}
-            </button>
-
-            <button
               onClick={() => setActiveTab('all')}
               className={`px-6 py-3 font-medium whitespace-nowrap ${
                 activeTab === 'all'
@@ -284,6 +249,17 @@ export default function RHPage() {
             >
               Gestion des utilisateurs
             </button>
+
+            <button
+              onClick={() => setActiveTab('create-leave')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'create-leave'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Créer un congé
+            </button>
           </div>
         </div>
 
@@ -293,99 +269,34 @@ export default function RHPage() {
           </div>
         )}
 
-        {activeTab === 'pending' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Demandes en attente de validation
-            </h2>
-
-            {pendingLeaves.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
-                Aucune demande en attente
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {pendingLeaves.map((leave) => (
-                  <div
-                    key={leave.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="font-semibold text-lg text-gray-800">
-                          {leave.prenom} {leave.nom}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {leave.type_utilisateur} • {leave.email}
-                        </p>
-                      </div>
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                        En attente
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <p className="text-xs text-gray-500">Période</p>
-                        <p className="font-medium">
-                          {formatDateFR(leave.date_debut)} - {formatDateFR(leave.date_fin)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Jours ouvrés</p>
-                        <p className="font-medium">{leave.nombre_jours_ouvres}</p>
-                      </div>
-                    </div>
-
-                    {leave.motif && (
-                      <div className="mb-3">
-                        <p className="text-xs text-gray-500">Motif</p>
-                        <p className="text-sm">{leave.motif}</p>
-                      </div>
-                    )}
-
-                    <div className="mb-3">
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Commentaire RH (optionnel)
-                      </label>
-                      <textarea
-                        value={selectedLeave === leave.id ? commentaire : ''}
-                        onChange={(e) => {
-                          setSelectedLeave(leave.id);
-                          setCommentaire(e.target.value);
-                        }}
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                        placeholder="Ajouter un commentaire..."
-                      />
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleValidate(leave.id, 'validee')}
-                        className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 transition font-medium"
-                      >
-                        ✓ Valider
-                      </button>
-                      <button
-                        onClick={() => handleValidate(leave.id, 'refusee')}
-                        className="flex-1 bg-red-600 text-white py-2 rounded hover:bg-red-700 transition font-medium"
-                      >
-                        ✗ Refuser
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'all' && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Toutes les demandes
+              Toutes les demandes - Suivi de validation
             </h2>
+
+            {/* Légende */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-700 mb-2">Légende du circuit de validation :</p>
+              <div className="flex flex-wrap gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                  <span className="text-gray-600">En attente</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                  <span className="text-gray-600">Bloqué ici</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-600">Validé</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-gray-600">Refusé</span>
+                </div>
+              </div>
+            </div>
 
             {allLeaves.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
@@ -399,31 +310,143 @@ export default function RHPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employé</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Période</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jours</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Circuit de validation</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut final</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date demande</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {allLeaves.map((leave) => (
-                      <tr key={leave.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{leave.prenom} {leave.nom}</p>
-                          <p className="text-xs text-gray-500">{leave.type_utilisateur}</p>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {formatDateFR(leave.date_debut)} - {formatDateFR(leave.date_fin)}
-                        </td>
-                        <td className="px-4 py-3">{leave.nombre_jours_ouvres}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(leave.statut)}`}>
-                            {formatStatus(leave.statut)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {formatDateFR(leave.date_demande)}
-                        </td>
-                      </tr>
-                    ))}
+                    {allLeaves.map((leave) => {
+                      // Déterminer où en est la validation
+                      const hasN1 = leave.responsable_id != null;
+                      const hasN2 = leave.responsable_n2_nom != null;
+
+                      const n1Validated = leave.statut_niveau_1 === 'validee';
+                      const n2Validated = leave.statut_niveau_2 === 'validee';
+                      const isFinalValidated = leave.statut === 'validee';
+                      const isRefused = leave.statut === 'refusee';
+
+                      // Où est-ce que ça bloque ?
+                      let blockingAt = null;
+                      if (!isRefused && !isFinalValidated) {
+                        if (hasN1 && !n1Validated) {
+                          blockingAt = 'n1';
+                        } else if (hasN2 && !n2Validated) {
+                          blockingAt = 'n2';
+                        } else {
+                          blockingAt = 'rh';
+                        }
+                      }
+
+                      return (
+                        <tr key={leave.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{leave.prenom} {leave.nom}</p>
+                            <p className="text-xs text-gray-500">{leave.type_utilisateur}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {formatDateFR(leave.date_debut)} - {formatDateFR(leave.date_fin)}
+                          </td>
+                          <td className="px-4 py-3">{leave.nombre_jours_ouvres}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {/* Niveau 1 - Responsable direct */}
+                              {hasN1 && (
+                                <div className="flex flex-col items-center">
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                      isRefused && !n1Validated ? 'bg-red-500' :
+                                      n1Validated ? 'bg-green-500' :
+                                      blockingAt === 'n1' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
+                                    }`}
+                                    title={`N1: ${leave.responsable_prenom} ${leave.responsable_nom}`}
+                                  >
+                                    N1
+                                  </div>
+                                  <span className="text-xs text-gray-500 mt-1 max-w-[60px] truncate" title={`${leave.responsable_prenom} ${leave.responsable_nom}`}>
+                                    {leave.responsable_prenom?.charAt(0)}. {leave.responsable_nom}
+                                  </span>
+                                  {n1Validated && leave.validateur_n1_nom && (
+                                    <span className="text-xs text-green-600">✓</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {hasN1 && (
+                                <div className={`w-6 h-0.5 ${n1Validated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                              )}
+
+                              {/* Niveau 2 - Responsable hiérarchique */}
+                              {hasN2 && (
+                                <>
+                                  <div className="flex flex-col items-center">
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                        isRefused && n1Validated && !n2Validated ? 'bg-red-500' :
+                                        n2Validated ? 'bg-green-500' :
+                                        blockingAt === 'n2' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
+                                      }`}
+                                      title={`N2: ${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}`}
+                                    >
+                                      N2
+                                    </div>
+                                    <span className="text-xs text-gray-500 mt-1 max-w-[60px] truncate" title={`${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}`}>
+                                      {leave.responsable_n2_prenom?.charAt(0)}. {leave.responsable_n2_nom}
+                                    </span>
+                                    {n2Validated && leave.validateur_n2_nom && (
+                                      <span className="text-xs text-green-600">✓</span>
+                                    )}
+                                  </div>
+                                  <div className={`w-6 h-0.5 ${n2Validated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                </>
+                              )}
+
+                              {/* RH - Validation finale */}
+                              <div className="flex flex-col items-center">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                    isRefused && ((!hasN1) || (hasN1 && n1Validated && (!hasN2 || n2Validated))) ? 'bg-red-500' :
+                                    isFinalValidated ? 'bg-green-500' :
+                                    blockingAt === 'rh' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
+                                  }`}
+                                  title="Validation RH"
+                                >
+                                  RH
+                                </div>
+                                <span className="text-xs text-gray-500 mt-1">Final</span>
+                                {isFinalValidated && leave.validateur_nom && (
+                                  <span className="text-xs text-green-600">✓</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Info sur le blocage */}
+                            {blockingAt && (
+                              <p className="text-xs text-yellow-600 mt-2 font-medium">
+                                ⏳ En attente : {
+                                  blockingAt === 'n1' ? `${leave.responsable_prenom} ${leave.responsable_nom}` :
+                                  blockingAt === 'n2' ? `${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}` :
+                                  'Validation RH'
+                                }
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(leave.statut)}`}>
+                              {formatStatus(leave.statut)}
+                            </span>
+                            {leave.validateur_nom && leave.statut !== 'en_attente' && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                par {leave.validateur_prenom} {leave.validateur_nom}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {formatDateFR(leave.date_demande)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -535,6 +558,119 @@ export default function RHPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'create-leave' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Créer un congé (validation directe)
+            </h2>
+
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Ce formulaire permet de créer un congé directement validé, sans passer par le circuit de validation
+                et sans la contrainte des 7 jours à l'avance.
+              </p>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!rhLeaveForm.user_id || !rhLeaveForm.date_debut || !rhLeaveForm.date_fin) {
+                toast.error('Veuillez remplir tous les champs obligatoires');
+                return;
+              }
+              if (new Date(rhLeaveForm.date_debut) > new Date(rhLeaveForm.date_fin)) {
+                toast.error('La date de début doit être avant la date de fin');
+                return;
+              }
+              setRhLeaveLoading(true);
+              try {
+                const response = await fetch('/api/leaves/rh-create', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(rhLeaveForm),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                  throw new Error(data.message);
+                }
+                toast.success(`Congé créé et validé avec succès (${data.businessDays} jour(s) ouvrés)`);
+                setRhLeaveForm({ user_id: '', date_debut: '', date_fin: '', motif: '' });
+              } catch (error) {
+                toast.error(error.message);
+              } finally {
+                setRhLeaveLoading(false);
+              }
+            }} className="space-y-4 max-w-xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Employé *
+                </label>
+                <select
+                  value={rhLeaveForm.user_id}
+                  onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, user_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Sélectionner un employé</option>
+                  {allUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.prenom} {user.nom} ({user.type_utilisateur}) - {user.jours_restants || 0} jours restants
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date de début *
+                  </label>
+                  <input
+                    type="date"
+                    value={rhLeaveForm.date_debut}
+                    onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_debut: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date de fin *
+                  </label>
+                  <input
+                    type="date"
+                    value={rhLeaveForm.date_fin}
+                    onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_fin: e.target.value })}
+                    min={rhLeaveForm.date_debut}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motif (optionnel)
+                </label>
+                <textarea
+                  value={rhLeaveForm.motif}
+                  onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, motif: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Motif du congé..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={rhLeaveLoading}
+                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold"
+              >
+                {rhLeaveLoading ? 'Création en cours...' : 'Créer et valider le congé'}
+              </button>
+            </form>
           </div>
         )}
       </div>

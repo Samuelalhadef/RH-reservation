@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -7,9 +8,33 @@ const Navbar = () => {
   const { user, logout, isRH } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
+  useEffect(() => {
+    // Charger la photo de profil
+    const fetchPhoto = async () => {
+      try {
+        const res = await fetch('/api/users/profile');
+        const data = await res.json();
+        if (data.user?.photo_profil) {
+          setProfilePhoto(data.user.photo_profil);
+        }
+      } catch (error) {
+        console.error('Error fetching profile photo:', error);
+      }
+    };
+
+    if (user) {
+      fetchPhoto();
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleProfileClick = () => {
+    router.push('/profil');
   };
 
   const navItems = [
@@ -32,14 +57,12 @@ const Navbar = () => {
       <div className="container mx-auto px-6">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-gray-200">
+              <img src="/images/logo.png" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-800">Mairie de Chartrettes</h1>
-              <p className="text-xs text-gray-500">Gestion des congés</p>
+              <h1 className="text-lg font-bold text-gray-800">Mon Portail Agent</h1>
+              <p className="text-xs text-gray-500">Chartrettes</p>
             </div>
           </div>
 
@@ -69,24 +92,44 @@ const Navbar = () => {
               </svg>
             </button>
 
-            <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-semibold">
-                  {user?.prenom?.[0]}{user?.nom?.[0]}
-                </span>
+            <div className="relative">
+              <div className="flex items-center gap-3 border-l border-gray-200 pl-4">
+                {/* Clic sur avatar/nom = profil */}
+                <button
+                  onClick={handleProfileClick}
+                  className="flex items-center gap-3 hover:opacity-80 transition"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"
+                    style={{
+                      background: profilePhoto ? 'transparent' : 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)'
+                    }}
+                  >
+                    {profilePhoto ? (
+                      <img src={profilePhoto} alt="Photo" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-sm font-semibold">
+                        {user?.prenom?.[0]}{user?.nom?.[0]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="hidden lg:block text-left">
+                    <p className="text-sm font-semibold text-gray-800">{user?.prenom} {user?.nom}</p>
+                    <p className="text-xs text-gray-500">{user?.type}</p>
+                  </div>
+                </button>
+
+                {/* Bouton déconnexion séparé */}
+                <button
+                  onClick={handleLogout}
+                  className="ml-2 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  title="Se déconnecter"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
               </div>
-              <div className="hidden lg:block">
-                <p className="text-sm font-semibold text-gray-800">{user?.prenom} {user?.nom}</p>
-                <p className="text-xs text-gray-500">{user?.type}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
             </div>
           </div>
         </div>

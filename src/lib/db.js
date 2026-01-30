@@ -56,7 +56,8 @@ export const initDatabase = async () => {
       { table: 'users', column: 'date_debut_contrat', type: 'DATE' },
       { table: 'users', column: 'date_fin_contrat', type: 'DATE' },
       { table: 'users', column: 'service', type: 'TEXT' },
-      { table: 'users', column: 'poste', type: 'TEXT' }
+      { table: 'users', column: 'poste', type: 'TEXT' },
+      { table: 'users', column: 'photo_profil', type: 'TEXT' }
     ];
 
     for (const migration of migrations) {
@@ -100,6 +101,30 @@ export const initDatabase = async () => {
         date DATE NOT NULL UNIQUE,
         nom TEXT NOT NULL,
         annee INTEGER NOT NULL
+      )
+    `);
+
+    // Table CET (Compte Épargne Temps)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS cet (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        solde REAL DEFAULT 0,
+        date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Table historique CET
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS cet_historique (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('credit', 'debit')),
+        jours REAL NOT NULL,
+        motif TEXT,
+        date_operation DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 

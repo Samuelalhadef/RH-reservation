@@ -24,11 +24,19 @@ export async function GET(request) {
     const year = searchParams.get('year');
 
     let sql = `
-      SELECT dc.*, u.nom, u.prenom, u.email, u.type_utilisateur,
-             v.nom as validateur_nom, v.prenom as validateur_prenom
+      SELECT dc.*, u.nom, u.prenom, u.email, u.type_utilisateur, u.responsable_id,
+             v.nom as validateur_nom, v.prenom as validateur_prenom,
+             v1.nom as validateur_n1_nom, v1.prenom as validateur_n1_prenom,
+             v2.nom as validateur_n2_nom, v2.prenom as validateur_n2_prenom,
+             resp.nom as responsable_nom, resp.prenom as responsable_prenom,
+             resp2.nom as responsable_n2_nom, resp2.prenom as responsable_n2_prenom
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id
       LEFT JOIN users v ON dc.validateur_id = v.id
+      LEFT JOIN users v1 ON dc.validateur_niveau_1_id = v1.id
+      LEFT JOIN users v2 ON dc.validateur_niveau_2_id = v2.id
+      LEFT JOIN users resp ON u.responsable_id = resp.id
+      LEFT JOIN users resp2 ON resp.responsable_id = resp2.id
       WHERE 1=1
     `;
     const args = [];
@@ -130,20 +138,6 @@ export async function POST(request) {
       }
     }
 
-    // Soustraire 0.5 pour chaque mercredi (après-midi non travaillé)
-    const startDate = new Date(date_debut);
-    const endDate = new Date(date_fin);
-    let currentDate = new Date(startDate);
-    let wednesdayAdjustment = 0;
-
-    while (currentDate <= endDate) {
-      if (currentDate.getDay() === 3) { // Mercredi
-        wednesdayAdjustment += 0.5;
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    businessDays -= wednesdayAdjustment;
     businessDays = Math.max(0, businessDays);
 
     if (businessDays === 0) {

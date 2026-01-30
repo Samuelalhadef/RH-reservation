@@ -6,8 +6,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Mairie de Chartrettes - Gestion des congés',
-  description: 'Application de gestion des congés pour la Mairie de Chartrettes',
+  title: 'Mon Portail Agent - Chartrettes',
+  description: 'Portail agent pour la gestion des congés - Mairie de Chartrettes',
 };
 
 export default function RootLayout({ children }) {

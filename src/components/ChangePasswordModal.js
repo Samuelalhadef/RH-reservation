@@ -27,6 +27,7 @@ const ChangePasswordModal = ({ onClose }) => {
     setLoading(true);
     try {
       await changePassword(currentPassword, newPassword);
+      toast.success('Mot de passe modifié avec succès');
       onClose();
     } catch (error) {
       // Error is handled in AuthContext

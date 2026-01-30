@@ -25,7 +25,8 @@
       "Bash(timeout /t 3 /nobreak)",
       "Bash(turso db:*)",
       "Bash(where:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(npm cache clean:*)"
     ],
     "deny": [],
     "ask": []

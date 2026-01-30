@@ -15,10 +15,48 @@ const LeaveRequestForm = ({ onSuccess }) => {
   const [holidays, setHolidays] = useState([]);
   const [businessDays, setBusinessDays] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showFractionnementInfo, setShowFractionnementInfo] = useState(false);
+  const [fractionnementDays, setFractionnementDays] = useState(0);
 
   useEffect(() => {
     fetchHolidays();
   }, []);
+
+  // Vérifier si une date est dans la période de fractionnement (hors période principale)
+  // Période principale : 1er mai - 31 octobre
+  const isInFractionnementPeriod = (dateStr) => {
+    const date = new Date(dateStr);
+    const month = date.getMonth(); // 0-11
+    // Hors période principale = novembre (10), décembre (11), janvier (0), février (1), mars (2), avril (3)
+    return month < 4 || month > 9; // janvier-avril ou novembre-décembre
+  };
+
+  // Calculer les jours de fractionnement potentiels
+  const calculateFractionnement = (startDate, endDate, days) => {
+    if (!startDate || !endDate || days <= 0) return 0;
+
+    // Compter les jours ouvrés hors période principale (nov-avril)
+    let daysOutsideMainPeriod = 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay();
+      // Exclure weekends
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+      const month = d.getMonth();
+      // Hors période principale (mai-octobre = 4-9)
+      if (month < 4 || month > 9) {
+        daysOutsideMainPeriod++;
+      }
+    }
+
+    // Règles de fractionnement
+    if (daysOutsideMainPeriod >= 6) return 2;
+    if (daysOutsideMainPeriod >= 3) return 1;
+    return 0;
+  };
 
   useEffect(() => {
     if (formData.date_debut && formData.date_fin) {
@@ -29,43 +67,33 @@ const LeaveRequestForm = ({ onSuccess }) => {
       const isSameDay = formData.date_debut === formData.date_fin;
 
       if (isSameDay) {
-        // Si c'est le même jour
         if (formData.type_debut === 'matin' && formData.type_fin === 'apres_midi') {
-          // Matin + après-midi = journée complète
           days = 1;
         } else if (formData.type_debut === 'matin' || formData.type_debut === 'apres_midi') {
-          // Seulement matin ou après-midi = 0.5 jour
           days = 0.5;
         }
       } else {
-        // Ajuster le premier jour si demi-journée
         if (formData.type_debut === 'apres_midi') {
           days -= 0.5;
         }
-        // Ajuster le dernier jour si demi-journée
         if (formData.type_fin === 'matin') {
           days -= 0.5;
         }
       }
 
-      // Soustraire 0.5 pour chaque mercredi dans la période (seulement l'après-midi)
-      const startDate = new Date(formData.date_debut);
-      const endDate = new Date(formData.date_fin);
-      let currentDate = new Date(startDate);
-      let wednesdayAdjustment = 0;
-
-      while (currentDate <= endDate) {
-        if (currentDate.getDay() === 3) { // 3 = Mercredi
-          wednesdayAdjustment += 0.5;
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      days -= wednesdayAdjustment;
-
       setBusinessDays(Math.max(0, days));
+
+      // Calculer le fractionnement potentiel
+      const fractionnement = calculateFractionnement(formData.date_debut, formData.date_fin, days);
+      setFractionnementDays(fractionnement);
+
+      // Afficher l'info si la période inclut des jours hors période principale
+      const hasOutsideDays = isInFractionnementPeriod(formData.date_debut) || isInFractionnementPeriod(formData.date_fin);
+      setShowFractionnementInfo(hasOutsideDays && days >= 1);
     } else {
       setBusinessDays(0);
+      setFractionnementDays(0);
+      setShowFractionnementInfo(false);
     }
   }, [formData.date_debut, formData.date_fin, formData.type_debut, formData.type_fin, holidays]);
 
@@ -222,6 +250,33 @@ const LeaveRequestForm = ({ onSuccess }) => {
               <p className="text-sm font-medium text-blue-800">
                 Nombre de jours ouvrés : <span className="font-bold">{businessDays}</span> jour(s)
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Info Fractionnement */}
+        {showFractionnementInfo && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+              <div>
+                <p className="font-semibold text-green-800">Période de fractionnement</p>
+                <p className="text-sm text-green-700 mt-1">
+                  Vous prenez des congés en dehors de la période principale (mai-octobre).
+                </p>
+                {fractionnementDays > 0 ? (
+                  <p className="text-sm text-green-700 mt-2 font-medium">
+                    Vous pouvez gagner <span className="font-bold text-green-800">{fractionnementDays} jour(s)</span> de fractionnement supplémentaire(s) !
+                  </p>
+                ) : (
+                  <p className="text-sm text-green-700 mt-2">
+                    Prenez au moins <span className="font-semibold">3 jours</span> hors période principale pour gagner <span className="font-semibold">1 jour</span> de fractionnement,
+                    ou <span className="font-semibold">6 jours</span> pour en gagner <span className="font-semibold">2</span>.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}

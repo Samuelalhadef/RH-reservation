@@ -75,6 +75,7 @@ export async function PUT(request, { params }) {
       // Envoyer les emails appropriés
       if (result.isFinal) {
         if (statut === 'validee') {
+          // Email
           await sendLeaveApprovedEmail(
             leave.email,
             `${leave.prenom} ${leave.nom}`,
@@ -83,6 +84,7 @@ export async function PUT(request, { params }) {
             leave.nombre_jours_ouvres
           );
         } else {
+          // Email
           await sendLeaveRejectedEmail(
             leave.email,
             `${leave.prenom} ${leave.nom}`,

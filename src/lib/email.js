@@ -20,7 +20,7 @@ export const sendLeaveApprovedEmail = async (userEmail, userName, startDate, end
           <p><strong>Nombre de jours :</strong> ${days} jour(s) ouvré(s)</p>
         </div>
         <p>Bonnes vacances !</p>
-        <p>L'équipe RH - Mairie de Chartrettes</p>
+        <p>L'équipe RH - Mon Portail Agent - Chartrettes</p>
       `,
     });
 
@@ -54,7 +54,7 @@ export const sendLeaveRejectedEmail = async (userEmail, userName, startDate, end
           ${reason ? `<p><strong>Motif du refus :</strong> ${reason}</p>` : ''}
         </div>
         <p>Pour plus d'informations, veuillez contacter le service RH.</p>
-        <p>L'équipe RH - Mairie de Chartrettes</p>
+        <p>L'équipe RH - Mon Portail Agent - Chartrettes</p>
       `,
     });
 
@@ -88,7 +88,7 @@ export const sendNewLeaveRequestEmail = async (rhEmail, userName, startDate, end
           <p><strong>Nombre de jours :</strong> ${days} jour(s) ouvré(s)</p>
         </div>
         <p>Connectez-vous à l'application pour valider ou refuser cette demande.</p>
-        <p>Système de gestion RH - Mairie de Chartrettes</p>
+        <p>Système de gestion RH - Mon Portail Agent - Chartrettes</p>
       `,
     });
 
@@ -122,7 +122,7 @@ export const sendTemporaryPasswordEmail = async (userEmail, userName, tempPasswo
           <p><strong>Mot de passe temporaire :</strong> <code style="background-color: #dbeafe; padding: 5px 10px; border-radius: 3px;">${tempPassword}</code></p>
         </div>
         <p><strong>⚠️ Important :</strong> Vous devrez changer ce mot de passe lors de votre première connexion.</p>
-        <p>L'équipe RH - Mairie de Chartrettes</p>
+        <p>L'équipe RH - Mon Portail Agent - Chartrettes</p>
       `,
     });
 

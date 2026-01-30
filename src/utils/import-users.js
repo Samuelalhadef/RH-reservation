@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 
 const importUsers = async () => {
   try {
-    console.log('📥 Importation des utilisateurs de la Mairie de Chartrettes...');
+    console.log('📥 Importation des utilisateurs - Mon Portail Agent Chartrettes...');
 
     const tempPassword = 'chartrettes2025';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);

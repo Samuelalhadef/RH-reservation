@@ -55,8 +55,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full overflow-hidden">
         <div className="bg-primary-600 text-white p-6">
-          <h1 className="text-3xl font-bold text-center">Mairie de Chartrettes</h1>
-          <p className="text-center text-primary-100 mt-2">Gestion des congés</p>
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <div className="w-14 h-14 rounded-lg overflow-hidden bg-white shadow">
+              <img src="/images/logo.png" alt="Logo" className="w-full h-full object-cover" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-center">Mon Portail Agent</h1>
+          <p className="text-center text-primary-100 mt-1">Chartrettes</p>
         </div>
 
         <div className="p-8">

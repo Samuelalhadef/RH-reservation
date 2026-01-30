@@ -7,6 +7,117 @@ import Navbar from '@/components/Navbar';
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 
+// Composant pour afficher le circuit de validation détaillé
+const ValidationCircuit = ({ leave }) => {
+  const { statut, validation_info } = leave;
+  const circuit = validation_info?.circuit;
+  const pendingValidation = validation_info?.pending_validation;
+
+  // Construire les étapes basées sur le circuit réel
+  const buildSteps = () => {
+    const steps = [
+      {
+        id: 'demande',
+        label: 'Demande créée',
+        status: 'completed',
+        icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+      }
+    ];
+
+    // Ajouter les niveaux du circuit s'ils existent
+    if (circuit?.niveaux) {
+      const n1 = circuit.niveaux.find(n => n.niveau === 1);
+      const n2 = circuit.niveaux.find(n => n.niveau === 2);
+
+      if (n1) {
+        const isValidated = validation_info?.validated_n1;
+        const isPending = pendingValidation?.niveau === 1;
+        steps.push({
+          id: 'n1',
+          label: n1.validateur_prenom ? `${n1.validateur_prenom} ${n1.validateur_nom}` : 'Responsable',
+          sublabel: 'N+1',
+          status: statut === 'refusee' && !isValidated ? 'rejected' : isValidated ? 'completed' : isPending ? 'current' : 'pending',
+          icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+        });
+      }
+
+      if (n2) {
+        const isValidated = validation_info?.validated_n2;
+        const isPending = pendingValidation?.niveau === 2;
+        steps.push({
+          id: 'n2',
+          label: n2.validateur_prenom ? `${n2.validateur_prenom} ${n2.validateur_nom}` : 'Direction',
+          sublabel: 'N+2',
+          status: statut === 'refusee' && !isValidated && validation_info?.validated_n1 ? 'rejected' : isValidated ? 'completed' : isPending ? 'current' : 'pending',
+          icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+        });
+      }
+    }
+
+    // Toujours ajouter RH à la fin
+    const isRHPending = pendingValidation?.niveau === 'rh';
+    const isRHStep = statut !== 'en_attente';
+    steps.push({
+      id: 'rh',
+      label: 'Service RH',
+      sublabel: 'Final',
+      status: statut === 'validee' ? 'completed' : statut === 'refusee' && isRHStep ? 'rejected' : isRHPending ? 'current' : 'pending',
+      icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+    });
+
+    return steps;
+  };
+
+  const steps = buildSteps();
+
+  const getStepColor = (status) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500 text-white';
+      case 'current': return 'bg-yellow-500 text-white animate-pulse';
+      case 'rejected': return 'bg-red-500 text-white';
+      default: return 'bg-gray-200 text-gray-400';
+    }
+  };
+
+  const getLineColor = (currentStep, nextStep) => {
+    if (currentStep.status === 'completed' && (nextStep.status === 'completed' || nextStep.status === 'current')) {
+      return 'bg-green-500';
+    }
+    if (currentStep.status === 'completed' && nextStep.status === 'rejected') {
+      return 'bg-red-500';
+    }
+    return 'bg-gray-200';
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        {steps.map((step, index) => (
+          <div key={step.id} className="flex items-center">
+            <div className="flex flex-col items-center" title={`${step.label}${step.sublabel ? ` (${step.sublabel})` : ''}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center ${getStepColor(step.status)}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={step.icon} />
+                </svg>
+              </div>
+            </div>
+            {index < steps.length - 1 && (
+              <div className={`w-4 h-1 ${getLineColor(step, steps[index + 1])}`} />
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Afficher où ça bloque */}
+      {statut === 'en_attente' && pendingValidation && (
+        <div className="text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded mt-1">
+          <span className="font-semibold">En attente : </span>
+          {pendingValidation.validateur || pendingValidation.type}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function MesDemandesPage() {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
@@ -168,6 +279,48 @@ export default function MesDemandesPage() {
           </div>
         </div>
 
+        {/* Légende du circuit de validation */}
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 mb-6">
+          <h3 className="text-sm font-semibold text-blue-800 mb-3">Circuit de validation hiérarchique</h3>
+          <div className="flex flex-wrap items-center gap-4 text-sm mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-gray-700">Validé</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-yellow-500 animate-pulse flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span className="text-gray-700">En attente (bloqué ici)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <span className="text-gray-700">Refusé</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span className="text-gray-700">Pas encore atteint</span>
+            </div>
+          </div>
+          <div className="text-xs text-blue-700 bg-blue-100 rounded p-2">
+            <strong>Parcours :</strong> Demande → Responsable direct (N+1) → Direction (N+2 si applicable) → Service RH (validation finale)
+          </div>
+        </div>
+
         {/* Filtres */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex flex-wrap gap-2">
@@ -247,10 +400,10 @@ export default function MesDemandesPage() {
                       Motif
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statut
+                      Circuit de validation
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Validateur
+                      Statut
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -286,25 +439,26 @@ export default function MesDemandesPage() {
                           </div>
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        <ValidationCircuit leave={leave} />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(leave.statut)}`}>
                           {formatStatus(leave.statut)}
                         </span>
-                        {leave.date_validation && (
+                        {leave.statut === 'en_attente' ? (
                           <div className="text-xs text-gray-500 mt-1">
-                            Le {formatDateFR(leave.date_validation)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {leave.validateur_nom ? (
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {leave.validateur_prenom} {leave.validateur_nom}
-                            </div>
+                            En attente de validation
                           </div>
                         ) : (
-                          <span className="text-gray-400 italic">En attente</span>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {leave.validateur_nom && (
+                              <span>Par {leave.validateur_prenom} {leave.validateur_nom}</span>
+                            )}
+                            {leave.date_validation && (
+                              <span className="block">Le {formatDateFR(leave.date_validation)}</span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

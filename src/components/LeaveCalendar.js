@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { formatDateFR } from '@/lib/clientDateUtils';
+import toast from 'react-hot-toast';
 
-const LeaveCalendar = () => {
+const LeaveCalendar = ({ onLeaveCreated }) => {
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -84,8 +85,36 @@ const LeaveCalendar = () => {
     return day === 0 || day === 6; // 0 = Dimanche, 6 = Samedi
   };
 
+  const isPastDate = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate < today;
+  };
+
+  const isLessThan7DaysAhead = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    const diffTime = checkDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays < 7;
+  };
+
   const isDateSelectable = (date) => {
     const dateStr = formatDateToYYYYMMDD(date);
+
+    // Les jours passés ne sont pas sélectionnables
+    if (isPastDate(date)) {
+      return false;
+    }
+
+    // Les demandes doivent être faites au moins 7 jours à l'avance
+    if (isLessThan7DaysAhead(date)) {
+      return false;
+    }
 
     // Les week-ends ne sont pas sélectionnables
     if (isWeekend(date)) {
@@ -120,7 +149,8 @@ const LeaveCalendar = () => {
     const isToday = date.getDate() === today.getDate() &&
                     date.getMonth() === today.getMonth() &&
                     date.getFullYear() === today.getFullYear();
-    const isWednesday = date.getDay() === 3 && isCurrentMonth && !isWeekend(date);
+    const isPast = isPastDate(date);
+    const isTooSoon = isLessThan7DaysAhead(date);
 
     // Vérifier si la date fait partie de la plage sélectionnée
     const isInRange = startDate && endDate && date >= startDate && date <= endDate;
@@ -129,8 +159,27 @@ const LeaveCalendar = () => {
 
     let classes = 'w-full aspect-square flex items-center justify-center rounded-xl cursor-pointer transition-all font-medium text-lg ';
 
+    // Vérifier si un congé existe pour cette date (pour toutes les dates du mois en cours)
+    const leaveOnDate = isCurrentMonth ? leaves.find(leave => {
+      const startStr = leave.date_debut.split('T')[0];
+      const endStr = leave.date_fin.split('T')[0];
+      return dateStr >= startStr && dateStr <= endStr;
+    }) : null;
+
     if (!isCurrentMonth) {
       classes += 'text-gray-300 ';
+    } else if (isPast || isTooSoon) {
+      // Jours passés ou dans les 7 prochains jours
+      if (leaveOnDate && leaveOnDate.statut === 'validee') {
+        // Congé validé sur un jour passé/trop proche -> vert grisé
+        classes += 'bg-green-200 text-green-600 border-2 border-green-200 font-semibold cursor-not-allowed opacity-60 ';
+      } else if (leaveOnDate && leaveOnDate.statut === 'en_attente') {
+        // Congé en attente sur un jour passé/trop proche -> orange grisé
+        classes += 'bg-orange-200 text-orange-600 border-2 border-orange-200 font-semibold cursor-not-allowed opacity-60 ';
+      } else {
+        // Pas de congé -> gris normal
+        classes += 'bg-gray-100 text-gray-400 cursor-not-allowed ';
+      }
     } else if (isWeekend(date)) {
       // Griser les week-ends
       classes += 'bg-gray-100 text-gray-400 cursor-not-allowed ';
@@ -138,31 +187,22 @@ const LeaveCalendar = () => {
       const isHoliday = holidays.some(h => h.date === dateStr);
       if (isHoliday) {
         classes += 'bg-purple-100 text-purple-800 font-semibold border-2 border-purple-300 cursor-not-allowed ';
-      } else {
-        // Vérifier si un congé existe pour cette date
-        const leaveOnDate = leaves.find(leave => {
-          const startStr = leave.date_debut.split('T')[0];
-          const endStr = leave.date_fin.split('T')[0];
-          return dateStr >= startStr && dateStr <= endStr;
-        });
-
-        if (leaveOnDate) {
-          // Colorier selon le statut (sans bordure pour les mercredis)
-          if (leaveOnDate.statut === 'validee') {
-            // Les congés validés ne sont pas modifiables
-            classes += `bg-green-100 text-green-800 ${isWednesday ? '' : 'border-2 border-green-300'} font-semibold cursor-not-allowed `;
-          } else if (leaveOnDate.statut === 'en_attente') {
-            // Les congés en attente peuvent être modifiés (cliquables)
-            classes += `bg-orange-100 text-orange-800 ${isWednesday ? '' : 'border-2 border-orange-300'} font-semibold cursor-pointer hover:bg-orange-200 `;
-          } else {
-            // refusée ou autre statut
-            classes += 'bg-gray-100 text-gray-500 border-2 border-gray-300 cursor-not-allowed ';
-          }
-        } else if (isInRange) {
-          classes += 'bg-blue-100 text-blue-800 ';
+      } else if (leaveOnDate) {
+        // Colorier selon le statut
+        if (leaveOnDate.statut === 'validee') {
+          // Les congés validés ne sont pas modifiables
+          classes += 'bg-green-100 text-green-800 border-2 border-green-300 font-semibold cursor-not-allowed ';
+        } else if (leaveOnDate.statut === 'en_attente') {
+          // Les congés en attente peuvent être modifiés (cliquables)
+          classes += 'bg-orange-100 text-orange-800 border-2 border-orange-300 font-semibold cursor-pointer hover:bg-orange-200 ';
         } else {
-          classes += 'text-gray-700 hover:bg-gray-100 ';
+          // refusée ou autre statut
+          classes += 'bg-gray-100 text-gray-500 border-2 border-gray-300 cursor-not-allowed ';
         }
+      } else if (isInRange) {
+        classes += 'bg-blue-100 text-blue-800 ';
+      } else {
+        classes += 'text-gray-700 hover:bg-gray-100 ';
       }
     }
 
@@ -243,14 +283,18 @@ const LeaveCalendar = () => {
         setReason('');
         // Recharger les données
         fetchData();
-        alert(data.message || `Demande de congé envoyée avec succès! (${data.businessDays} jour(s) ouvrés)`);
+        toast.success(data.message || `Demande de congé envoyée avec succès! (${data.businessDays} jour(s) ouvrés)`);
+        // Appeler le callback si fourni
+        if (onLeaveCreated) {
+          onLeaveCreated();
+        }
       } else {
         console.error('Erreur API:', data);
-        alert(data.message || 'Erreur lors de l\'envoi de la demande');
+        toast.error(data.message || 'Erreur lors de l\'envoi de la demande');
       }
     } catch (error) {
       console.error('Error submitting leave request:', error);
-      alert('Erreur lors de l\'envoi de la demande: ' + error.message);
+      toast.error('Erreur lors de l\'envoi de la demande: ' + error.message);
     }
   };
 
@@ -311,14 +355,7 @@ const LeaveCalendar = () => {
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-gray-100 rounded"></div>
-            <span className="text-gray-600">Week-end</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded relative overflow-hidden border border-gray-300">
-              <div className="absolute inset-0 bg-white"></div>
-              <div className="absolute inset-0" style={{background: 'linear-gradient(to bottom, transparent 50%, #f3f4f6 50%)'}}></div>
-            </div>
-            <span className="text-gray-600">Mercredi (après-midi libre)</span>
+            <span className="text-gray-600">Non disponible (week-end / passé / délai 7j)</span>
           </div>
         </div>
       </div>
@@ -339,7 +376,6 @@ const LeaveCalendar = () => {
         {/* Grille des jours */}
         <div className="grid grid-cols-7 gap-2">
           {days.map((day, index) => {
-            const isWednesday = day.date.getDay() === 3 && day.isCurrentMonth && !isWeekend(day.date);
             const dayClasses = getDayClassName(day.date, day.isCurrentMonth);
 
             return (
@@ -347,22 +383,7 @@ const LeaveCalendar = () => {
                 <button
                   onClick={() => handleDateClick(day.date)}
                   disabled={!isDateSelectable(day.date) || !day.isCurrentMonth}
-                  className={`${dayClasses} ${isWednesday ? 'items-start pt-2' : ''}`}
-                  style={isWednesday ? (() => {
-                    const dateStr = formatDateToYYYYMMDD(day.date);
-                    const leaveOnDate = leaves.find(leave => {
-                      const startStr = leave.date_debut.split('T')[0];
-                      const endStr = leave.date_fin.split('T')[0];
-                      return dateStr >= startStr && dateStr <= endStr;
-                    });
-
-                    if (leaveOnDate?.statut === 'validee') {
-                      return { background: 'linear-gradient(to bottom, #dcfce7 50%, #f3f4f6 50%)' };
-                    } else if (leaveOnDate?.statut === 'en_attente') {
-                      return { background: 'linear-gradient(to bottom, #fed7aa 50%, #f3f4f6 50%)' };
-                    }
-                    return { background: 'linear-gradient(to bottom, transparent 50%, #f3f4f6 50%)' };
-                  })() : {}}
+                  className={dayClasses}
                 >
                   {day.date.getDate()}
                 </button>

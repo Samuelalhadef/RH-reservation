@@ -14,8 +14,8 @@ export async function GET() {
 
     const result = await db.execute({
       sql: `
-        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur,
-               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes
+        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.service, u.poste, u.photo_profil,
+               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement
         FROM users u
         LEFT JOIN soldes_conges sc ON u.id = sc.user_id AND sc.annee = ?
         WHERE u.id = ?
@@ -42,3 +42,4 @@ export async function GET() {
     );
   }
 }
+
