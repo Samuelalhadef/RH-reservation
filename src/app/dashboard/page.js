@@ -108,6 +108,10 @@ export default function DashboardPage() {
                   <span className="text-sm text-green-700">Fractionnement</span>
                   <span className="font-bold text-green-700">{profile?.jours_fractionnement || 0}</span>
                 </div>
+                <div className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
+                  <span className="text-sm text-indigo-700">Compensateurs</span>
+                  <span className="font-bold text-indigo-700">{profile?.jours_compensateurs || 0}</span>
+                </div>
               </div>
             </div>
 

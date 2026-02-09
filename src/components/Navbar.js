@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
+import NotificationButton from './NotificationButton';
 
 const Navbar = () => {
   const { user, logout, isRH } = useAuth();
@@ -90,6 +91,7 @@ const Navbar = () => {
 
           {/* Actions droite */}
           <div className="flex items-center gap-2 sm:gap-4">
+            <NotificationButton />
             <button
               onClick={handleProfileClick}
               className="flex items-center gap-2 hover:opacity-80 transition"

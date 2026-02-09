@@ -34,7 +34,9 @@
       "Bash(npm view:*)",
       "Bash(xargs:*)",
       "Bash(npx next build:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx next:*)",
+      "Bash(npx web-push:*)"
     ],
     "deny": [],
     "ask": []

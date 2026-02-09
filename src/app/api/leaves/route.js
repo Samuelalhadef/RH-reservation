@@ -7,6 +7,7 @@ import {
   formatDateFR
 } from '@/lib/dateUtils';
 import { sendNewLeaveRequestEmail } from '@/lib/email';
+import { notifyLeaveRequest, sendPushToRH } from '@/lib/pushNotifications';
 
 export async function GET(request) {
   try {
@@ -294,6 +295,10 @@ export async function POST(request) {
           } catch (emailError) {
             console.error('Error sending email to responsable:', emailError);
           }
+          // Notification push au responsable
+          try {
+            await notifyLeaveRequest(`${userData.prenom} ${userData.nom}`, hasResponsable, Number(result.lastInsertRowid));
+          } catch (e) { /* ignore push errors */ }
         }
       } else {
         // Pas de responsable direct, envoyer à la RH
@@ -318,6 +323,15 @@ export async function POST(request) {
             }
           }
         }
+        // Notification push aux RH
+        try {
+          await sendPushToRH({
+            title: 'Nouvelle demande de congé',
+            body: `${userData.prenom} ${userData.nom} a fait une demande de congé`,
+            url: '/validation',
+            tag: `leave-${Number(result.lastInsertRowid)}`
+          });
+        } catch (e) { /* ignore push errors */ }
       }
     } catch (emailError) {
       console.error('Error in email process:', emailError);

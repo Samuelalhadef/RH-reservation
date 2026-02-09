@@ -256,18 +256,20 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
 
   // Si validation finale RH
   if (validation.isFinal) {
-    // Déduire les jours du solde
-    const currentYear = new Date().getFullYear();
-    await db.execute({
-      sql: `
-        UPDATE soldes_conges
-        SET jours_pris = jours_pris + ?,
-            jours_restants = jours_restants - ?
-        WHERE user_id = ? AND annee = ?
-      `,
-      args: [leave.nombre_jours_ouvres, leave.nombre_jours_ouvres, leave.user_id, currentYear]
-    });
+    // Vérifier que la demande n'a pas déjà été validée (protection double-décompte)
+    if (leave.statut === 'validee') {
+      return {
+        success: true,
+        message: 'Demande déjà validée',
+        newStatus: 'validee',
+        isFinal: true
+      };
+    }
 
+    // Recalculer le solde à partir des congés validés plutôt qu'incrémenter
+    const currentYear = new Date().getFullYear();
+
+    // D'abord marquer la demande comme validée
     await db.execute({
       sql: `
         UPDATE demandes_conges
@@ -279,6 +281,40 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
       `,
       args: [now, validatorId, commentaire, leaveId]
     });
+
+    // Recalculer jours_pris à partir de TOUS les congés validés de l'année
+    const totalResult = await db.execute({
+      sql: `
+        SELECT COALESCE(SUM(nombre_jours_ouvres), 0) as total_pris
+        FROM demandes_conges
+        WHERE user_id = ? AND statut = 'validee'
+          AND strftime('%Y', date_debut) = ?
+      `,
+      args: [leave.user_id, String(currentYear)]
+    });
+    const totalPris = totalResult.rows[0]?.total_pris || 0;
+
+    // Récupérer les infos du solde pour recalculer jours_restants
+    const soldeResult = await db.execute({
+      sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs FROM soldes_conges WHERE user_id = ? AND annee = ?',
+      args: [leave.user_id, currentYear]
+    });
+
+    if (soldeResult.rows.length > 0) {
+      const s = soldeResult.rows[0];
+      const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + (s.jours_fractionnement || 0) + (s.jours_compensateurs || 0);
+      const restants = totalAcquis - totalPris;
+
+      await db.execute({
+        sql: `
+          UPDATE soldes_conges
+          SET jours_pris = ?,
+              jours_restants = ?
+          WHERE user_id = ? AND annee = ?
+        `,
+        args: [totalPris, restants, leave.user_id, currentYear]
+      });
+    }
 
     return {
       success: true,

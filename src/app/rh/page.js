@@ -25,7 +25,8 @@ export default function RHPage() {
     poste: '',
     type_contrat: 'CDI',
     date_debut_contrat: '',
-    date_fin_contrat: ''
+    date_fin_contrat: '',
+    date_entree_mairie: ''
   });
   const [editingUser, setEditingUser] = useState(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -41,6 +42,10 @@ export default function RHPage() {
   const [adjustingUser, setAdjustingUser] = useState(null);
   const [adjustForm, setAdjustForm] = useState({ adjustment: '', motif: '' });
   const [adjustLoading, setAdjustLoading] = useState(false);
+  const [cetRequests, setCetRequests] = useState([]);
+  const [cetActionLoading, setCetActionLoading] = useState(null);
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -53,6 +58,13 @@ export default function RHPage() {
   }, [activeTab, isAuthenticated, isRH, router]);
 
   const fetchData = async () => {
+    // Toujours charger le nombre de demandes CET pour le badge
+    try {
+      const cetRes = await fetch('/api/cet/requests');
+      const cetData = await cetRes.json();
+      setCetRequests(cetData.demandes || []);
+    } catch (e) { /* ignore */ }
+
     if (activeTab === 'stats') {
       setLoading(false);
       return;
@@ -73,6 +85,10 @@ export default function RHPage() {
         const response = await fetch('/api/users/all');
         const data = await response.json();
         setAllUsers(data.users || []);
+      } else if (activeTab === 'cet-requests') {
+        const response = await fetch('/api/cet/requests');
+        const data = await response.json();
+        setCetRequests(data.demandes || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -134,7 +150,7 @@ export default function RHPage() {
 
       toast.success(`Utilisateur créé avec succès ! Mot de passe temporaire: ${data.tempPassword}`, { duration: 8000 });
       setShowCreateUserModal(false);
-      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
+      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '' });
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -234,6 +250,93 @@ export default function RHPage() {
     }
   };
 
+  const calculateAnciennete = (dateEntree) => {
+    if (!dateEntree) return null;
+    const start = new Date(dateEntree);
+    const now = new Date();
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    if (now.getDate() < start.getDate()) {
+      months--;
+      if (months < 0) {
+        years--;
+        months += 12;
+      }
+    }
+    if (years > 0) return `${years} an${years > 1 ? 's' : ''}${months > 0 ? ` ${months} mois` : ''}`;
+    if (months > 0) return `${months} mois`;
+    return 'Moins d\'un mois';
+  };
+
+  const handleCetAction = async (requestId, action) => {
+    const label = action === 'valider' ? 'valider' : 'refuser';
+    const commentaire = action === 'refuser' ? window.prompt('Motif du refus (optionnel) :') : null;
+    if (action === 'refuser' && commentaire === null) return; // Annulé
+
+    setCetActionLoading(requestId);
+    try {
+      const response = await fetch(`/api/cet/requests/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, commentaire }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setCetActionLoading(null);
+    }
+  };
+
+  const handleRecalculateBalances = async () => {
+    if (!window.confirm('Recalculer les soldes de tous les utilisateurs à partir des congés validés ?')) {
+      return;
+    }
+    setRecalcLoading(true);
+    try {
+      const response = await fetch('/api/balance/recalculate', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRecalcLoading(false);
+    }
+  };
+
+  const handleCancelLeave = async (leaveId, employeeName) => {
+    const motif = window.prompt(`Motif de l'annulation du congé de ${employeeName} :`);
+    if (motif === null) return; // Annulé par l'utilisateur
+
+    setCancelLoading(leaveId);
+    try {
+      const response = await fetch(`/api/leaves/${leaveId}/cancel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motif }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setCancelLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -287,6 +390,22 @@ export default function RHPage() {
               }`}
             >
               Gestion des utilisateurs
+            </button>
+
+            <button
+              onClick={() => setActiveTab('cet-requests')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'cet-requests'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Demandes CET
+              {cetRequests.filter(r => r.statut === 'en_attente').length > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                  {cetRequests.filter(r => r.statut === 'en_attente').length}
+                </span>
+              )}
             </button>
 
             <button
@@ -352,6 +471,7 @@ export default function RHPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Circuit de validation</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut final</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date demande</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -483,6 +603,20 @@ export default function RHPage() {
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {formatDateFR(leave.date_demande)}
                           </td>
+                          <td className="px-4 py-3">
+                            {leave.statut !== 'annulee' && (
+                              <button
+                                onClick={() => handleCancelLeave(leave.id, `${leave.prenom} ${leave.nom}`)}
+                                disabled={cancelLoading === leave.id}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                              >
+                                {cancelLoading === leave.id ? '...' : 'Annuler'}
+                              </button>
+                            )}
+                            {leave.statut === 'annulee' && (
+                              <span className="text-xs text-gray-400">Annulée</span>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -499,15 +633,28 @@ export default function RHPage() {
               <h2 className="text-xl font-bold text-gray-800">
                 Gestion des utilisateurs
               </h2>
-              <button
-                onClick={() => setShowCreateUserModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Créer un utilisateur
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRecalculateBalances}
+                  disabled={recalcLoading}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition disabled:opacity-50"
+                  title="Recalculer les soldes de tous les utilisateurs"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {recalcLoading ? 'Recalcul...' : 'Recalculer soldes'}
+                </button>
+                <button
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Créer un utilisateur
+                </button>
+              </div>
             </div>
 
             {users && users.length === 0 ? (
@@ -525,6 +672,7 @@ export default function RHPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrat</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ancienneté</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jours restants</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
@@ -555,6 +703,18 @@ export default function RHPage() {
                             </div>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-sm">
+                          {user.date_entree_mairie ? (
+                            <>
+                              <span className="font-medium text-gray-900">{calculateAnciennete(user.date_entree_mairie)}</span>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Depuis le {new Date(user.date_entree_mairie).toLocaleDateString('fr-FR')}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-gray-400">Non renseigné</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="font-semibold">{user.jours_restants || 0}</span> / {user.jours_acquis || 0}
                           {user.type_contrat === 'CDD' && (
@@ -562,6 +722,9 @@ export default function RHPage() {
                               (2,08 j/mois)
                             </div>
                           )}
+                          <div className="text-xs text-indigo-600 mt-1 font-medium">
+                            {user.jours_compensateurs || 0} comp.
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
@@ -601,6 +764,94 @@ export default function RHPage() {
                               Supprimer
                             </button>
                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'cet-requests' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Demandes CET
+            </h2>
+
+            {cetRequests.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                Aucune demande CET
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jours</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solde CET</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motif</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {cetRequests.map((req) => (
+                      <tr key={req.id} className={`hover:bg-gray-50 ${req.statut === 'en_attente' ? 'bg-yellow-50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <p className="font-medium">{req.prenom} {req.nom}</p>
+                          <p className="text-xs text-gray-500">{req.service || ''} {req.poste ? `- ${req.poste}` : ''}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                            req.type === 'credit'
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {req.type === 'credit' ? 'Versement' : 'Retrait'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold">{req.jours}</td>
+                        <td className="px-4 py-3 text-sm">{req.solde_cet || 0}/60</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{req.motif || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{req.date_demande}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                            req.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-800' :
+                            req.statut === 'validee' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {req.statut === 'en_attente' ? 'En attente' : req.statut === 'validee' ? 'Validée' : 'Refusée'}
+                          </span>
+                          {req.commentaire_rh && (
+                            <p className="text-xs text-gray-500 mt-1">{req.commentaire_rh}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {req.statut === 'en_attente' ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleCetAction(req.id, 'valider')}
+                                disabled={cetActionLoading === req.id}
+                                className="text-green-600 hover:text-green-700 text-sm font-medium disabled:opacity-50"
+                              >
+                                {cetActionLoading === req.id ? '...' : 'Valider'}
+                              </button>
+                              <button
+                                onClick={() => handleCetAction(req.id, 'refuser')}
+                                disabled={cetActionLoading === req.id}
+                                className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                              >
+                                Refuser
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">Traitée {req.date_validation}</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -824,6 +1075,21 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date d'entrée à la mairie
+                </label>
+                <input
+                  type="date"
+                  value={newUser.date_entree_mairie}
+                  onChange={(e) => setNewUser({ ...newUser, date_entree_mairie: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Permet de calculer l'ancienneté de l'agent
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type de contrat *
                 </label>
                 <select
@@ -871,7 +1137,7 @@ export default function RHPage() {
                   type="button"
                   onClick={() => {
                     setShowCreateUserModal(false);
-                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '' });
+                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
@@ -988,6 +1254,23 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date d'entrée à la mairie
+                </label>
+                <input
+                  type="date"
+                  value={editingUser.date_entree_mairie || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, date_entree_mairie: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {editingUser.date_entree_mairie && (
+                  <p className="text-xs text-blue-600 mt-1 font-medium">
+                    Ancienneté : {calculateAnciennete(editingUser.date_entree_mairie)}
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type de contrat *
                 </label>
                 <select
@@ -1069,11 +1352,15 @@ export default function RHPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              Ajuster les jours de congé
+              Ajuster les jours compensateurs
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {adjustingUser.prenom} {adjustingUser.nom} — Solde actuel : <span className="font-semibold">{adjustingUser.jours_restants || 0}</span> / {adjustingUser.jours_acquis || 0} jours
+            <p className="text-sm text-gray-600 mb-1">
+              {adjustingUser.prenom} {adjustingUser.nom}
             </p>
+            <div className="text-sm text-gray-600 mb-4 space-y-0.5">
+              <p>Solde restant : <span className="font-semibold">{adjustingUser.jours_restants || 0}</span> jours</p>
+              <p>Jours compensateurs actuels : <span className="font-semibold text-indigo-600">{adjustingUser.jours_compensateurs || 0}</span></p>
+            </div>
 
             <form onSubmit={handleAdjustBalance}>
               <div className="mb-4">
@@ -1100,7 +1387,7 @@ export default function RHPage() {
                     {parseFloat(adjustForm.adjustment) > 0 ? '+ ' : ''}{adjustForm.adjustment} jour(s)
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Nouveau solde : {((adjustingUser.jours_restants || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} / {((adjustingUser.jours_acquis || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} jours
+                    Compensateurs : {(adjustingUser.jours_compensateurs || 0)} → {((adjustingUser.jours_compensateurs || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} | Solde restant : {(adjustingUser.jours_restants || 0)} → {((adjustingUser.jours_restants || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)}
                   </p>
                 </div>
               )}
@@ -1114,7 +1401,7 @@ export default function RHPage() {
                   onChange={(e) => setAdjustForm({ ...adjustForm, motif: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: Report de l'année précédente, correction, bonus..."
+                  placeholder="Ex: Heures supplémentaires, récupération, compensation..."
                 />
               </div>
 

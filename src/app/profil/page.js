@@ -16,6 +16,8 @@ export default function ProfilPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [transferAmount, setTransferAmount] = useState(0);
   const [transferring, setTransferring] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [activeTab, setActiveTab] = useState('profil');
   const [profileImage, setProfileImage] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -67,7 +69,7 @@ export default function ProfilPage() {
       const response = await fetch('/api/cet/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jours: transferAmount }),
+        body: JSON.stringify({ jours: transferAmount, type: 'credit' }),
       });
 
       const data = await response.json();
@@ -76,13 +78,43 @@ export default function ProfilPage() {
         throw new Error(data.message);
       }
 
-      toast.success(`${transferAmount} jour(s) transféré(s) vers votre CET`);
+      toast.success(data.message);
       setTransferAmount(0);
       fetchData();
     } catch (error) {
-      toast.error(error.message || 'Erreur lors du transfert');
+      toast.error(error.message || 'Erreur lors de la demande');
     } finally {
       setTransferring(false);
+    }
+  };
+
+  const handleWithdrawFromCET = async () => {
+    if (withdrawAmount <= 0) {
+      toast.error('Veuillez entrer un nombre de jours valide');
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      const response = await fetch('/api/cet/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jours: withdrawAmount, type: 'debit' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message);
+      }
+
+      toast.success(data.message);
+      setWithdrawAmount(0);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message || 'Erreur lors de la demande');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
@@ -147,6 +179,63 @@ export default function ProfilPage() {
         </div>
       </div>
     );
+  }
+
+  const calculateAnciennete = (dateEntree) => {
+    if (!dateEntree) return null;
+    const start = new Date(dateEntree);
+    const now = new Date();
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    if (now.getDate() < start.getDate()) {
+      months--;
+      if (months < 0) {
+        years--;
+        months += 12;
+      }
+    }
+    if (years > 0) return `${years} an${years > 1 ? 's' : ''}${months > 0 ? ` ${months} mois` : ''}`;
+    if (months > 0) return `${months} mois`;
+    return 'Moins d\'un mois';
+  };
+
+  const hasMinOneYearAnciennete = (dateEntree) => {
+    if (!dateEntree) return false;
+    const entree = new Date(dateEntree);
+    const now = new Date();
+    return (now - entree) >= 365.25 * 24 * 60 * 60 * 1000;
+  };
+
+  const cetAncienneteOk = hasMinOneYearAnciennete(profile?.date_entree_mairie);
+  const cetJoursPrisOk = (profile?.jours_pris || 0) >= 20;
+  const cetJoursTransferesAnnee = cet?.jours_transferes_annee || 0;
+  const cetResteTransferable = Math.max(0, 5 - cetJoursTransferesAnnee);
+  const cetSolde = cet?.solde || 0;
+  const cetPlaceDisponible = Math.max(0, 60 - cetSolde);
+  const cetPlafondOk = cetPlaceDisponible > 0;
+  const cetMaxTransferable = Math.min(cetResteTransferable, cetPlaceDisponible, profile?.jours_restants || 0);
+  const cetEligible = cetAncienneteOk && cetJoursPrisOk && cetResteTransferable > 0 && cetPlafondOk;
+
+  const cetBlockReasons = [];
+  if (!cetAncienneteOk) {
+    cetBlockReasons.push(
+      profile?.date_entree_mairie
+        ? `Ancienneté insuffisante (${calculateAnciennete(profile.date_entree_mairie)}, minimum 1 an requis)`
+        : 'Date d\'entrée à la mairie non renseignée. Contactez les RH.'
+    );
+  }
+  if (!cetJoursPrisOk) {
+    cetBlockReasons.push(`Vous devez avoir pris au moins 20 jours de congé (${profile?.jours_pris || 0} pris actuellement)`);
+  }
+  if (cetAncienneteOk && cetJoursPrisOk && cetResteTransferable <= 0) {
+    cetBlockReasons.push('Vous avez déjà transféré le maximum de 5 jours cette année');
+  }
+  if (!cetPlafondOk) {
+    cetBlockReasons.push('Votre CET a atteint le plafond maximum de 60 jours');
   }
 
   const tabs = [
@@ -251,9 +340,20 @@ export default function ProfilPage() {
                   <span className="text-gray-600">Service</span>
                   <span className="font-medium text-gray-800">{profile?.service || '-'}</span>
                 </div>
-                <div className="flex justify-between items-center py-3">
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <span className="text-gray-600">Poste</span>
                   <span className="font-medium text-gray-800">{profile?.poste || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center py-3">
+                  <span className="text-gray-600">Ancienneté</span>
+                  {profile?.date_entree_mairie ? (
+                    <div className="text-right">
+                      <span className="font-medium text-gray-800">{calculateAnciennete(profile.date_entree_mairie)}</span>
+                      <p className="text-xs text-gray-500">Depuis le {new Date(profile.date_entree_mairie).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Non renseigné</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -328,6 +428,11 @@ export default function ProfilPage() {
                     <p className="text-xl font-bold text-green-600">{profile?.jours_fractionnement || 0}</p>
                   </div>
                 </div>
+
+                <div className="p-3 bg-indigo-50 rounded-lg text-center">
+                  <p className="text-xs text-indigo-600">Jours compensateurs</p>
+                  <p className="text-xl font-bold text-indigo-600">{profile?.jours_compensateurs || 0}</p>
+                </div>
               </div>
             </div>
 
@@ -346,34 +451,139 @@ export default function ProfilPage() {
                 <p className="text-xs text-gray-500 mt-1">jours épargnés</p>
               </div>
 
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Transférer des jours vers le CET</p>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max={profile?.jours_restants || 0}
-                    value={transferAmount}
-                    onChange={(e) => setTransferAmount(parseInt(e.target.value) || 0)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Nb jours"
-                  />
-                  <button
-                    onClick={handleTransferToCET}
-                    disabled={transferring || transferAmount <= 0}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition font-medium"
-                  >
-                    {transferring ? '...' : 'Transférer'}
-                  </button>
+              {/* Demandes en attente */}
+              {cet?.demandes_en_attente && cet.demandes_en_attente.length > 0 && (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-sm font-medium text-yellow-800 mb-2">Demande(s) en attente de validation RH :</p>
+                  {cet.demandes_en_attente.map((d) => (
+                    <div key={d.id} className="flex justify-between items-center text-sm py-1">
+                      <span className="text-yellow-700">
+                        {d.type === 'credit' ? 'Versement vers CET' : 'Retrait CET vers congés'} - {d.jours} jour(s)
+                      </span>
+                      <span className="text-xs text-yellow-600">{d.date_demande}</span>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Maximum : {profile?.jours_restants || 0} jour(s) disponible(s)
-                </p>
+              )}
+
+              {/* Demandes récentes traitées */}
+              {cet?.demandes_recentes && cet.demandes_recentes.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Demandes récentes</p>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {cet.demandes_recentes.slice(0, 5).map((d) => (
+                      <div key={d.id} className="flex justify-between items-center text-xs py-1">
+                        <span className="text-gray-600">
+                          {d.type === 'credit' ? 'Versement' : 'Retrait'} {d.jours}j - {d.date_demande}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded font-medium ${d.statut === 'validee' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {d.statut === 'validee' ? 'Validée' : 'Refusée'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Versement congés -> CET */}
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm font-semibold text-gray-800 mb-3">Verser des jours vers le CET</p>
+                {cetEligible ? (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={cetMaxTransferable}
+                        value={transferAmount}
+                        onChange={(e) => setTransferAmount(parseInt(e.target.value) || 0)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Nb jours"
+                      />
+                      <button
+                        onClick={handleTransferToCET}
+                        disabled={transferring || transferAmount <= 0}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition font-medium text-sm"
+                      >
+                        {transferring ? '...' : 'Demander'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {cetJoursTransferesAnnee}/5 jour(s) cette année — Plafond : {cetSolde}/60 — Max : {cetMaxTransferable} jour(s)
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      La demande sera soumise aux RH pour validation.
+                    </p>
+                  </>
+                ) : (
+                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <p className="text-sm font-medium text-orange-800">Versement non disponible</p>
+                    <ul className="text-xs text-orange-700 mt-1 space-y-0.5">
+                      {cetBlockReasons.map((reason, i) => (
+                        <li key={i}>- {reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Retrait CET -> congés */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <p className="text-sm font-semibold text-gray-800 mb-3">Retirer des jours du CET vers vos congés</p>
+                {cetSolde > 0 ? (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={cetSolde}
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(parseInt(e.target.value) || 0)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="Nb jours"
+                      />
+                      <button
+                        onClick={handleWithdrawFromCET}
+                        disabled={withdrawing || withdrawAmount <= 0}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition font-medium text-sm"
+                      >
+                        {withdrawing ? '...' : 'Demander'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {cetSolde} jour(s) disponible(s) dans votre CET
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      La demande sera soumise aux RH pour validation.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">Aucun jour dans votre CET</p>
+                )}
+              </div>
+
+              {/* Conditions CET */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-600 mb-1">Conditions pour verser vers le CET :</p>
+                <ul className="text-xs text-gray-500 space-y-0.5">
+                  <li className={cetAncienneteOk ? 'text-green-600' : ''}>
+                    {cetAncienneteOk ? '\u2713' : '\u2022'} 1 an d'ancienneté minimum
+                  </li>
+                  <li className={cetJoursPrisOk ? 'text-green-600' : ''}>
+                    {cetJoursPrisOk ? '\u2713' : '\u2022'} 20 jours de congé pris minimum ({profile?.jours_pris || 0}/20)
+                  </li>
+                  <li className={cetResteTransferable > 0 ? 'text-green-600' : ''}>
+                    {cetResteTransferable > 0 ? '\u2713' : '\u2022'} Maximum 5 jours/an ({cetJoursTransferesAnnee}/5 utilisés)
+                  </li>
+                  <li className={cetPlafondOk ? 'text-green-600' : ''}>
+                    {cetPlafondOk ? '\u2713' : '\u2022'} Plafond CET de 60 jours ({cetSolde}/60)
+                  </li>
+                </ul>
               </div>
 
               {cet?.historique && cet.historique.length > 0 && (
                 <div className="mt-4 border-t border-gray-200 pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Historique récent</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Historique des transferts</p>
                   <div className="space-y-2 max-h-32 overflow-y-auto">
                     {cet.historique.slice(0, 5).map((h, i) => (
                       <div key={i} className="flex justify-between items-center text-sm">

@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { formatDateFR } from '@/lib/dateUtils';
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from '@/lib/email';
 import { validateLeaveAtLevel } from '@/lib/hierarchy';
+import { notifyLeaveDecision, notifyLeaveProgress, sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
 
 export async function PUT(request, { params }) {
   try {
@@ -72,10 +73,18 @@ export async function PUT(request, { params }) {
         commentaire_rh || ''
       );
 
-      // Envoyer les emails appropriés
+      // Récupérer le nom du validateur pour la notification
+      const validatorResult = await db.execute({
+        sql: 'SELECT nom, prenom FROM users WHERE id = ?',
+        args: [validatorId]
+      });
+      const validatorName = validatorResult.rows[0]
+        ? `${validatorResult.rows[0].prenom} ${validatorResult.rows[0].nom}`
+        : 'un responsable';
+
+      // Envoyer les emails et notifications push
       if (result.isFinal) {
         if (statut === 'validee') {
-          // Email
           await sendLeaveApprovedEmail(
             leave.email,
             `${leave.prenom} ${leave.nom}`,
@@ -84,7 +93,6 @@ export async function PUT(request, { params }) {
             leave.nombre_jours_ouvres
           );
         } else {
-          // Email
           await sendLeaveRejectedEmail(
             leave.email,
             `${leave.prenom} ${leave.nom}`,
@@ -92,6 +100,27 @@ export async function PUT(request, { params }) {
             formatDateFR(leave.date_fin),
             commentaire_rh
           );
+        }
+        // Notification push à l'agent
+        try {
+          await notifyLeaveDecision(leave.user_id, statut, validatorName);
+        } catch (e) { /* ignore push errors */ }
+      } else {
+        // Validation intermédiaire - notifier l'agent de l'avancement
+        try {
+          await notifyLeaveProgress(leave.user_id, result.message);
+        } catch (e) { /* ignore push errors */ }
+
+        // Notifier le validateur suivant
+        if (result.nextLevel === 'rh') {
+          try {
+            await sendPushToRH({
+              title: 'Demande en attente de validation RH',
+              body: `La demande de ${leave.prenom} ${leave.nom} nécessite votre validation`,
+              url: '/validation',
+              tag: `leave-${id}`
+            });
+          } catch (e) { /* ignore */ }
         }
       }
 

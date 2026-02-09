@@ -59,7 +59,7 @@ export async function POST(request, { params }) {
     }
 
     const balance = balanceResult.rows[0];
-    const newAcquis = parseFloat(balance.jours_acquis) + adjustmentNum;
+    const newCompensateurs = parseFloat(balance.jours_compensateurs || 0) + adjustmentNum;
     const newRestants = parseFloat(balance.jours_restants) + adjustmentNum;
 
     if (newRestants < 0) {
@@ -69,27 +69,27 @@ export async function POST(request, { params }) {
       );
     }
 
-    if (newAcquis < 0) {
+    if (newCompensateurs < 0) {
       return NextResponse.json(
-        { success: false, message: `Impossible : les jours acquis deviendraient négatifs (${newAcquis.toFixed(2)} jours)` },
+        { success: false, message: `Impossible : les jours compensateurs deviendraient négatifs (${newCompensateurs.toFixed(2)} jours)` },
         { status: 400 }
       );
     }
 
-    // Mettre à jour le solde
+    // Mettre à jour le solde (jours_compensateurs + jours_restants)
     await db.execute({
-      sql: 'UPDATE soldes_conges SET jours_acquis = ?, jours_restants = ? WHERE user_id = ? AND annee = ?',
-      args: [newAcquis, newRestants, id, currentYear]
+      sql: 'UPDATE soldes_conges SET jours_compensateurs = ?, jours_restants = ? WHERE user_id = ? AND annee = ?',
+      args: [newCompensateurs, newRestants, id, currentYear]
     });
 
     const user = userResult.rows[0];
-    console.log(`Balance adjusted for ${user.prenom} ${user.nom}: ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} days (motif: ${motif || 'non spécifié'})`);
+    console.log(`Compensatory days adjusted for ${user.prenom} ${user.nom}: ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} days (motif: ${motif || 'non spécifié'})`);
 
     return NextResponse.json({
       success: true,
-      message: `Solde ajusté avec succès : ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} jour(s)`,
+      message: `Jours compensateurs ajustés : ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} jour(s)`,
       newBalance: {
-        jours_acquis: newAcquis,
+        jours_compensateurs: newCompensateurs,
         jours_restants: newRestants
       }
     });

@@ -61,6 +61,7 @@ export const formatStatus = (status) => {
     en_attente: 'En attente',
     validee: 'Validée',
     refusee: 'Refusée',
+    annulee: 'Annulée',
   };
   return statuses[status] || status;
 };
@@ -70,6 +71,7 @@ export const getStatusColor = (status) => {
     en_attente: 'bg-yellow-100 text-yellow-800',
     validee: 'bg-green-100 text-green-800',
     refusee: 'bg-red-100 text-red-800',
+    annulee: 'bg-gray-100 text-gray-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 };
