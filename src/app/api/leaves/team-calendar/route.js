@@ -18,6 +18,7 @@ export async function GET(request) {
 
     let sql = `
       SELECT dc.id, dc.date_debut, dc.date_fin, dc.nombre_jours_ouvres,
+             dc.type_debut, dc.type_fin,
              u.id as user_id, u.nom, u.prenom, u.type_utilisateur
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id

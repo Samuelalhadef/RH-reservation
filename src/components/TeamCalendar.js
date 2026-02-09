@@ -7,7 +7,6 @@ const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
   const [hoveredTooltip, setHoveredTooltip] = useState(null);
@@ -78,20 +77,46 @@ const TeamCalendar = () => {
 
   const isWeekend = (date) => {
     const day = date.getDay();
-    return day === 0 || day === 6; // 0 = Dimanche, 6 = Samedi
+    return day === 0 || day === 6;
   };
 
-  const getLeavesForDate = (dateStr) => {
-    // Ne pas afficher les congés sur les week-ends
+  // Récupérer les congés pour une demi-journée spécifique
+  const getLeavesForHalfDay = (dateStr, period) => {
     const date = new Date(dateStr + 'T00:00:00');
-    if (isWeekend(date)) {
-      return [];
-    }
+    if (isWeekend(date)) return [];
 
     return leaves.filter(leave => {
       const startStr = leave.date_debut.split('T')[0];
       const endStr = leave.date_fin.split('T')[0];
-      return dateStr >= startStr && dateStr <= endStr;
+
+      if (dateStr < startStr || dateStr > endStr) return false;
+
+      const typeDebut = leave.type_debut || 'journee_complete';
+      const typeFin = leave.type_fin || 'journee_complete';
+
+      if (dateStr > startStr && dateStr < endStr) return true;
+
+      if (dateStr === startStr && dateStr === endStr) {
+        if (typeDebut === 'journee_complete' && typeFin === 'journee_complete') return true;
+        if (typeDebut === 'matin' && typeFin === 'matin') return period === 'matin';
+        if (typeDebut === 'apres_midi' && typeFin === 'apres_midi') return period === 'apres_midi';
+        if (typeDebut === 'matin' && typeFin === 'apres_midi') return true;
+        if (typeDebut === 'apres_midi') return period === 'apres_midi';
+        if (typeFin === 'matin') return period === 'matin';
+        return true;
+      }
+
+      if (dateStr === startStr) {
+        if (typeDebut === 'apres_midi') return period === 'apres_midi';
+        return true;
+      }
+
+      if (dateStr === endStr) {
+        if (typeFin === 'matin') return period === 'matin';
+        return true;
+      }
+
+      return false;
     });
   };
 
@@ -102,10 +127,11 @@ const TeamCalendar = () => {
     }
 
     const dateStr = formatDateToYYYYMMDD(date);
-    const leavesOnDate = getLeavesForDate(dateStr);
+    const leavesAM = getLeavesForHalfDay(dateStr, 'matin');
+    const leavesPM = getLeavesForHalfDay(dateStr, 'apres_midi');
     const isHoliday = holidays.find(h => h.date === dateStr);
 
-    if (leavesOnDate.length > 0 || isHoliday) {
+    if (leavesAM.length > 0 || leavesPM.length > 0 || isHoliday) {
       const rect = event.currentTarget.getBoundingClientRect();
       setTooltipPosition({
         x: rect.left + rect.width / 2,
@@ -113,12 +139,14 @@ const TeamCalendar = () => {
       });
       setHoveredTooltip({
         date: date,
-        leaves: leavesOnDate,
+        leavesAM,
+        leavesPM,
         holiday: isHoliday
       });
       setTooltipData({
         date: date,
-        leaves: leavesOnDate,
+        leavesAM,
+        leavesPM,
         holiday: isHoliday
       });
       setShowTooltip(true);
@@ -148,30 +176,6 @@ const TeamCalendar = () => {
     return colors[index % colors.length];
   };
 
-  const getDayClassName = (date, isCurrentMonth) => {
-    const today = new Date();
-    const isToday = date.getDate() === today.getDate() &&
-                    date.getMonth() === today.getMonth() &&
-                    date.getFullYear() === today.getFullYear();
-
-    let classes = 'w-full aspect-square flex items-center justify-center rounded-xl transition-all font-medium text-lg relative overflow-hidden ';
-
-    if (!isCurrentMonth) {
-      classes += 'text-gray-300 ';
-    } else if (isWeekend(date)) {
-      // Griser les week-ends
-      classes += 'bg-gray-100 text-gray-400 ';
-    } else {
-      classes += 'cursor-pointer ';
-    }
-
-    if (isToday && isCurrentMonth) {
-      classes += 'ring-2 ring-blue-500 ';
-    }
-
-    return classes;
-  };
-
   const goToPreviousMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
@@ -187,7 +191,7 @@ const TeamCalendar = () => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative">
       {/* Tooltip flottant au survol */}
-      {hoveredTooltip && hoveredTooltip.leaves.length > 0 && (
+      {hoveredTooltip && (hoveredTooltip.leavesAM?.length > 0 || hoveredTooltip.leavesPM?.length > 0) && (
         <div
           className="fixed z-50 pointer-events-none"
           style={{
@@ -197,22 +201,28 @@ const TeamCalendar = () => {
           }}
         >
           <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-sm whitespace-nowrap">
-            {hoveredTooltip.leaves.length === 1 ? (
-              <p className="font-semibold">
-                {hoveredTooltip.leaves[0].prenom} {hoveredTooltip.leaves[0].nom}
-              </p>
-            ) : (
-              <div>
-                <p className="font-bold mb-1">{hoveredTooltip.leaves.length} personnes en congé:</p>
-                {hoveredTooltip.leaves.map((leave, idx) => (
-                  <div key={leave.id} className="flex items-center gap-2 py-0.5">
+            {hoveredTooltip.leavesAM?.length > 0 && (
+              <div className="mb-1">
+                <p className="text-xs text-gray-400 font-bold">Matin :</p>
+                {hoveredTooltip.leavesAM.map((leave, idx) => (
+                  <div key={`am-${leave.id}`} className="flex items-center gap-2 py-0.5">
                     <div className={`w-2 h-2 rounded-full ${getPersonColor(idx)}`}></div>
                     <span>{leave.prenom} {leave.nom}</span>
                   </div>
                 ))}
               </div>
             )}
-            {/* Flèche du tooltip */}
+            {hoveredTooltip.leavesPM?.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-400 font-bold">Après-midi :</p>
+                {hoveredTooltip.leavesPM.map((leave, idx) => (
+                  <div key={`pm-${leave.id}`} className="flex items-center gap-2 py-0.5">
+                    <div className={`w-2 h-2 rounded-full ${getPersonColor(idx)}`}></div>
+                    <span>{leave.prenom} {leave.nom}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
           </div>
         </div>
@@ -260,15 +270,14 @@ const TeamCalendar = () => {
             <div className="flex-1 bg-blue-500"></div>
             <div className="flex-1 bg-green-500"></div>
           </div>
-          <span className="text-gray-600">2 personnes</span>
+          <span className="text-gray-600">2+ personnes</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-4 rounded overflow-hidden flex">
-            <div className="flex-1 bg-blue-500"></div>
-            <div className="flex-1 bg-green-500"></div>
-            <div className="flex-1 bg-yellow-500"></div>
+          <div className="w-4 h-4 rounded overflow-hidden flex flex-col">
+            <div className="flex-1 bg-blue-300"></div>
+            <div className="flex-1"></div>
           </div>
-          <span className="text-gray-600">3+ personnes</span>
+          <span className="text-gray-600">Haut = matin, Bas = après-midi</span>
         </div>
       </div>
 
@@ -289,42 +298,73 @@ const TeamCalendar = () => {
         <div className="grid grid-cols-7 gap-2 relative">
           {days.map((day, index) => {
             const dateStr = formatDateToYYYYMMDD(day.date);
-            const leavesOnDate = getLeavesForDate(dateStr);
-            const leaveCount = leavesOnDate.length;
+            const leavesAM = getLeavesForHalfDay(dateStr, 'matin');
+            const leavesPM = getLeavesForHalfDay(dateStr, 'apres_midi');
             const isHoliday = holidays.some(h => h.date === dateStr);
+            const today = new Date();
+            const isToday = day.date.getDate() === today.getDate() &&
+                            day.date.getMonth() === today.getMonth() &&
+                            day.date.getFullYear() === today.getFullYear();
+
+            const hasAnyLeave = leavesAM.length > 0 || leavesPM.length > 0;
 
             return (
               <div
                 key={index}
-                className={getDayClassName(day.date, day.isCurrentMonth)}
+                className={`w-full aspect-square relative transition-all font-medium text-lg ${
+                  isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-xl' : ''
+                } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                 onMouseEnter={(e) => handleDateHover(e, day.date, day.isCurrentMonth)}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Arrière-plan avec couleurs multiples */}
-                {day.isCurrentMonth && (
-                  <>
-                    {isHoliday ? (
-                      <div className="absolute inset-0 bg-purple-100 border-2 border-purple-300 rounded-xl"></div>
-                    ) : leaveCount > 0 ? (
-                      <div className="absolute inset-0 flex rounded-xl overflow-hidden">
-                        {leavesOnDate.map((leave, idx) => (
-                          <div
-                            key={leave.id}
-                            className={`flex-1 ${getPersonColor(idx)}`}
-                            style={{ flex: 1 }}
-                          ></div>
-                        ))}
+                {/* Deux moitiés avec gap */}
+                <div className="absolute inset-0 flex flex-col gap-1">
+                  {day.isCurrentMonth && !isWeekend(day.date) && !isHoliday ? (
+                    <>
+                      {/* Moitié haute - Matin */}
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesAM.length > 0 ? '' : ''}`}>
+                        {leavesAM.length > 0 ? (
+                          leavesAM.map((leave, idx) => (
+                            <div
+                              key={leave.id}
+                              className={`flex-1 ${getPersonColor(idx)}`}
+                            ></div>
+                          ))
+                        ) : null}
                       </div>
-                    ) : null}
-                  </>
-                )}
+                      {/* Moitié basse - Après-midi */}
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesPM.length > 0 ? '' : ''}`}>
+                        {leavesPM.length > 0 ? (
+                          leavesPM.map((leave, idx) => (
+                            <div
+                              key={leave.id}
+                              className={`flex-1 ${getPersonColor(idx)}`}
+                            ></div>
+                          ))
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Jour férié ou weekend - deux moitiés même couleur */}
+                      <div className={`flex-1 rounded-lg ${
+                        day.isCurrentMonth && isHoliday ? 'bg-purple-100 border border-purple-300' :
+                        day.isCurrentMonth && isWeekend(day.date) ? 'bg-gray-100' : ''
+                      }`} />
+                      <div className={`flex-1 rounded-lg ${
+                        day.isCurrentMonth && isHoliday ? 'bg-purple-100 border border-purple-300' :
+                        day.isCurrentMonth && isWeekend(day.date) ? 'bg-gray-100' : ''
+                      }`} />
+                    </>
+                  )}
+                </div>
 
                 {/* Numéro du jour */}
-                <span className={`relative z-10 ${
-                  day.isCurrentMonth && (leaveCount > 0 || isHoliday)
+                <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none ${
+                  day.isCurrentMonth && (hasAnyLeave || isHoliday)
                     ? 'text-white font-bold drop-shadow-md'
                     : day.isCurrentMonth
-                      ? 'text-gray-700'
+                      ? isWeekend(day.date) ? 'text-gray-400' : 'text-gray-700'
                       : 'text-gray-300'
                 }`}>
                   {day.date.getDate()}
@@ -335,7 +375,7 @@ const TeamCalendar = () => {
         </div>
       </div>
 
-      {/* Tooltip */}
+      {/* Tooltip détaillé en bas */}
       {showTooltip && tooltipData && (
         <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
           <h3 className="font-bold text-gray-800 mb-3">
@@ -350,14 +390,40 @@ const TeamCalendar = () => {
             </div>
           )}
 
-          {tooltipData.leaves.length > 0 && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                {tooltipData.leaves.length} personne{tooltipData.leaves.length > 1 ? 's' : ''} en congé:
+          {tooltipData.leavesAM?.length > 0 && (
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-gray-700 mb-2">
+                Matin - {tooltipData.leavesAM.length} personne{tooltipData.leavesAM.length > 1 ? 's' : ''} en congé :
               </p>
               <div className="space-y-2">
-                {tooltipData.leaves.map((leave, idx) => (
-                  <div key={leave.id} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                {tooltipData.leavesAM.map((leave, idx) => (
+                  <div key={`am-${leave.id}`} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                    <div className={`w-4 h-4 rounded ${getPersonColor(idx)} flex-shrink-0 mt-0.5`}></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-800">
+                        {leave.prenom} {leave.nom}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Du {formatDateFR(leave.date_debut)} au {formatDateFR(leave.date_fin)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {leave.nombre_jours_ouvres} jour{leave.nombre_jours_ouvres > 1 ? 's' : ''} ouvrés
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tooltipData.leavesPM?.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">
+                Après-midi - {tooltipData.leavesPM.length} personne{tooltipData.leavesPM.length > 1 ? 's' : ''} en congé :
+              </p>
+              <div className="space-y-2">
+                {tooltipData.leavesPM.map((leave, idx) => (
+                  <div key={`pm-${leave.id}`} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
                     <div className={`w-4 h-4 rounded ${getPersonColor(idx)} flex-shrink-0 mt-0.5`}></div>
                     <div className="flex-1">
                       <p className="text-sm font-bold text-gray-800">

@@ -12,7 +12,7 @@ const seed = async () => {
 
     console.log('👤 Création des utilisateurs par défaut...');
 
-    const tempPassword = 'password123';
+    const tempPassword = 'chartrettes2026';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const users = [

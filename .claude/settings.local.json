@@ -31,7 +31,10 @@
       "Bash(sips:*)",
       "Bash(npm run build:*)",
       "Bash(npm info:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(xargs:*)",
+      "Bash(npx next build:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

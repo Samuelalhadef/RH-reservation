@@ -37,6 +37,10 @@ export default function RHPage() {
     motif: ''
   });
   const [rhLeaveLoading, setRhLeaveLoading] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustingUser, setAdjustingUser] = useState(null);
+  const [adjustForm, setAdjustForm] = useState({ adjustment: '', motif: '' });
+  const [adjustLoading, setAdjustLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -192,6 +196,41 @@ export default function RHPage() {
       fetchData();
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  const handleAdjustBalance = async (e) => {
+    e.preventDefault();
+
+    const adj = parseFloat(adjustForm.adjustment);
+    if (!adjustForm.adjustment || isNaN(adj) || adj === 0) {
+      toast.error('Veuillez entrer un nombre de jours valide (différent de 0)');
+      return;
+    }
+
+    setAdjustLoading(true);
+    try {
+      const response = await fetch(`/api/users/${adjustingUser.id}/adjust-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adjustment: adj, motif: adjustForm.motif }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message);
+      }
+
+      toast.success(data.message);
+      setShowAdjustModal(false);
+      setAdjustingUser(null);
+      setAdjustForm({ adjustment: '', motif: '' });
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setAdjustLoading(false);
     }
   };
 
@@ -535,6 +574,17 @@ export default function RHPage() {
                               title="Modifier"
                             >
                               Modifier
+                            </button>
+                            <button
+                              onClick={() => {
+                                setAdjustingUser(user);
+                                setAdjustForm({ adjustment: '', motif: '' });
+                                setShowAdjustModal(true);
+                              }}
+                              className="text-green-600 hover:text-green-700 text-sm font-medium"
+                              title="Ajuster les jours de congé"
+                            >
+                              Jours
                             </button>
                             <button
                               onClick={() => handleResetPassword(user.id)}
@@ -1008,6 +1058,84 @@ export default function RHPage() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                 >
                   Modifier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal d'ajustement des jours de congé */}
+      {showAdjustModal && adjustingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              Ajuster les jours de congé
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {adjustingUser.prenom} {adjustingUser.nom} — Solde actuel : <span className="font-semibold">{adjustingUser.jours_restants || 0}</span> / {adjustingUser.jours_acquis || 0} jours
+            </p>
+
+            <form onSubmit={handleAdjustBalance}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre de jours *
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={adjustForm.adjustment}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, adjustment: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: 2 pour ajouter, -3 pour retirer"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Positif pour ajouter des jours, négatif pour en retirer
+                </p>
+              </div>
+
+              {adjustForm.adjustment && !isNaN(parseFloat(adjustForm.adjustment)) && parseFloat(adjustForm.adjustment) !== 0 && (
+                <div className={`mb-4 p-3 rounded-lg border ${parseFloat(adjustForm.adjustment) > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <p className="text-sm font-medium">
+                    {parseFloat(adjustForm.adjustment) > 0 ? '+ ' : ''}{adjustForm.adjustment} jour(s)
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Nouveau solde : {((adjustingUser.jours_restants || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} / {((adjustingUser.jours_acquis || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} jours
+                  </p>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motif
+                </label>
+                <textarea
+                  value={adjustForm.motif}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, motif: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Report de l'année précédente, correction, bonus..."
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdjustModal(false);
+                    setAdjustingUser(null);
+                    setAdjustForm({ adjustment: '', motif: '' });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={adjustLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+                >
+                  {adjustLoading ? 'En cours...' : 'Valider'}
                 </button>
               </div>
             </form>
