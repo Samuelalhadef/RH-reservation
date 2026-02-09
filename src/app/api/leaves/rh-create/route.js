@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { calculateBusinessDays } from '@/lib/dateUtils';
+import { recalculateFractionnement } from '@/lib/fractionnement';
 
 export async function POST(request) {
   try {
@@ -140,6 +141,9 @@ export async function POST(request) {
         args: [totalPris, restants, user_id, currentYear]
       });
     }
+
+    // Recalculer les jours de fractionnement
+    await recalculateFractionnement(user_id, currentYear);
 
     return NextResponse.json({
       success: true,

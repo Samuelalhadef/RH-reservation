@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { recalculateFractionnement } from './fractionnement.js';
 
 /**
  * Détermine le circuit de validation pour un utilisateur
@@ -315,6 +316,9 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
         args: [totalPris, restants, leave.user_id, currentYear]
       });
     }
+
+    // Recalculer les jours de fractionnement
+    await recalculateFractionnement(leave.user_id, currentYear);
 
     return {
       success: true,

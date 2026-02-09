@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
+import { recalculateFractionnement } from '@/lib/fractionnement';
 
 export async function POST(request) {
   try {
@@ -35,11 +36,21 @@ export async function POST(request) {
       });
 
       const totalPris = totalResult.rows[0]?.total_pris || 0;
-      const totalAcquis = (solde.jours_acquis || 0) + (solde.jours_reportes || 0) + (solde.jours_fractionnement || 0) + (solde.jours_compensateurs || 0);
-      const restants = totalAcquis - totalPris;
 
-      // Mettre à jour si différent
-      if (solde.jours_pris !== totalPris || solde.jours_restants !== restants) {
+      // D'abord recalculer le fractionnement
+      const fractionnement = await recalculateFractionnement(solde.user_id, currentYear);
+
+      // Re-lire le solde après le recalcul du fractionnement
+      const updatedSolde = await db.execute({
+        sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs FROM soldes_conges WHERE user_id = ? AND annee = ?',
+        args: [solde.user_id, currentYear]
+      });
+
+      if (updatedSolde.rows.length > 0) {
+        const s = updatedSolde.rows[0];
+        const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + (s.jours_fractionnement || 0) + (s.jours_compensateurs || 0);
+        const restants = totalAcquis - totalPris;
+
         await db.execute({
           sql: `
             UPDATE soldes_conges
@@ -55,7 +66,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: `Recalcul terminé. ${corrected} solde(s) corrigé(s) sur ${soldes.rows.length} utilisateur(s).`,
+      message: `Recalcul terminé. ${corrected} solde(s) recalculé(s) (dont fractionnement) sur ${soldes.rows.length} utilisateur(s).`,
       corrected,
       total: soldes.rows.length
     });
