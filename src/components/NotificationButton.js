@@ -1,9 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -33,15 +31,25 @@ export default function NotificationButton() {
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
-  const [showInstallTip, setShowInstallTip] = useState(false);
+  const vapidKeyRef = useRef(null);
 
   useEffect(() => {
-    const hasPush = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && VAPID_PUBLIC_KEY;
-    setPushSupported(hasPush);
+    const hasSW = 'serviceWorker' in navigator;
+    const hasPush = hasSW && 'PushManager' in window && 'Notification' in window;
 
     if (hasPush) {
       setPermission(Notification.permission);
-      checkSubscription();
+      // Charger la clé VAPID depuis l'API
+      fetch('/api/push/vapid-key')
+        .then(res => res.json())
+        .then(data => {
+          if (data.publicKey) {
+            vapidKeyRef.current = data.publicKey;
+            setPushSupported(true);
+            checkSubscription();
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -59,15 +67,13 @@ export default function NotificationButton() {
 
   const handleClick = () => {
     if (!pushSupported) {
-      // Push non supporté - afficher un message d'aide
       if (isIOS() && !isStandalone()) {
-        setShowInstallTip(true);
         toast((t) => (
           <div>
             <p className="font-semibold mb-1">Installer l'application</p>
             <p className="text-sm">Pour recevoir les notifications sur iPhone :</p>
             <ol className="text-sm mt-1 ml-4 list-decimal">
-              <li>Appuyez sur le bouton <strong>Partager</strong> (en bas)</li>
+              <li>Appuyez sur le bouton <strong>Partager</strong></li>
               <li>Choisissez <strong>"Sur l'écran d'accueil"</strong></li>
               <li>Ouvrez l'app depuis l'écran d'accueil</li>
             </ol>
@@ -80,7 +86,7 @@ export default function NotificationButton() {
           </div>
         ), { duration: 10000 });
       } else {
-        toast.error('Les notifications push ne sont pas supportées par ce navigateur. Essayez avec Chrome ou installez l\'application.');
+        toast.error('Les notifications ne sont pas encore disponibles. Essayez de recharger la page ou d\'utiliser Chrome.');
       }
       return;
     }
@@ -108,7 +114,7 @@ export default function NotificationButton() {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        applicationServerKey: urlBase64ToUint8Array(vapidKeyRef.current)
       });
 
       const response = await fetch('/api/push', {
