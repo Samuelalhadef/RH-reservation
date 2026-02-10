@@ -14,10 +14,12 @@ export async function GET() {
 
     const result = await db.execute('SELECT * FROM jours_feries ORDER BY date');
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       holidays: result.rows
     });
+    response.headers.set('Cache-Control', 'public, max-age=3600');
+    return response;
   } catch (error) {
     console.error('Error fetching all holidays:', error);
     return NextResponse.json(

@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 3; // Incrémenter pour forcer re-migration
+let _migrationVersion = 4; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -176,6 +176,22 @@ async function runMigrations() {
       )
     `);
   } catch (error) { /* already exists */ }
+
+  // Performance indexes
+  const indexes = [
+    'CREATE INDEX IF NOT EXISTS idx_demandes_user_id ON demandes_conges(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_statut ON demandes_conges(statut)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_date_debut ON demandes_conges(date_debut)',
+    'CREATE INDEX IF NOT EXISTS idx_soldes_user_annee ON soldes_conges(user_id, annee)',
+    'CREATE INDEX IF NOT EXISTS idx_jours_feries_date ON jours_feries(date)',
+    'CREATE INDEX IF NOT EXISTS idx_jours_cours_user_date ON jours_cours(user_id, date)',
+    'CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_cet_hist_user ON cet_historique(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_cet_user ON demandes_cet(user_id)',
+  ];
+  for (const idx of indexes) {
+    try { await client.execute(idx); } catch (e) { /* ignore */ }
+  }
 }
 
 // Backward-compatible named export using lazy proxy with auto-init

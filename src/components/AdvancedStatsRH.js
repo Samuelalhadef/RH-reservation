@@ -78,7 +78,7 @@ export default function AdvancedStatsRH() {
         setAllUsers(data.users || []);
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
+      // ignore fetch error
     }
   };
 

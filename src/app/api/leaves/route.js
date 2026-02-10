@@ -78,8 +78,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { authenticated, user } = await requireAuth();
-    console.log('Auth result:', { authenticated, user });
-
     if (!authenticated) {
       return NextResponse.json(
         { success: false, message: 'Non authentifié' },
@@ -88,8 +86,6 @@ export async function POST(request) {
     }
 
     const { date_debut, date_fin, motif, type_debut, type_fin } = await request.json();
-    console.log('Request data:', { date_debut, date_fin, motif, type_debut, type_fin, userId: user.userId });
-
     if (!date_debut || !date_fin) {
       return NextResponse.json(
         { success: false, message: 'Les dates de début et de fin sont requises' },
@@ -150,8 +146,6 @@ export async function POST(request) {
 
     // Utiliser user.userId ou user.id selon ce qui est disponible
     const userId = user.userId || user.id;
-    console.log('Using userId:', userId);
-
     if (!userId) {
       return NextResponse.json(
         { success: false, message: 'Impossible de récupérer l\'ID utilisateur' },
@@ -165,12 +159,9 @@ export async function POST(request) {
       args: [userId, currentYear]
     });
 
-    console.log('Balance result:', balanceResult);
-
     let joursRestants = 25;
 
     if (!balanceResult.rows || balanceResult.rows.length === 0) {
-      console.log('Creating new balance entry for user:', userId);
       await db.execute({
         sql: `
           INSERT INTO soldes_conges (user_id, annee, jours_acquis, jours_pris, jours_restants)
@@ -183,8 +174,6 @@ export async function POST(request) {
       joursRestants = balanceResult.rows[0].jours_restants;
     }
 
-    console.log('Jours restants:', joursRestants);
-
     if (businessDays > joursRestants) {
       return NextResponse.json(
         { success: false, message: `Solde insuffisant. Vous avez ${joursRestants} jour(s) disponible(s)` },
@@ -192,11 +181,11 @@ export async function POST(request) {
       );
     }
 
-    // Vérifier les chevauchements avec d'autres demandes VALIDÉES uniquement
-    const validatedOverlapResult = await db.execute({
+    // Vérifier les chevauchements (validées + en attente) en une seule requête
+    const overlapResult = await db.execute({
       sql: `
-        SELECT COUNT(*) as count FROM demandes_conges
-        WHERE user_id = ? AND statut = 'validee'
+        SELECT id, statut FROM demandes_conges
+        WHERE user_id = ? AND statut IN ('validee', 'en_attente')
         AND ((date_debut <= ? AND date_fin >= ?)
              OR (date_debut <= ? AND date_fin >= ?)
              OR (date_debut >= ? AND date_fin <= ?))
@@ -204,36 +193,24 @@ export async function POST(request) {
       args: [userId, date_fin, date_debut, date_debut, date_debut, date_debut, date_fin]
     });
 
-    if (validatedOverlapResult.rows[0].count > 0) {
+    const hasValidatedOverlap = overlapResult.rows.some(r => r.statut === 'validee');
+    if (hasValidatedOverlap) {
       return NextResponse.json(
         { success: false, message: 'Vous avez déjà une demande validée sur cette période. Vous ne pouvez pas la modifier.' },
         { status: 400 }
       );
     }
 
-    // Supprimer automatiquement les demandes EN ATTENTE qui chevauchent
-    const pendingOverlapResult = await db.execute({
-      sql: `
-        SELECT id, date_debut, date_fin FROM demandes_conges
-        WHERE user_id = ? AND statut = 'en_attente'
-        AND ((date_debut <= ? AND date_fin >= ?)
-             OR (date_debut <= ? AND date_fin >= ?)
-             OR (date_debut >= ? AND date_fin <= ?))
-      `,
-      args: [userId, date_fin, date_debut, date_debut, date_debut, date_debut, date_fin]
-    });
-
-    // Supprimer les demandes en attente qui chevauchent
+    // Supprimer en batch les demandes en attente qui chevauchent
+    const pendingIds = overlapResult.rows.filter(r => r.statut === 'en_attente').map(r => r.id);
     let deletedCount = 0;
-    if (pendingOverlapResult.rows && pendingOverlapResult.rows.length > 0) {
-      for (const pendingLeave of pendingOverlapResult.rows) {
-        await db.execute({
-          sql: 'DELETE FROM demandes_conges WHERE id = ?',
-          args: [pendingLeave.id]
-        });
-        deletedCount++;
-      }
-      console.log(`Supprimé ${deletedCount} demande(s) en attente qui chevauchaient`);
+    if (pendingIds.length > 0) {
+      const placeholders = pendingIds.map(() => '?').join(',');
+      await db.execute({
+        sql: `DELETE FROM demandes_conges WHERE id IN (${placeholders})`,
+        args: pendingIds
+      });
+      deletedCount = pendingIds.length;
     }
 
     const result = await db.execute({
@@ -245,14 +222,11 @@ export async function POST(request) {
     });
 
     const userResult = await db.execute({
-      sql: 'SELECT nom, prenom FROM users WHERE id = ?',
+      sql: 'SELECT nom, prenom, responsable_id FROM users WHERE id = ?',
       args: [userId]
     });
 
-    console.log('User result:', userResult);
-
     if (!userResult.rows || userResult.rows.length === 0) {
-      console.error('User not found:', userId);
       return NextResponse.json(
         { success: false, message: 'Utilisateur introuvable' },
         { status: 404 }
@@ -260,17 +234,10 @@ export async function POST(request) {
     }
 
     const userData = userResult.rows[0];
-    console.log('User data:', userData);
 
     // Envoyer notification au bon validateur selon la hiérarchie
     try {
-      // Récupérer les infos complètes de l'utilisateur (avec responsable_id)
-      const fullUserResult = await db.execute({
-        sql: 'SELECT responsable_id FROM users WHERE id = ?',
-        args: [userId]
-      });
-
-      const hasResponsable = fullUserResult.rows[0]?.responsable_id;
+      const hasResponsable = userData.responsable_id;
 
       if (hasResponsable) {
         // L'utilisateur a un responsable direct, lui envoyer la notification
@@ -278,8 +245,6 @@ export async function POST(request) {
           sql: 'SELECT email, nom, prenom FROM users WHERE id = ?',
           args: [hasResponsable]
         });
-
-        console.log('Responsable found:', responsableResult.rows?.length || 0);
 
         if (responsableResult.rows && responsableResult.rows.length > 0) {
           const responsable = responsableResult.rows[0];
@@ -291,7 +256,6 @@ export async function POST(request) {
               formatDateFR(date_fin),
               businessDays
             );
-            console.log(`Email envoyé au responsable: ${responsable.prenom} ${responsable.nom}`);
           } catch (emailError) {
             console.error('Error sending email to responsable:', emailError);
           }
@@ -305,8 +269,6 @@ export async function POST(request) {
         const rhResult = await db.execute({
           sql: 'SELECT email FROM users WHERE type_utilisateur IN ("RH", "Direction") AND actif = 1'
         });
-
-        console.log('RH found:', rhResult.rows?.length || 0);
 
         if (rhResult.rows && rhResult.rows.length > 0) {
           for (const rh of rhResult.rows) {
@@ -352,7 +314,6 @@ export async function POST(request) {
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating leave request:', error);
-    console.error('Error stack:', error.stack);
     return NextResponse.json(
       { success: false, message: 'Erreur lors de la création de la demande: ' + error.message },
       { status: 500 }

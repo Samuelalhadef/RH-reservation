@@ -20,28 +20,26 @@ const TeamCalendar = () => {
 
   const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
 
+  // Fetch holidays once at mount (static data, cached 1h server-side)
   useEffect(() => {
-    fetchData();
-  }, [currentMonth]);
+    fetch('/api/holidays/all').then(r => r.json()).then(data => {
+      setHolidays(data.holidays || []);
+    }).catch(() => {});
+  }, []);
 
-  const fetchData = async () => {
-    try {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth() + 1;
+  // Fetch month-specific data on month change
+  useEffect(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth() + 1;
 
-      const [leavesRes, holidaysRes, coursRes] = await Promise.all([
-        fetch(`/api/leaves/team-calendar?year=${year}&month=${month}`).then(r => r.json()),
-        fetch('/api/holidays/all').then(r => r.json()),
-        fetch(`/api/cours/team?year=${year}&month=${month}`).then(r => r.json()),
-      ]);
-
+    Promise.all([
+      fetch(`/api/leaves/team-calendar?year=${year}&month=${month}`).then(r => r.json()),
+      fetch(`/api/cours/team?year=${year}&month=${month}`).then(r => r.json()),
+    ]).then(([leavesRes, coursRes]) => {
       setLeaves(leavesRes.events || []);
-      setHolidays(holidaysRes.holidays || []);
       setCoursDays(coursRes.jours || []);
-    } catch (error) {
-      console.error('Error fetching team calendar data:', error);
-    }
-  };
+    }).catch(() => {});
+  }, [currentMonth]);
 
   const formatDateToYYYYMMDD = (date) => {
     const year = date.getFullYear();

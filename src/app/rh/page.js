@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import AdvancedStatsRH from '@/components/AdvancedStatsRH';
+import dynamic from 'next/dynamic';
+const AdvancedStatsRH = dynamic(() => import('@/components/AdvancedStatsRH'), {
+  loading: () => <div className="p-8 text-center text-gray-500">Chargement des statistiques...</div>
+});
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 

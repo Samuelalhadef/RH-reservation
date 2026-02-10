@@ -30,10 +30,12 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: result.rows[0]
     });
+    response.headers.set('Cache-Control', 'private, max-age=60');
+    return response;
   } catch (error) {
     console.error('Error fetching profile:', error);
     return NextResponse.json(

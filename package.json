@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
-    "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
@@ -22,7 +21,6 @@
     "jspdf-autotable": "^5.0.2",
     "next": "^15.5.10",
     "react": "^18.3.1",
-    "react-calendar": "^5.1.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",

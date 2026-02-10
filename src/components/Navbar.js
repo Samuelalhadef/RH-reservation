@@ -22,7 +22,7 @@ const Navbar = () => {
           setProfilePhoto(data.user.photo_profil);
         }
       } catch (error) {
-        console.error('Error fetching profile photo:', error);
+        // ignore fetch error
       }
     };
 

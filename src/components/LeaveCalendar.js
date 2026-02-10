@@ -53,7 +53,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         setCoursDays(daysSet);
       }
     } catch (error) {
-      console.error('Error fetching calendar data:', error);
+      // ignore fetch error
     }
   };
 
@@ -269,7 +269,6 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         toast.error(data.message || 'Erreur');
       }
     } catch (error) {
-      console.error('Error toggling cours day:', error);
       toast.error('Erreur lors de la modification');
     }
   };

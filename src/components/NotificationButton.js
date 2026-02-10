@@ -73,7 +73,7 @@ export default function NotificationButton() {
       await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
     } catch (err) {
-      console.warn('SW registration failed:', err);
+      // ignore SW registration error
     }
 
     // Charger la clé VAPID depuis l'API
@@ -230,7 +230,7 @@ export default function NotificationButton() {
         });
       } catch (pushError) {
         // Si échec, réenregistrer le service worker et réessayer
-        console.warn('Premier essai échoué, réenregistrement du SW...', pushError);
+        // Premier essai échoué, réenregistrement du SW
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const reg of regs) {
           await reg.unregister();
@@ -255,7 +255,7 @@ export default function NotificationButton() {
       setSubscribed(true);
       toast.success('Notifications activées !');
     } catch (error) {
-      console.error('Error subscribing:', error);
+      // subscription error handled below
       if (error.name === 'NotAllowedError') {
         toast.error('Les notifications ont été bloquées. Vérifiez les paramètres de votre navigateur.', { duration: 5000 });
       } else if (error.message && error.message.toLowerCase().includes('push service')) {
@@ -300,7 +300,7 @@ export default function NotificationButton() {
       setSubscribed(false);
       toast.success('Notifications désactivées');
     } catch (error) {
-      console.error('Error unsubscribing:', error);
+      // unsubscribe error handled below
       toast.error('Erreur lors de la désactivation');
     } finally {
       setLoading(false);
