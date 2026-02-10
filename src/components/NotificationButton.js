@@ -202,7 +202,7 @@ export default function NotificationButton() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.ready;
 
       const perm = await Notification.requestPermission();
       setPermission(perm);
@@ -212,10 +212,36 @@ export default function NotificationButton() {
         return;
       }
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKeyRef.current)
-      });
+      // Nettoyer une éventuelle ancienne inscription qui pourrait causer un conflit
+      try {
+        const existingSub = await registration.pushManager.getSubscription();
+        if (existingSub) {
+          await existingSub.unsubscribe();
+        }
+      } catch (e) {
+        // Ignorer les erreurs de nettoyage
+      }
+
+      let subscription;
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKeyRef.current)
+        });
+      } catch (pushError) {
+        // Si échec, réenregistrer le service worker et réessayer
+        console.warn('Premier essai échoué, réenregistrement du SW...', pushError);
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.unregister();
+        }
+        await navigator.serviceWorker.register('/sw.js');
+        registration = await navigator.serviceWorker.ready;
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKeyRef.current)
+        });
+      }
 
       const response = await fetch('/api/push', {
         method: 'POST',
@@ -232,6 +258,20 @@ export default function NotificationButton() {
       console.error('Error subscribing:', error);
       if (error.name === 'NotAllowedError') {
         toast.error('Les notifications ont été bloquées. Vérifiez les paramètres de votre navigateur.', { duration: 5000 });
+      } else if (error.message && error.message.toLowerCase().includes('push service')) {
+        toast((t) => (
+          <div>
+            <p className="font-semibold mb-1">Erreur du service push</p>
+            <p className="text-sm">Essayez ces étapes :</p>
+            <ol className="text-sm mt-1 ml-4 list-decimal">
+              <li>Vérifiez que <strong>Google Play Services</strong> est à jour</li>
+              <li>Allez dans <strong>Paramètres &gt; Applications &gt; Chrome &gt; Notifications</strong> et activez-les</li>
+              <li>Désactivez l&apos;<strong>économie de batterie</strong> pour Chrome</li>
+              <li>Redémarrez le téléphone et réessayez</li>
+            </ol>
+            <button onClick={() => toast.dismiss(t.id)} className="mt-2 text-xs text-blue-600 font-medium">Compris</button>
+          </div>
+        ), { duration: 15000 });
       } else {
         toast.error('Erreur : ' + error.message);
       }
