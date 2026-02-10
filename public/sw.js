@@ -1,5 +1,10 @@
 // Service Worker pour les notifications push
 
+// Installation immédiate (crucial pour mobile)
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
+});
+
 self.addEventListener('push', function(event) {
   if (!event.data) return;
 
