@@ -267,7 +267,7 @@ export async function POST(request) {
       } else {
         // Pas de responsable direct, envoyer à la RH
         const rhResult = await db.execute({
-          sql: 'SELECT email FROM users WHERE type_utilisateur IN ("RH", "Direction") AND actif = 1'
+          sql: 'SELECT email FROM users WHERE type_utilisateur IN ("RH", "Direction", "DG") AND actif = 1'
         });
 
         if (rhResult.rows && rhResult.rows.length > 0) {

@@ -42,7 +42,7 @@ export async function GET(request) {
     }
 
     const validator = validatorResult.rows[0];
-    const isRH = validator.type_utilisateur === 'RH' || validator.type_utilisateur === 'Direction';
+    const isRH = validator.type_utilisateur === 'RH' || validator.type_utilisateur === 'Direction' || validator.type_utilisateur === 'DG';
     const validatorLevel = validator.niveau_validation || 0;
 
     let query;

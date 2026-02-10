@@ -61,7 +61,7 @@ export async function requireAuth() {
  */
 export async function requireRH() {
   const { authenticated, user } = await requireAuth();
-  if (!authenticated || (user.type !== 'RH' && user.type !== 'Direction')) {
+  if (!authenticated || (user.type !== 'RH' && user.type !== 'Direction' && user.type !== 'DG')) {
     return { authorized: false, user: null };
   }
   return { authorized: true, user };

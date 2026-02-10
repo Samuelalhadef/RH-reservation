@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const isRH = () => user && (user.type === 'RH' || user.type === 'Direction');
+  const isRH = () => user && (user.type === 'RH' || user.type === 'Direction' || user.type === 'DG');
   const isAlternant = () => user && user.type === 'Alternant';
 
   const value = {
