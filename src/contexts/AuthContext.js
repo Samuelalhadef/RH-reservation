@@ -102,7 +102,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const isRH = () => user && user.type === 'RH';
+  const isRH = () => user && (user.type === 'RH' || user.type === 'Direction');
+  const isAlternant = () => user && user.type === 'Alternant';
 
   const value = {
     user,
@@ -112,6 +113,7 @@ export const AuthProvider = ({ children }) => {
     changePassword,
     refreshProfile,
     isRH,
+    isAlternant,
     isAuthenticated: !!user,
   };
 

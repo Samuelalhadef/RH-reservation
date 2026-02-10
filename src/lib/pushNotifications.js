@@ -70,7 +70,7 @@ export async function sendPushToUser(userId, payload) {
 export async function sendPushToRH(payload) {
   try {
     const rhUsers = await db.execute({
-      sql: "SELECT id FROM users WHERE type_utilisateur = 'RH' AND actif = 1"
+      sql: "SELECT id FROM users WHERE type_utilisateur IN ('RH', 'Direction') AND actif = 1"
     });
 
     for (const rh of rhUsers.rows) {

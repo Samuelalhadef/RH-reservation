@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDateFR } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 
 const LeaveCalendar = ({ onLeaveCreated }) => {
+  const { isAlternant } = useAuth();
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [coursDays, setCoursDays] = useState(new Set());
+  const [coursMode, setCoursMode] = useState(false);
 
   // Sélection par demi-journée
   const [startDate, setStartDate] = useState(null);
@@ -30,13 +34,24 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
   const fetchData = async () => {
     try {
-      const [leavesRes, holidaysRes] = await Promise.all([
+      const promises = [
         fetch('/api/leaves/calendar').then(r => r.json()),
         fetch('/api/holidays/all').then(r => r.json()),
-      ]);
+      ];
 
-      setLeaves(leavesRes.events || []);
-      setHolidays(holidaysRes.holidays || []);
+      if (isAlternant()) {
+        promises.push(fetch('/api/cours').then(r => r.json()));
+      }
+
+      const results = await Promise.all(promises);
+
+      setLeaves(results[0].events || []);
+      setHolidays(results[1].holidays || []);
+
+      if (isAlternant() && results[2]) {
+        const daysSet = new Set((results[2].jours || []).map(j => j.date));
+        setCoursDays(daysSet);
+      }
     } catch (error) {
       console.error('Error fetching calendar data:', error);
     }
@@ -98,6 +113,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const diffTime = checkDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays < 7;
+  };
+
+  const isCoursDay = (date) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+    return coursDays.has(dateStr);
   };
 
   // Détermine le statut d'une demi-journée par rapport aux congés existants
@@ -220,7 +240,46 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     return date.getTime() === endDate.getTime() && period === endPeriod;
   };
 
+  const handleCoursToggle = async (date) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+    if (isWeekend(date)) return;
+    if (holidays.some(h => h.date === dateStr)) return;
+
+    try {
+      const response = await fetch('/api/cours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setCoursDays(prev => {
+          const next = new Set(prev);
+          if (data.action === 'added') {
+            next.add(dateStr);
+          } else {
+            next.delete(dateStr);
+          }
+          return next;
+        });
+        toast.success(data.message);
+      } else {
+        toast.error(data.message || 'Erreur');
+      }
+    } catch (error) {
+      console.error('Error toggling cours day:', error);
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
   const handleHalfDayClick = (date, period) => {
+    if (coursMode) {
+      handleCoursToggle(date);
+      return;
+    }
+
     if (!isHalfDaySelectable(date, period)) return;
 
     if (!startDate || (startDate && endDate)) {
@@ -341,9 +400,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const inRange = isInSelectedRange(date, period);
     const isStart = isStartSlot(date, period);
     const isEnd = isEndSlot(date, period);
+    const isCours = isCoursDay(date);
 
     if (isWeekend(date)) return 'bg-gray-100';
     if (isHoliday) return 'bg-purple-100';
+    if (isCours) return 'bg-violet-200';
 
     if (isPast || isTooSoon) {
       if (leaveStatus && leaveStatus.statut === 'validee') return 'bg-green-200 opacity-60';
@@ -370,9 +431,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isPast = isPastDate(date);
     const isTooSoon = isLessThan7DaysAhead(date);
     const isHoliday = holidays.some(h => h.date === dateStr);
+    const isCours = isCoursDay(date);
 
     if (isWeekend(date)) return 'text-gray-400';
     if (isHoliday) return 'text-purple-800 font-semibold';
+    if (isCours) return 'text-violet-800 font-semibold';
 
     if (isPast || isTooSoon) {
       const lsAM = getHalfDayLeaveStatus(date, 'matin');
@@ -404,6 +467,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
   // Est-ce que la demi-journée est cliquable ?
   const isHalfDayClickable = (date, period, isCurrentMonth) => {
     if (!isCurrentMonth) return false;
+    if (coursMode) {
+      const dateStr = formatDateToYYYYMMDD(date);
+      return !isWeekend(date) && !holidays.some(h => h.date === dateStr);
+    }
     return isHalfDaySelectable(date, period);
   };
 
@@ -438,6 +505,40 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         </div>
       </div>
 
+      {/* Toggle mode cours pour alternants */}
+      {isAlternant() && (
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => { setCoursMode(false); handleCancel(); }}
+            className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium transition ${
+              !coursMode
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Mode congé
+          </button>
+          <button
+            onClick={() => { setCoursMode(true); handleCancel(); }}
+            className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium transition ${
+              coursMode
+                ? 'bg-violet-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Mode en cours
+          </button>
+        </div>
+      )}
+
+      {coursMode && (
+        <div className="mb-4 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+          <p className="text-sm text-violet-700">
+            Cliquez sur un jour pour le marquer/démarquer comme jour en cours.
+          </p>
+        </div>
+      )}
+
       {/* Légende */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <p className="text-xs font-semibold text-gray-700 mb-2">Légende :</p>
@@ -454,6 +555,12 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             <div className="w-4 h-4 bg-purple-100 border-2 border-purple-300 rounded"></div>
             <span className="text-gray-600">Jour férié</span>
           </div>
+          {isAlternant() && (
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 bg-violet-200 border-2 border-violet-400 rounded"></div>
+              <span className="text-gray-600">En cours</span>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-gray-100 rounded"></div>
             <span className="text-gray-600">Non disponible</span>
@@ -529,7 +636,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
       </div>
 
       {/* Sélection en cours (un seul clic) */}
-      {startDate && startPeriod && !endDate && (
+      {!coursMode && startDate && startPeriod && !endDate && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700">
             Début : <span className="font-semibold">{formatDateFR(startDate)} ({formatPeriodLabel(startPeriod)})</span>
@@ -539,7 +646,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
       )}
 
       {/* Boutons Annuler et Continuer */}
-      {startDate && endDate && startPeriod && endPeriod && (
+      {!coursMode && startDate && endDate && startPeriod && endPeriod && (
         <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex-1 mb-1 sm:mb-0">
             <p className="text-sm font-semibold text-gray-800">

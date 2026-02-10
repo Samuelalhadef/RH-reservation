@@ -303,7 +303,7 @@ export async function POST(request) {
       } else {
         // Pas de responsable direct, envoyer à la RH
         const rhResult = await db.execute({
-          sql: 'SELECT email FROM users WHERE type_utilisateur = "RH" AND actif = 1'
+          sql: 'SELECT email FROM users WHERE type_utilisateur IN ("RH", "Direction") AND actif = 1'
         });
 
         console.log('RH found:', rhResult.rows?.length || 0);

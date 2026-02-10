@@ -6,6 +6,7 @@ import { formatDateFR } from '@/lib/clientDateUtils';
 const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [coursDays, setCoursDays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipData, setTooltipData] = useState(null);
@@ -28,13 +29,15 @@ const TeamCalendar = () => {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
 
-      const [leavesRes, holidaysRes] = await Promise.all([
+      const [leavesRes, holidaysRes, coursRes] = await Promise.all([
         fetch(`/api/leaves/team-calendar?year=${year}&month=${month}`).then(r => r.json()),
         fetch('/api/holidays/all').then(r => r.json()),
+        fetch(`/api/cours/team?year=${year}&month=${month}`).then(r => r.json()),
       ]);
 
       setLeaves(leavesRes.events || []);
       setHolidays(holidaysRes.holidays || []);
+      setCoursDays(coursRes.jours || []);
     } catch (error) {
       console.error('Error fetching team calendar data:', error);
     }
@@ -78,6 +81,11 @@ const TeamCalendar = () => {
   const isWeekend = (date) => {
     const day = date.getDay();
     return day === 0 || day === 6;
+  };
+
+  // Récupérer les jours en cours pour une date
+  const getCoursForDate = (dateStr) => {
+    return coursDays.filter(c => c.date === dateStr);
   };
 
   // Récupérer les congés pour une demi-journée spécifique
@@ -130,8 +138,9 @@ const TeamCalendar = () => {
     const leavesAM = getLeavesForHalfDay(dateStr, 'matin');
     const leavesPM = getLeavesForHalfDay(dateStr, 'apres_midi');
     const isHoliday = holidays.find(h => h.date === dateStr);
+    const coursForDate = getCoursForDate(dateStr);
 
-    if (leavesAM.length > 0 || leavesPM.length > 0 || isHoliday) {
+    if (leavesAM.length > 0 || leavesPM.length > 0 || isHoliday || coursForDate.length > 0) {
       const rect = event.currentTarget.getBoundingClientRect();
       setTooltipPosition({
         x: rect.left + rect.width / 2,
@@ -141,13 +150,15 @@ const TeamCalendar = () => {
         date: date,
         leavesAM,
         leavesPM,
-        holiday: isHoliday
+        holiday: isHoliday,
+        cours: coursForDate
       });
       setTooltipData({
         date: date,
         leavesAM,
         leavesPM,
-        holiday: isHoliday
+        holiday: isHoliday,
+        cours: coursForDate
       });
       setShowTooltip(true);
     } else {
@@ -191,7 +202,7 @@ const TeamCalendar = () => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative">
       {/* Tooltip flottant au survol */}
-      {hoveredTooltip && (hoveredTooltip.leavesAM?.length > 0 || hoveredTooltip.leavesPM?.length > 0) && (
+      {hoveredTooltip && (hoveredTooltip.leavesAM?.length > 0 || hoveredTooltip.leavesPM?.length > 0 || hoveredTooltip.cours?.length > 0) && (
         <div
           className="fixed z-50 pointer-events-none"
           style={{
@@ -201,6 +212,17 @@ const TeamCalendar = () => {
           }}
         >
           <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-sm whitespace-nowrap">
+            {hoveredTooltip.cours?.length > 0 && (
+              <div className="mb-1">
+                <p className="text-xs text-gray-400 font-bold">En cours :</p>
+                {hoveredTooltip.cours.map((c, idx) => (
+                  <div key={`cours-${c.id}`} className="flex items-center gap-2 py-0.5">
+                    <div className="w-2 h-2 rounded-full bg-violet-500"></div>
+                    <span>{c.prenom} {c.nom} - En cours</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {hoveredTooltip.leavesAM?.length > 0 && (
               <div className="mb-1">
                 <p className="text-xs text-gray-400 font-bold">Matin :</p>
@@ -260,6 +282,10 @@ const TeamCalendar = () => {
           <span className="text-gray-600">Jour férié</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-violet-200 border-2 border-violet-400 rounded"></div>
+          <span className="text-gray-600">En cours (alternant)</span>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="w-6 h-4 rounded overflow-hidden flex">
             <div className="flex-1 bg-blue-500"></div>
           </div>
@@ -301,6 +327,8 @@ const TeamCalendar = () => {
             const leavesAM = getLeavesForHalfDay(dateStr, 'matin');
             const leavesPM = getLeavesForHalfDay(dateStr, 'apres_midi');
             const isHoliday = holidays.some(h => h.date === dateStr);
+            const coursForDate = getCoursForDate(dateStr);
+            const hasCours = coursForDate.length > 0;
             const today = new Date();
             const isToday = day.date.getDate() === today.getDate() &&
                             day.date.getMonth() === today.getMonth() &&
@@ -322,25 +350,39 @@ const TeamCalendar = () => {
                   {day.isCurrentMonth && !isWeekend(day.date) && !isHoliday ? (
                     <>
                       {/* Moitié haute - Matin */}
-                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesAM.length > 0 ? '' : ''}`}>
-                        {leavesAM.length > 0 ? (
-                          leavesAM.map((leave, idx) => (
-                            <div
-                              key={leave.id}
-                              className={`flex-1 ${getPersonColor(idx)}`}
-                            ></div>
-                          ))
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesAM.length > 0 || hasCours ? '' : ''}`}>
+                        {hasCours && leavesAM.length === 0 ? (
+                          <div className="flex-1 bg-violet-300"></div>
+                        ) : leavesAM.length > 0 ? (
+                          <>
+                            {leavesAM.map((leave, idx) => (
+                              <div
+                                key={leave.id}
+                                className={`flex-1 ${getPersonColor(idx)}`}
+                              ></div>
+                            ))}
+                            {hasCours && (
+                              <div className="flex-1 bg-violet-500"></div>
+                            )}
+                          </>
                         ) : null}
                       </div>
                       {/* Moitié basse - Après-midi */}
-                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesPM.length > 0 ? '' : ''}`}>
-                        {leavesPM.length > 0 ? (
-                          leavesPM.map((leave, idx) => (
-                            <div
-                              key={leave.id}
-                              className={`flex-1 ${getPersonColor(idx)}`}
-                            ></div>
-                          ))
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesPM.length > 0 || hasCours ? '' : ''}`}>
+                        {hasCours && leavesPM.length === 0 ? (
+                          <div className="flex-1 bg-violet-300"></div>
+                        ) : leavesPM.length > 0 ? (
+                          <>
+                            {leavesPM.map((leave, idx) => (
+                              <div
+                                key={leave.id}
+                                className={`flex-1 ${getPersonColor(idx)}`}
+                              ></div>
+                            ))}
+                            {hasCours && (
+                              <div className="flex-1 bg-violet-500"></div>
+                            )}
+                          </>
                         ) : null}
                       </div>
                     </>
@@ -361,7 +403,7 @@ const TeamCalendar = () => {
 
                 {/* Numéro du jour */}
                 <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none ${
-                  day.isCurrentMonth && (hasAnyLeave || isHoliday)
+                  day.isCurrentMonth && (hasAnyLeave || isHoliday || hasCours)
                     ? 'text-white font-bold drop-shadow-md'
                     : day.isCurrentMonth
                       ? isWeekend(day.date) ? 'text-gray-400' : 'text-gray-700'
@@ -387,6 +429,26 @@ const TeamCalendar = () => {
               <p className="text-sm font-semibold text-purple-800">
                 {tooltipData.holiday.nom}
               </p>
+            </div>
+          )}
+
+          {tooltipData.cours?.length > 0 && (
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-violet-700 mb-2">
+                En cours :
+              </p>
+              <div className="space-y-2">
+                {tooltipData.cours.map((c) => (
+                  <div key={`cours-${c.id}`} className="flex items-start gap-3 p-3 bg-violet-50 rounded-lg border border-violet-200">
+                    <div className="w-4 h-4 rounded bg-violet-500 flex-shrink-0 mt-0.5"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-800">
+                        {c.prenom} {c.nom} - <span className="text-violet-600">En cours</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

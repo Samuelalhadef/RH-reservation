@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 2; // Incrémenter pour forcer re-migration
+let _migrationVersion = 3; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -159,6 +159,20 @@ async function runMigrations() {
         auth TEXT NOT NULL,
         date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+  } catch (error) { /* already exists */ }
+
+  // Create jours_cours table for alternants school days
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS jours_cours (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date DATE NOT NULL,
+        date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, date)
       )
     `);
   } catch (error) { /* already exists */ }

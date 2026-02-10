@@ -109,7 +109,7 @@ export async function canUserValidateLeave(validatorId, leave) {
   }
 
   const validatorData = validator.rows[0];
-  const isRH = validatorData.type_utilisateur === 'RH';
+  const isRH = validatorData.type_utilisateur === 'RH' || validatorData.type_utilisateur === 'Direction';
   const validatorLevel = validatorData.niveau_validation || 0;
 
   // Récupérer les infos de l'agent qui a fait la demande
