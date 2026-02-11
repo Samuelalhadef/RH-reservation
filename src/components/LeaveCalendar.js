@@ -192,6 +192,9 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isHoliday = holidays.some(h => h.date === dateStr);
     if (isHoliday) return false;
 
+    // Alternants ne peuvent pas poser de congé sur leurs jours de cours
+    if (isAlternant() && coursDays.has(dateStr)) return false;
+
     const leaveStatus = getHalfDayLeaveStatus(date, period);
     if (leaveStatus && leaveStatus.statut === 'validee') return false;
 

@@ -153,6 +153,21 @@ export async function POST(request) {
       );
     }
 
+    // Vérifier que l'alternant ne pose pas de congé sur ses jours de cours
+    if (user.type === 'Alternant') {
+      const coursResult = await db.execute({
+        sql: 'SELECT date FROM jours_cours WHERE user_id = ? AND date >= ? AND date <= ?',
+        args: [userId, date_debut, date_fin]
+      });
+      if (coursResult.rows.length > 0) {
+        const coursDates = coursResult.rows.map(r => r.date).join(', ');
+        return NextResponse.json(
+          { success: false, message: `Vous ne pouvez pas poser de congé sur vos jours de cours (${coursDates})` },
+          { status: 400 }
+        );
+      }
+    }
+
     const currentYear = new Date().getFullYear();
     const balanceResult = await db.execute({
       sql: 'SELECT jours_restants FROM soldes_conges WHERE user_id = ? AND annee = ?',
