@@ -22,9 +22,21 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsed = JSON.parse(savedUser);
+      setUser(parsed);
+      // Vérifier que la session est encore valide
+      fetch('/api/users/profile').then(res => {
+        if (res.status === 401) {
+          // Session expirée, déconnecter
+          setUser(null);
+          localStorage.removeItem('user');
+          toast.error('Session expirée, veuillez vous reconnecter');
+          router.push('/');
+        }
+      }).catch(() => {}).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (userId, password) => {

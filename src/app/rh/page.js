@@ -46,7 +46,12 @@ export default function RHPage() {
   const [adjustForm, setAdjustForm] = useState({ adjustment: '', motif: '' });
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [cetRequests, setCetRequests] = useState([]);
+  const [cetBalances, setCetBalances] = useState([]);
   const [cetActionLoading, setCetActionLoading] = useState(null);
+  const [showCetAdjustModal, setShowCetAdjustModal] = useState(false);
+  const [cetAdjustingUser, setCetAdjustingUser] = useState(null);
+  const [cetAdjustForm, setCetAdjustForm] = useState({ jours: '', motif: '' });
+  const [cetAdjustLoading, setCetAdjustLoading] = useState(false);
   const [recalcLoading, setRecalcLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(null);
 
@@ -92,6 +97,10 @@ export default function RHPage() {
         const response = await fetch('/api/cet/requests');
         const data = await response.json();
         setCetRequests(data.demandes || []);
+      } else if (activeTab === 'cet-balances') {
+        const response = await fetch('/api/cet/all-balances');
+        const data = await response.json();
+        setCetBalances(data.balances || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -318,6 +327,38 @@ export default function RHPage() {
     }
   };
 
+  const handleCetAdjust = async (e) => {
+    e.preventDefault();
+    const jours = parseFloat(cetAdjustForm.jours);
+    if (!cetAdjustForm.jours || isNaN(jours) || jours === 0) {
+      toast.error('Veuillez entrer un nombre de jours valide');
+      return;
+    }
+    setCetAdjustLoading(true);
+    try {
+      const response = await fetch('/api/cet/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: cetAdjustingUser.id,
+          jours,
+          motif: cetAdjustForm.motif
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      setShowCetAdjustModal(false);
+      setCetAdjustingUser(null);
+      setCetAdjustForm({ jours: '', motif: '' });
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setCetAdjustLoading(false);
+    }
+  };
+
   const handleCancelLeave = async (leaveId, employeeName) => {
     const motif = window.prompt(`Motif de l'annulation du congé de ${employeeName} :`);
     if (motif === null) return; // Annulé par l'utilisateur
@@ -409,6 +450,17 @@ export default function RHPage() {
                   {cetRequests.filter(r => r.statut === 'en_attente').length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('cet-balances')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'cet-balances'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Soldes CET
             </button>
 
             <button
@@ -861,6 +913,124 @@ export default function RHPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'cet-balances' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Soldes CET de tous les agents
+            </h2>
+
+            {cetBalances.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                Aucun agent trouvé
+              </p>
+            ) : (
+              <>
+                {/* Résumé */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                    <p className="text-sm text-indigo-600 font-medium">Agents avec CET</p>
+                    <p className="text-2xl font-bold text-indigo-800">
+                      {cetBalances.filter(b => b.solde_cet > 0).length}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-600 font-medium">Total jours en CET</p>
+                    <p className="text-2xl font-bold text-green-800">
+                      {cetBalances.reduce((sum, b) => sum + (b.solde_cet || 0), 0)}
+                    </p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <p className="text-sm text-orange-600 font-medium">Demandes en attente</p>
+                    <p className="text-2xl font-bold text-orange-800">
+                      {cetBalances.reduce((sum, b) => sum + (b.demandes_en_attente || 0), 0)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Poste</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solde CET</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Crédités {new Date().getFullYear()}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Débités {new Date().getFullYear()}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">En attente</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {cetBalances.map((agent) => (
+                        <tr key={agent.id} className={`hover:bg-gray-50 ${agent.solde_cet > 0 ? '' : 'opacity-60'}`}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{agent.prenom} {agent.nom}</p>
+                            <p className="text-xs text-gray-500">{agent.type_utilisateur}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{agent.service || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{agent.poste || '-'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-lg">{agent.solde_cet || 0}</span>
+                              <span className="text-xs text-gray-500">/ 60</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  agent.solde_cet >= 50 ? 'bg-red-500' :
+                                  agent.solde_cet >= 30 ? 'bg-orange-500' :
+                                  'bg-indigo-500'
+                                }`}
+                                style={{ width: `${Math.min(100, ((agent.solde_cet || 0) / 60) * 100)}%` }}
+                              ></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {agent.jours_credites_annee ? (
+                              <span className="text-green-600 font-semibold">+{agent.jours_credites_annee}</span>
+                            ) : (
+                              <span className="text-gray-400">0</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {agent.jours_debites_annee ? (
+                              <span className="text-orange-600 font-semibold">-{agent.jours_debites_annee}</span>
+                            ) : (
+                              <span className="text-gray-400">0</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {agent.demandes_en_attente > 0 ? (
+                              <span className="px-2 py-1 text-xs font-semibold rounded bg-yellow-100 text-yellow-800">
+                                {agent.demandes_en_attente}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => {
+                                setCetAdjustingUser(agent);
+                                setCetAdjustForm({ jours: '', motif: '' });
+                                setShowCetAdjustModal(true);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                            >
+                              Ajuster
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1426,6 +1596,87 @@ export default function RHPage() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
                 >
                   {adjustLoading ? 'En cours...' : 'Valider'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal d'ajustement CET */}
+      {showCetAdjustModal && cetAdjustingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              Ajuster le CET
+            </h3>
+            <p className="text-sm text-gray-600 mb-1">
+              {cetAdjustingUser.prenom} {cetAdjustingUser.nom}
+            </p>
+            <div className="text-sm text-gray-600 mb-4">
+              <p>Solde CET actuel : <span className="font-semibold text-indigo-600">{cetAdjustingUser.solde_cet || 0}</span> / 60 jours</p>
+            </div>
+
+            <form onSubmit={handleCetAdjust}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre de jours *
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={cetAdjustForm.jours}
+                  onChange={(e) => setCetAdjustForm({ ...cetAdjustForm, jours: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: 10 pour ajouter, -5 pour retirer"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Positif pour ajouter, négatif pour retirer (max 60 jours au total)
+                </p>
+              </div>
+
+              {cetAdjustForm.jours && !isNaN(parseFloat(cetAdjustForm.jours)) && parseFloat(cetAdjustForm.jours) !== 0 && (
+                <div className={`mb-4 p-3 rounded-lg border ${parseFloat(cetAdjustForm.jours) > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <p className="text-sm font-medium">
+                    {parseFloat(cetAdjustForm.jours) > 0 ? '+ ' : ''}{cetAdjustForm.jours} jour(s)
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    CET : {cetAdjustingUser.solde_cet || 0} → {((cetAdjustingUser.solde_cet || 0) + parseFloat(cetAdjustForm.jours))} / 60 jours
+                  </p>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motif
+                </label>
+                <textarea
+                  value={cetAdjustForm.motif}
+                  onChange={(e) => setCetAdjustForm({ ...cetAdjustForm, motif: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Ex: CET accumulé dans un précédent poste, régularisation..."
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCetAdjustModal(false);
+                    setCetAdjustingUser(null);
+                    setCetAdjustForm({ jours: '', motif: '' });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={cetAdjustLoading}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+                >
+                  {cetAdjustLoading ? 'En cours...' : 'Valider'}
                 </button>
               </div>
             </form>
