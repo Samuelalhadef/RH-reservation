@@ -43,7 +43,7 @@ export default function RHPage() {
   const [rhLeaveLoading, setRhLeaveLoading] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustingUser, setAdjustingUser] = useState(null);
-  const [adjustForm, setAdjustForm] = useState({ adjustment: '', motif: '' });
+  const [adjustForm, setAdjustForm] = useState({ adjustment: '', motif: '', type: 'compensateurs' });
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [cetRequests, setCetRequests] = useState([]);
   const [cetBalances, setCetBalances] = useState([]);
@@ -241,7 +241,7 @@ export default function RHPage() {
       const response = await fetch(`/api/users/${adjustingUser.id}/adjust-balance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adjustment: adj, motif: adjustForm.motif }),
+        body: JSON.stringify({ adjustment: adj, motif: adjustForm.motif, type: adjustForm.type }),
       });
 
       const data = await response.json();
@@ -253,7 +253,7 @@ export default function RHPage() {
       toast.success(data.message);
       setShowAdjustModal(false);
       setAdjustingUser(null);
-      setAdjustForm({ adjustment: '', motif: '' });
+      setAdjustForm({ adjustment: '', motif: '', type: 'compensateurs' });
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -796,7 +796,7 @@ export default function RHPage() {
                             <button
                               onClick={() => {
                                 setAdjustingUser(user);
-                                setAdjustForm({ adjustment: '', motif: '' });
+                                setAdjustForm({ adjustment: '', motif: '', type: 'compensateurs' });
                                 setShowAdjustModal(true);
                               }}
                               className="text-green-600 hover:text-green-700 text-sm font-medium"
@@ -1525,17 +1525,48 @@ export default function RHPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              Ajuster les jours compensateurs
+              Ajuster les jours
             </h3>
             <p className="text-sm text-gray-600 mb-1">
               {adjustingUser.prenom} {adjustingUser.nom}
             </p>
             <div className="text-sm text-gray-600 mb-4 space-y-0.5">
               <p>Solde restant : <span className="font-semibold">{adjustingUser.jours_restants || 0}</span> jours</p>
-              <p>Jours compensateurs actuels : <span className="font-semibold text-indigo-600">{adjustingUser.jours_compensateurs || 0}</span></p>
+              <p>Jours acquis : <span className="font-semibold text-blue-600">{adjustingUser.jours_acquis || 0}</span></p>
+              <p>Jours compensateurs : <span className="font-semibold text-indigo-600">{adjustingUser.jours_compensateurs || 0}</span></p>
             </div>
 
             <form onSubmit={handleAdjustBalance}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type de jours *
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustForm({ ...adjustForm, type: 'compensateurs' })}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                      adjustForm.type === 'compensateurs'
+                        ? 'bg-indigo-100 border-indigo-400 text-indigo-700'
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Compensateurs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustForm({ ...adjustForm, type: 'conges' })}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                      adjustForm.type === 'conges'
+                        ? 'bg-blue-100 border-blue-400 text-blue-700'
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Congés (acquis)
+                  </button>
+                </div>
+              </div>
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nombre de jours *
@@ -1557,10 +1588,15 @@ export default function RHPage() {
               {adjustForm.adjustment && !isNaN(parseFloat(adjustForm.adjustment)) && parseFloat(adjustForm.adjustment) !== 0 && (
                 <div className={`mb-4 p-3 rounded-lg border ${parseFloat(adjustForm.adjustment) > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                   <p className="text-sm font-medium">
-                    {parseFloat(adjustForm.adjustment) > 0 ? '+ ' : ''}{adjustForm.adjustment} jour(s)
+                    {parseFloat(adjustForm.adjustment) > 0 ? '+ ' : ''}{adjustForm.adjustment} jour(s) {adjustForm.type === 'compensateurs' ? 'compensateurs' : 'de congés'}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    Compensateurs : {(adjustingUser.jours_compensateurs || 0)} → {((adjustingUser.jours_compensateurs || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)} | Solde restant : {(adjustingUser.jours_restants || 0)} → {((adjustingUser.jours_restants || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)}
+                    {adjustForm.type === 'compensateurs' ? (
+                      <>Compensateurs : {(adjustingUser.jours_compensateurs || 0)} → {((adjustingUser.jours_compensateurs || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)}</>
+                    ) : (
+                      <>Acquis : {(adjustingUser.jours_acquis || 0)} → {((adjustingUser.jours_acquis || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)}</>
+                    )}
+                    {' | '}Solde restant : {(adjustingUser.jours_restants || 0)} → {((adjustingUser.jours_restants || 0) + parseFloat(adjustForm.adjustment)).toFixed(2)}
                   </p>
                 </div>
               )}
@@ -1574,7 +1610,7 @@ export default function RHPage() {
                   onChange={(e) => setAdjustForm({ ...adjustForm, motif: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: Heures supplémentaires, récupération, compensation..."
+                  placeholder={adjustForm.type === 'compensateurs' ? 'Ex: Heures supplémentaires, récupération...' : 'Ex: Correction de solde, ajustement annuel...'}
                 />
               </div>
 
@@ -1584,7 +1620,7 @@ export default function RHPage() {
                   onClick={() => {
                     setShowAdjustModal(false);
                     setAdjustingUser(null);
-                    setAdjustForm({ adjustment: '', motif: '' });
+                    setAdjustForm({ adjustment: '', motif: '', type: 'compensateurs' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >

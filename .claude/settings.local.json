@@ -36,7 +36,8 @@
       "Bash(npx next build:*)",
       "Bash(ls:*)",
       "Bash(npx next:*)",
-      "Bash(npx web-push:*)"
+      "Bash(npx web-push:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []

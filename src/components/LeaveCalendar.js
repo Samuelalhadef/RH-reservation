@@ -405,7 +405,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isCours = isCoursDay(date);
 
     if (isWeekend(date)) return 'bg-gray-100';
-    if (isHoliday) return 'bg-purple-100';
+    if (isHoliday) return 'bg-gray-300 ring-1 ring-inset ring-gray-400';
     if (isCours) return 'bg-violet-200';
 
     if (isPast || isTooSoon) {
@@ -436,7 +436,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isCours = isCoursDay(date);
 
     if (isWeekend(date)) return 'text-gray-400';
-    if (isHoliday) return 'text-purple-800 font-semibold';
+    if (isHoliday) return 'text-gray-600 font-bold';
     if (isCours) return 'text-violet-800 font-semibold';
 
     if (isPast || isTooSoon) {
@@ -554,7 +554,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             <span className="text-gray-600">En attente</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 bg-purple-100 border-2 border-purple-300 rounded"></div>
+            <div className="w-4 h-4 bg-gray-300 border-2 border-gray-400 rounded"></div>
             <span className="text-gray-600">Jour férié</span>
           </div>
           {isAlternant() && (

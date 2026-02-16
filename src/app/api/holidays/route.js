@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { getFrenchHolidays } from '@/lib/holidays';
 
 export async function GET(request) {
   try {
@@ -13,16 +13,13 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') || new Date().getFullYear();
+    const year = parseInt(searchParams.get('year')) || new Date().getFullYear();
 
-    const result = await db.execute({
-      sql: 'SELECT * FROM jours_feries WHERE annee = ? ORDER BY date',
-      args: [year]
-    });
+    const holidays = getFrenchHolidays(year);
 
     return NextResponse.json({
       success: true,
-      holidays: result.rows
+      holidays
     });
   } catch (error) {
     console.error('Error fetching holidays:', error);

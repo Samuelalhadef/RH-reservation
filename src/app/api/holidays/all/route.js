@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { getFrenchHolidaysRange } from '@/lib/holidays';
 
 export async function GET() {
   try {
@@ -12,11 +12,12 @@ export async function GET() {
       );
     }
 
-    const result = await db.execute('SELECT * FROM jours_feries ORDER BY date');
+    const currentYear = new Date().getFullYear();
+    const holidays = getFrenchHolidaysRange(currentYear - 1, currentYear + 5);
 
     const response = NextResponse.json({
       success: true,
-      holidays: result.rows
+      holidays
     });
     response.headers.set('Cache-Control', 'public, max-age=3600');
     return response;

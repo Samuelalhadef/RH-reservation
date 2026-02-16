@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { calculateBusinessDays } from '@/lib/dateUtils';
+import { getFrenchHolidaysRange } from '@/lib/holidays';
 import { recalculateFractionnement } from '@/lib/fractionnement';
 
 export async function POST(request) {
@@ -31,11 +32,12 @@ export async function POST(request) {
     }
 
     // Récupérer les jours fériés
-    const holidaysResult = await db.execute({
-      sql: `SELECT date FROM jours_feries WHERE date >= ? AND date <= ?`,
-      args: [date_debut, date_fin]
-    });
-    const holidays = holidaysResult.rows.map(row => row.date);
+    const startYear = new Date(date_debut).getFullYear();
+    const endYear = new Date(date_fin).getFullYear();
+    const allHolidays = getFrenchHolidaysRange(startYear, endYear);
+    const holidays = allHolidays
+      .map(h => h.date)
+      .filter(d => d >= date_debut && d <= date_fin);
 
     // Calculer les jours ouvrés
     let businessDays = calculateBusinessDays(date_debut, date_fin, holidays);

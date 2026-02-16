@@ -276,7 +276,7 @@ const TeamCalendar = () => {
       {/* Légende */}
       <div className="mb-4 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-purple-100 border-2 border-purple-300 rounded"></div>
+          <div className="w-4 h-4 bg-gray-300 border-2 border-gray-400 rounded"></div>
           <span className="text-gray-600">Jour férié</span>
         </div>
         <div className="flex items-center gap-2">
@@ -388,11 +388,11 @@ const TeamCalendar = () => {
                     <>
                       {/* Jour férié ou weekend - deux moitiés même couleur */}
                       <div className={`flex-1 rounded-lg ${
-                        day.isCurrentMonth && isHoliday ? 'bg-purple-100 border border-purple-300' :
+                        day.isCurrentMonth && isHoliday ? 'bg-gray-300 border border-gray-400' :
                         day.isCurrentMonth && isWeekend(day.date) ? 'bg-gray-100' : ''
                       }`} />
                       <div className={`flex-1 rounded-lg ${
-                        day.isCurrentMonth && isHoliday ? 'bg-purple-100 border border-purple-300' :
+                        day.isCurrentMonth && isHoliday ? 'bg-gray-300 border border-gray-400' :
                         day.isCurrentMonth && isWeekend(day.date) ? 'bg-gray-100' : ''
                       }`} />
                     </>
@@ -401,7 +401,9 @@ const TeamCalendar = () => {
 
                 {/* Numéro du jour */}
                 <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none ${
-                  day.isCurrentMonth && (hasAnyLeave || isHoliday || hasCours)
+                  day.isCurrentMonth && isHoliday && !hasAnyLeave
+                    ? 'text-gray-500 font-semibold'
+                    : day.isCurrentMonth && (hasAnyLeave || hasCours)
                     ? 'text-white font-bold drop-shadow-md'
                     : day.isCurrentMonth
                       ? isWeekend(day.date) ? 'text-gray-400' : 'text-gray-700'
