@@ -9,6 +9,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
   const { isAlternant } = useAuth();
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [schoolHolidays, setSchoolHolidays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [coursDays, setCoursDays] = useState(new Set());
   const [coursMode, setCoursMode] = useState(false);
@@ -37,6 +38,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
       const promises = [
         fetch('/api/leaves/calendar').then(r => r.json()),
         fetch('/api/holidays/all').then(r => r.json()),
+        fetch('/api/school-holidays').then(r => r.json()),
       ];
 
       if (isAlternant()) {
@@ -47,9 +49,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
       setLeaves(results[0].events || []);
       setHolidays(results[1].holidays || []);
+      setSchoolHolidays(results[2].periods || []);
 
-      if (isAlternant() && results[2]) {
-        const daysSet = new Set((results[2].jours || []).map(j => j.date));
+      if (isAlternant() && results[3]) {
+        const daysSet = new Set((results[3].jours || []).map(j => j.date));
         setCoursDays(daysSet);
       }
     } catch (error) {
@@ -118,6 +121,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
   const isCoursDay = (date) => {
     const dateStr = formatDateToYYYYMMDD(date);
     return coursDays.has(dateStr);
+  };
+
+  const isSchoolHoliday = (date) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+    return schoolHolidays.some(p => dateStr >= p.debut && dateStr <= p.fin);
   };
 
   // Détermine le statut d'une demi-journée par rapport aux congés existants
@@ -564,6 +572,12 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             </div>
           )}
           <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-amber-50 border border-amber-200 rounded relative">
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"></span>
+            </div>
+            <span className="text-gray-600">Vacances scolaires</span>
+          </div>
+          <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-gray-100 rounded"></div>
             <span className="text-gray-600">Non disponible</span>
           </div>
@@ -603,12 +617,13 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             const textClass = getDayTextClass(day.date, day.isCurrentMonth);
             const clickableAM = isHalfDayClickable(day.date, 'matin', day.isCurrentMonth);
             const clickablePM = isHalfDayClickable(day.date, 'apres_midi', day.isCurrentMonth);
+            const schoolHol = day.isCurrentMonth && isSchoolHoliday(day.date);
 
             return (
               <div key={index} className="relative">
                 <div className={`w-full aspect-square relative ${
                   isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-lg sm:rounded-xl' : ''
-                }`}>
+                } ${schoolHol ? 'bg-amber-50 rounded-lg sm:rounded-xl' : ''}`}>
                   {/* Deux moitiés avec gap */}
                   <div className="absolute inset-0 flex flex-col gap-1">
                     {/* Moitié haute - Matin */}
@@ -630,6 +645,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
                   <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none font-medium text-sm sm:text-lg ${textClass}`}>
                     {day.date.getDate()}
                   </span>
+                  {/* Indicateur vacances scolaires */}
+                  {schoolHol && (
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
+                  )}
                 </div>
               </div>
             );

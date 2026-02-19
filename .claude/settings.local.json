@@ -37,7 +37,14 @@
       "Bash(ls:*)",
       "Bash(npx next:*)",
       "Bash(npx web-push:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "WebSearch",
+      "WebFetch(domain:www.vacances-scolaires-education.fr)",
+      "WebFetch(domain:www.vacances-scolaires-gouv.com)",
+      "WebFetch(domain:www.education.gouv.fr)",
+      "WebFetch(domain:www.service-public.gouv.fr)",
+      "WebFetch(domain:vacances-scolaires.com)",
+      "WebFetch(domain:www.calendrier.best)"
     ],
     "deny": [],
     "ask": []

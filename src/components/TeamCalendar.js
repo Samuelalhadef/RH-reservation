@@ -6,6 +6,7 @@ import { formatDateFR } from '@/lib/clientDateUtils';
 const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [schoolHolidays, setSchoolHolidays] = useState([]);
   const [coursDays, setCoursDays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showTooltip, setShowTooltip] = useState(false);
@@ -20,10 +21,14 @@ const TeamCalendar = () => {
 
   const dayNames = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
 
-  // Fetch holidays once at mount (static data, cached 1h server-side)
+  // Fetch holidays and school holidays once at mount
   useEffect(() => {
-    fetch('/api/holidays/all').then(r => r.json()).then(data => {
-      setHolidays(data.holidays || []);
+    Promise.all([
+      fetch('/api/holidays/all').then(r => r.json()),
+      fetch('/api/school-holidays').then(r => r.json()),
+    ]).then(([holidaysData, schoolData]) => {
+      setHolidays(holidaysData.holidays || []);
+      setSchoolHolidays(schoolData.periods || []);
     }).catch(() => {});
   }, []);
 
@@ -79,6 +84,11 @@ const TeamCalendar = () => {
   const isWeekend = (date) => {
     const day = date.getDay();
     return day === 0 || day === 6;
+  };
+
+  const isSchoolHoliday = (date) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+    return schoolHolidays.some(p => dateStr >= p.debut && dateStr <= p.fin);
   };
 
   // Récupérer les jours en cours pour une date
@@ -297,6 +307,12 @@ const TeamCalendar = () => {
           <span className="text-gray-600">2+ personnes</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-amber-50 border border-amber-200 rounded relative">
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"></span>
+          </div>
+          <span className="text-gray-600">Vacances scolaires (Zone C)</span>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded overflow-hidden flex flex-col">
             <div className="flex-1 bg-blue-300"></div>
             <div className="flex-1"></div>
@@ -333,13 +349,14 @@ const TeamCalendar = () => {
                             day.date.getFullYear() === today.getFullYear();
 
             const hasAnyLeave = leavesAM.length > 0 || leavesPM.length > 0;
+            const schoolHol = day.isCurrentMonth && isSchoolHoliday(day.date);
 
             return (
               <div
                 key={index}
                 className={`w-full aspect-square relative transition-all font-medium text-lg ${
                   isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-xl' : ''
-                } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
+                } ${day.isCurrentMonth ? 'cursor-pointer' : ''} ${schoolHol ? 'bg-amber-50 rounded-xl' : ''}`}
                 onMouseEnter={(e) => handleDateHover(e, day.date, day.isCurrentMonth)}
                 onMouseLeave={handleMouseLeave}
               >
@@ -411,6 +428,10 @@ const TeamCalendar = () => {
                 }`}>
                   {day.date.getDate()}
                 </span>
+                {/* Indicateur vacances scolaires */}
+                {schoolHol && (
+                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
+                )}
               </div>
             );
           })}
