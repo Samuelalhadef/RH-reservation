@@ -24,7 +24,7 @@ const resetLeaves = async () => {
     }
 
     const currentYear = new Date().getFullYear();
-    const users = await db.execute('SELECT id, nom, prenom, email, type_utilisateur, actif, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, responsable_id FROM users ORDER BY nom, prenom');
+    const users = await db.execute('SELECT id, nom, prenom, email, type_utilisateur, actif, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, responsable_id, quotite_travail FROM users ORDER BY nom, prenom');
 
     console.log(`\n📋 Recréation des soldes pour ${users.rows.length} utilisateur(s) (année ${currentYear})...\n`);
 
@@ -35,7 +35,8 @@ const resetLeaves = async () => {
           typeContrat,
           user.date_debut_contrat,
           user.date_fin_contrat,
-          currentYear
+          currentYear,
+          user.quotite_travail || 100
         );
 
         await db.execute({
@@ -68,7 +69,7 @@ const resetLeaves = async () => {
     for (const user of users.rows) {
       const typeContrat = user.type_contrat || 'CDI';
       const joursAcquis = (user.actif === 1 || user.actif === null)
-        ? calculateLeaveBalance(typeContrat, user.date_debut_contrat, user.date_fin_contrat, currentYear)
+        ? calculateLeaveBalance(typeContrat, user.date_debut_contrat, user.date_fin_contrat, currentYear, user.quotite_travail || 100)
         : 0;
 
       console.log(

@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 4; // Incrémenter pour forcer re-migration
+let _migrationVersion = 5; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -41,6 +41,15 @@ async function runMigrations() {
     { table: 'users', column: 'date_entree_mairie', type: 'DATE' },
     { table: 'soldes_conges', column: 'jours_fractionnement', type: 'REAL DEFAULT 0' },
     { table: 'soldes_conges', column: 'jours_compensateurs', type: 'REAL DEFAULT 0' },
+    { table: 'users', column: 'quotite_travail', type: 'REAL DEFAULT 100' },
+    { table: 'users', column: 'responsable_id', type: 'INTEGER' },
+    { table: 'users', column: 'niveau_validation', type: 'INTEGER DEFAULT 0' },
+    { table: 'demandes_conges', column: 'statut_niveau_1', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_conges', column: 'validateur_niveau_1_id', type: 'INTEGER' },
+    { table: 'demandes_conges', column: 'date_validation_niveau_1', type: 'DATETIME' },
+    { table: 'demandes_conges', column: 'statut_niveau_2', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_conges', column: 'validateur_niveau_2_id', type: 'INTEGER' },
+    { table: 'demandes_conges', column: 'date_validation_niveau_2', type: 'DATETIME' },
   ];
   for (const migration of migrations) {
     try {
@@ -231,7 +240,10 @@ export const initDatabase = async () => {
         date_debut_contrat DATE,
         date_fin_contrat DATE,
         service TEXT,
-        poste TEXT
+        poste TEXT,
+        quotite_travail REAL DEFAULT 100,
+        responsable_id INTEGER,
+        niveau_validation INTEGER DEFAULT 0
       )
     `);
 

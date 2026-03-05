@@ -14,7 +14,7 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    const { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie } = await request.json();
+    const { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = await request.json();
 
     if (!nom || !prenom || !email || !type_utilisateur) {
       return NextResponse.json(
@@ -45,7 +45,7 @@ export async function PUT(request, { params }) {
 
     // Récupérer les anciennes valeurs pour vérifier si le contrat a changé
     const oldUserResult = await db.execute({
-      sql: 'SELECT type_contrat, date_debut_contrat, date_fin_contrat FROM users WHERE id = ?',
+      sql: 'SELECT type_contrat, date_debut_contrat, date_fin_contrat, quotite_travail FROM users WHERE id = ?',
       args: [id]
     });
     const oldUser = oldUserResult.rows[0];
@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
       sql: `
         UPDATE users
         SET nom = ?, prenom = ?, email = ?, type_utilisateur = ?, service = ?, poste = ?, actif = ?,
-            type_contrat = ?, date_debut_contrat = ?, date_fin_contrat = ?, date_entree_mairie = ?
+            type_contrat = ?, date_debut_contrat = ?, date_fin_contrat = ?, date_entree_mairie = ?, quotite_travail = ?, responsable_id = ?
         WHERE id = ?
       `,
       args: [
@@ -69,6 +69,8 @@ export async function PUT(request, { params }) {
         date_debut_contrat || null,
         date_fin_contrat || null,
         date_entree_mairie || null,
+        quotite_travail || 100,
+        responsable_id || null,
         id
       ]
     });
@@ -77,11 +79,12 @@ export async function PUT(request, { params }) {
     const contractChanged =
       oldUser.type_contrat !== (type_contrat || 'CDI') ||
       oldUser.date_debut_contrat !== date_debut_contrat ||
-      oldUser.date_fin_contrat !== date_fin_contrat;
+      oldUser.date_fin_contrat !== date_fin_contrat ||
+      oldUser.quotite_travail !== (quotite_travail || 100);
 
     if (contractChanged) {
       const currentYear = new Date().getFullYear();
-      const newJoursAcquis = calculateLeaveBalance(type_contrat || 'CDI', date_debut_contrat, date_fin_contrat, currentYear);
+      const newJoursAcquis = calculateLeaveBalance(type_contrat || 'CDI', date_debut_contrat, date_fin_contrat, currentYear, quotite_travail || 100);
 
       // Récupérer les jours déjà pris
       const balanceResult = await db.execute({
@@ -104,6 +107,14 @@ export async function PUT(request, { params }) {
 
         console.log(`Updated balance for user ${id}: ${newJoursAcquis} days acquired`);
       }
+    }
+
+    // Auto-configurer niveau_validation du responsable assigné
+    if (responsable_id) {
+      await db.execute({
+        sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
+        args: [responsable_id]
+      });
     }
 
     return NextResponse.json({

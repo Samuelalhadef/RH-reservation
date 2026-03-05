@@ -29,7 +29,9 @@ export default function RHPage() {
     type_contrat: 'CDI',
     date_debut_contrat: '',
     date_fin_contrat: '',
-    date_entree_mairie: ''
+    date_entree_mairie: '',
+    quotite_travail: 100,
+    responsable_id: ''
   });
   const [editingUser, setEditingUser] = useState(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
@@ -162,7 +164,7 @@ export default function RHPage() {
 
       toast.success(`Utilisateur créé avec succès ! Mot de passe temporaire: ${data.tempPassword}`, { duration: 8000 });
       setShowCreateUserModal(false);
-      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '' });
+      setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -1236,9 +1238,14 @@ export default function RHPage() {
                   <option value="Direction">Direction</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
+                  <option value="Responsable Service Technique">Responsable Service Technique</option>
+                  <option value="Responsable Animation">Responsable Animation</option>
+                  <option value="Responsable Urbanisme">Responsable Urbanisme</option>
+                  <option value="Responsable Vie Locale">Responsable Vie Locale</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
                   <option value="Animateur">Animateur</option>
+                  <option value="Animateur Culturel">Animateur Culturel</option>
                   <option value="ATSEM/Animation">ATSEM/Animation</option>
                   <option value="Police Municipale">Police Municipale</option>
                   <option value="Entretien">Entretien</option>
@@ -1258,6 +1265,27 @@ export default function RHPage() {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Permet de calculer l'ancienneté de l'agent
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quotité de travail (%)
+                </label>
+                <select
+                  value={newUser.quotite_travail}
+                  onChange={(e) => setNewUser({ ...newUser, quotite_travail: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={100}>100% - Temps plein</option>
+                  <option value={90}>90%</option>
+                  <option value={80}>80% - 4/5e</option>
+                  <option value={70}>70%</option>
+                  <option value={60}>60% - 3/5e</option>
+                  <option value={50}>50% - Mi-temps</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Les jours de congés seront proratisés selon la quotité ({Math.round(25 * newUser.quotite_travail / 100 * 100) / 100} jours/an)
                 </p>
               </div>
 
@@ -1305,12 +1333,31 @@ export default function RHPage() {
                 </>
               )}
 
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Responsable hiérarchique
+                </label>
+                <select
+                  value={newUser.responsable_id}
+                  onChange={(e) => setNewUser({ ...newUser, responsable_id: e.target.value ? Number(e.target.value) : '' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Aucun (validation directe RH)</option>
+                  {allUsers.filter(u => u.actif !== 0).map((u) => (
+                    <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.type_utilisateur})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Le responsable validera les demandes de congés en premier
+                </p>
+              </div>
+
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreateUserModal(false);
-                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '' });
+                    setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
@@ -1415,9 +1462,14 @@ export default function RHPage() {
                   <option value="Direction">Direction</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
+                  <option value="Responsable Service Technique">Responsable Service Technique</option>
+                  <option value="Responsable Animation">Responsable Animation</option>
+                  <option value="Responsable Urbanisme">Responsable Urbanisme</option>
+                  <option value="Responsable Vie Locale">Responsable Vie Locale</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
                   <option value="Animateur">Animateur</option>
+                  <option value="Animateur Culturel">Animateur Culturel</option>
                   <option value="ATSEM/Animation">ATSEM/Animation</option>
                   <option value="Police Municipale">Police Municipale</option>
                   <option value="Entretien">Entretien</option>
@@ -1440,6 +1492,27 @@ export default function RHPage() {
                     Ancienneté : {calculateAnciennete(editingUser.date_entree_mairie)}
                   </p>
                 )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quotité de travail (%)
+                </label>
+                <select
+                  value={editingUser.quotite_travail || 100}
+                  onChange={(e) => setEditingUser({ ...editingUser, quotite_travail: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={100}>100% - Temps plein</option>
+                  <option value={90}>90%</option>
+                  <option value={80}>80% - 4/5e</option>
+                  <option value={70}>70%</option>
+                  <option value={60}>60% - 3/5e</option>
+                  <option value={50}>50% - Mi-temps</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Les jours de congés seront proratisés selon la quotité ({Math.round(25 * (editingUser.quotite_travail || 100) / 100 * 100) / 100} jours/an)
+                </p>
               </div>
 
               <div className="mb-4">
@@ -1485,6 +1558,25 @@ export default function RHPage() {
                   </div>
                 </>
               )}
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Responsable hiérarchique
+                </label>
+                <select
+                  value={editingUser.responsable_id || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, responsable_id: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Aucun (validation directe RH)</option>
+                  {allUsers.filter(u => u.actif !== 0 && u.id !== editingUser.id).map((u) => (
+                    <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.type_utilisateur})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Le responsable validera les demandes de congés en premier
+                </p>
+              </div>
 
               <div className="mb-4">
                 <label className="flex items-center">
