@@ -56,6 +56,9 @@ export default function RHPage() {
   const [cetAdjustLoading, setCetAdjustLoading] = useState(false);
   const [recalcLoading, setRecalcLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(null);
+  const [recupRequests, setRecupRequests] = useState([]);
+  const [recupActionLoading, setRecupActionLoading] = useState(null);
+  const [selectedRecupDoc, setSelectedRecupDoc] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -68,11 +71,14 @@ export default function RHPage() {
   }, [activeTab, isAuthenticated, isRH, router]);
 
   const fetchData = async () => {
-    // Toujours charger le nombre de demandes CET pour le badge
+    // Toujours charger le nombre de demandes CET et récup pour les badges
     try {
-      const cetRes = await fetch('/api/cet/requests');
-      const cetData = await cetRes.json();
-      setCetRequests(cetData.demandes || []);
+      const [cetRes, recupRes] = await Promise.all([
+        fetch('/api/cet/requests').then(r => r.json()),
+        fetch('/api/recuperation/all').then(r => r.json())
+      ]);
+      setCetRequests(cetRes.demandes || []);
+      setRecupRequests(recupRes.demandes || []);
     } catch (e) { /* ignore */ }
 
     if (activeTab === 'stats') {
@@ -99,6 +105,10 @@ export default function RHPage() {
         const response = await fetch('/api/cet/requests');
         const data = await response.json();
         setCetRequests(data.demandes || []);
+      } else if (activeTab === 'recup-requests') {
+        const response = await fetch('/api/recuperation/all');
+        const data = await response.json();
+        setRecupRequests(data.demandes || []);
       } else if (activeTab === 'cet-balances') {
         const response = await fetch('/api/cet/all-balances');
         const data = await response.json();
@@ -309,6 +319,28 @@ export default function RHPage() {
     }
   };
 
+  const handleRecupAction = async (requestId, action) => {
+    const commentaire = action === 'refuser' ? window.prompt('Motif du refus (optionnel) :') : null;
+    if (action === 'refuser' && commentaire === null) return;
+
+    setRecupActionLoading(requestId);
+    try {
+      const response = await fetch(`/api/recuperation/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, commentaire }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRecupActionLoading(null);
+    }
+  };
+
   const handleRecalculateBalances = async () => {
     if (!window.confirm('Recalculer les soldes de tous les utilisateurs à partir des congés validés ?')) {
       return;
@@ -463,6 +495,22 @@ export default function RHPage() {
               }`}
             >
               Soldes CET
+            </button>
+
+            <button
+              onClick={() => setActiveTab('recup-requests')}
+              className={`px-6 py-3 font-medium whitespace-nowrap ${
+                activeTab === 'recup-requests'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Récupération
+              {recupRequests.filter(r => r.statut === 'en_attente').length > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500 text-white rounded-full">
+                  {recupRequests.filter(r => r.statut === 'en_attente').length}
+                </span>
+              )}
             </button>
 
             <button
@@ -1035,6 +1083,83 @@ export default function RHPage() {
               </>
             )}
           </div>
+        )}
+
+        {activeTab === 'recup-requests' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Demandes de récupération d'heures
+            </h2>
+
+            {recupRequests.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">Aucune demande de récupération</p>
+            ) : (
+              <div className="space-y-4">
+                {recupRequests.map((req) => (
+                  <div key={req.id} className={`border rounded-lg p-4 ${
+                    req.statut === 'en_attente' ? 'border-orange-200 bg-orange-50' : 'border-gray-200'
+                  }`}>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-gray-800">{req.prenom} {req.nom}</span>
+                          {req.service && <span className="text-xs text-gray-500">({req.service})</span>}
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
+                            req.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-800' :
+                            req.statut === 'validee' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {req.statut === 'en_attente' ? 'En attente' : req.statut === 'validee' ? 'Validée' : 'Refusée'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-0.5">
+                          <p><strong>Date travail :</strong> {req.date_travail_fr} | <strong>Heures :</strong> {req.nombre_heures}h</p>
+                          <p><strong>Raison :</strong> {req.raison}</p>
+                          <p><strong>Type :</strong> {req.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération en congé'}</p>
+                          <p className="text-xs text-gray-400">Demandé le {req.date_demande_fr}</p>
+                        </div>
+                        {req.commentaire && (
+                          <p className="text-xs text-gray-500 mt-1 italic">Commentaire : {req.commentaire}</p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 items-center">
+                        <button
+                          onClick={() => setSelectedRecupDoc(req)}
+                          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        >
+                          Voir document
+                        </button>
+                        {req.statut === 'en_attente' && (
+                          <>
+                            <button
+                              onClick={() => handleRecupAction(req.id, 'valider')}
+                              disabled={recupActionLoading === req.id}
+                              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                            >
+                              {recupActionLoading === req.id ? '...' : 'Valider'}
+                            </button>
+                            <button
+                              onClick={() => handleRecupAction(req.id, 'refuser')}
+                              disabled={recupActionLoading === req.id}
+                              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {recupActionLoading === req.id ? '...' : 'Refuser'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal document récupération */}
+        {selectedRecupDoc && (
+          <RecupDocumentModal demande={selectedRecupDoc} onClose={() => setSelectedRecupDoc(null)} />
         )}
 
         {activeTab === 'create-leave' && (
@@ -1811,6 +1936,186 @@ export default function RHPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RecupDocumentModal({ demande, onClose }) {
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Récupération - ${demande.prenom} ${demande.nom} - ${demande.date_travail_fr}</title>
+        <style>
+          body { font-family: 'Times New Roman', serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a2e; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { font-size: 20px; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+          .header p { font-size: 14px; color: #555; margin: 5px 0; }
+          .separator { width: 100px; height: 2px; background: #555; margin: 15px auto; }
+          .title { text-align: center; font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 30px 0; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
+          .section { margin: 20px 0; padding-top: 15px; border-top: 1px solid #ddd; }
+          .detail-box { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0; }
+          .checkbox-line { display: flex; align-items: center; gap: 8px; margin: 5px 0 5px 20px; }
+          .checkbox { width: 14px; height: 14px; border: 2px solid #555; display: inline-block; text-align: center; line-height: 12px; font-size: 10px; }
+          .checkbox.checked { background: #333; color: white; }
+          .footer { display: flex; justify-content: space-between; margin-top: 40px; }
+          .signature-area img { max-width: 200px; max-height: 80px; }
+          .stamp { margin-top: 30px; padding: 15px; border: 2px solid; text-align: center; font-weight: bold; }
+          .stamp.validated { border-color: #16a34a; color: #16a34a; }
+          .stamp.refused { border-color: #dc2626; color: #dc2626; }
+          .disclaimer { font-size: 11px; font-style: italic; color: #777; margin: 20px 0; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Commune de Chartrettes</h1>
+          <p>Service des Ressources Humaines</p>
+          <div class="separator"></div>
+        </div>
+        <div class="title">
+          Demande de ${demande.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération'} d'Heures Supplémentaires
+        </div>
+        <div class="info-grid">
+          <div><strong>Nom :</strong> ${demande.nom}</div>
+          <div><strong>Prénom :</strong> ${demande.prenom}</div>
+          <div><strong>Service :</strong> ${demande.service || 'Non renseigné'}</div>
+          <div><strong>Poste :</strong> ${demande.poste || 'Non renseigné'}</div>
+        </div>
+        <div class="section">
+          <p>Je soussigné(e) <strong>${demande.prenom} ${demande.nom}</strong>,
+          déclare avoir effectué des heures de travail supplémentaires dans les conditions suivantes :</p>
+          <div class="detail-box">
+            <p><strong>Date du travail supplémentaire :</strong> ${demande.date_travail_fr}</p>
+            <p><strong>Nombre d'heures effectuées :</strong> ${demande.nombre_heures} heure(s)</p>
+            <p><strong>Nature du travail :</strong> ${demande.raison}</p>
+          </div>
+        </div>
+        <div class="section">
+          <p><strong>Compensation demandée :</strong></p>
+          <div class="checkbox-line">
+            <span class="checkbox ${demande.type_compensation === 'recuperation' ? 'checked' : ''}">${demande.type_compensation === 'recuperation' ? 'X' : ''}</span>
+            <span>Récupération en jours de congé</span>
+          </div>
+          <div class="checkbox-line">
+            <span class="checkbox ${demande.type_compensation === 'remuneration' ? 'checked' : ''}">${demande.type_compensation === 'remuneration' ? 'X' : ''}</span>
+            <span>Rémunération des heures supplémentaires</span>
+          </div>
+        </div>
+        <p class="disclaimer">En signant ce document, je certifie sur l'honneur l'exactitude des informations ci-dessus.</p>
+        <div class="footer">
+          <div>
+            <p><strong>Fait à Chartrettes,</strong></p>
+            <p>Le ${demande.date_demande_fr}</p>
+          </div>
+          <div class="signature-area">
+            <p><strong>Signature de l'agent</strong></p>
+            ${demande.signature ? `<img src="${demande.signature}" alt="Signature" />` : ''}
+          </div>
+        </div>
+        ${demande.statut !== 'en_attente' ? `
+          <div class="stamp ${demande.statut === 'validee' ? 'validated' : 'refused'}">
+            ${demande.statut === 'validee' ? 'VALIDEE' : 'REFUSEE'}
+            ${demande.date_validation_fr ? ` - Le ${demande.date_validation_fr}` : ''}
+            ${demande.validateur_prenom ? ` - Par ${demande.validateur_prenom} ${demande.validateur_nom}` : ''}
+          </div>
+        ` : ''}
+        ${demande.commentaire ? `<p style="margin-top:15px;font-style:italic"><strong>Commentaire :</strong> ${demande.commentaire}</p>` : ''}
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+          <h3 className="font-bold text-gray-800">Document - {demande.prenom} {demande.nom}</h3>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            >
+              Imprimer / PDF
+            </button>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-8">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900 uppercase tracking-wide">Commune de Chartrettes</h3>
+            <p className="text-sm text-gray-600 mt-1">Service des Ressources Humaines</p>
+            <div className="w-24 h-0.5 bg-gray-400 mx-auto mt-3"></div>
+          </div>
+
+          <h4 className="text-center text-base font-bold text-gray-800 mb-6 uppercase">
+            Demande de {demande.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération'} d'Heures Supplémentaires
+          </h4>
+
+          <div className="grid grid-cols-2 gap-2 bg-gray-50 p-4 rounded-lg text-sm mb-4">
+            <p><span className="font-semibold">Nom :</span> {demande.nom}</p>
+            <p><span className="font-semibold">Prénom :</span> {demande.prenom}</p>
+            <p><span className="font-semibold">Service :</span> {demande.service || 'Non renseigné'}</p>
+            <p><span className="font-semibold">Poste :</span> {demande.poste || 'Non renseigné'}</p>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4 text-sm space-y-3">
+            <p>
+              Je soussigné(e) <strong>{demande.prenom} {demande.nom}</strong>,
+              déclare avoir effectué des heures de travail supplémentaires :
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg space-y-1">
+              <p><strong>Date :</strong> {demande.date_travail_fr}</p>
+              <p><strong>Heures :</strong> {demande.nombre_heures}h</p>
+              <p><strong>Nature :</strong> {demande.raison}</p>
+            </div>
+            <p>
+              <strong>Compensation :</strong>{' '}
+              {demande.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération en congé'}
+            </p>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4 mt-4 flex justify-between items-end text-sm">
+            <div>
+              <p className="font-semibold">Fait à Chartrettes,</p>
+              <p>Le {demande.date_demande_fr}</p>
+            </div>
+            <div className="text-center">
+              <p className="font-semibold mb-1">Signature</p>
+              {demande.signature && (
+                <img src={demande.signature} alt="Signature" className="max-w-[180px] max-h-[70px]" />
+              )}
+            </div>
+          </div>
+
+          {demande.statut !== 'en_attente' && (
+            <div className={`mt-6 p-3 border-2 rounded-lg text-center font-bold ${
+              demande.statut === 'validee' ? 'border-green-500 text-green-600' : 'border-red-500 text-red-600'
+            }`}>
+              {demande.statut === 'validee' ? 'VALIDEE' : 'REFUSEE'}
+              {demande.date_validation_fr && ` - Le ${demande.date_validation_fr}`}
+              {demande.validateur_prenom && ` - Par ${demande.validateur_prenom} ${demande.validateur_nom}`}
+            </div>
+          )}
+
+          {demande.commentaire && (
+            <p className="mt-3 text-sm italic text-gray-600">
+              <strong>Commentaire :</strong> {demande.commentaire}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -149,6 +149,34 @@ export async function notifyCetDecision(userId, decision, jours) {
 }
 
 /**
+ * Notifie la DGS/RH d'une nouvelle demande de récupération
+ */
+export async function notifyRecuperationRequest(requesterName) {
+  await sendPushToRH({
+    title: 'Nouvelle demande de récupération',
+    body: `${requesterName} a fait une demande de récupération d'heures`,
+    url: '/rh',
+    tag: 'recup-request'
+  });
+}
+
+/**
+ * Notifie l'agent d'une décision sur sa demande de récupération
+ */
+export async function notifyRecuperationDecision(userId, decision, typeCompensation) {
+  const isApproved = decision === 'valider';
+  const typeLabel = typeCompensation === 'remuneration' ? 'rémunération' : 'récupération en congé';
+  await sendPushToUser(userId, {
+    title: isApproved ? 'Demande de récupération validée' : 'Demande de récupération refusée',
+    body: isApproved
+      ? `Votre demande de ${typeLabel} a été acceptée`
+      : `Votre demande de ${typeLabel} a été refusée`,
+    url: '/recuperation',
+    tag: 'recup-decision'
+  });
+}
+
+/**
  * Notifie l'agent que son congé a été annulé par la RH
  */
 export async function notifyLeaveCancelled(userId, dateDebut, dateFin) {

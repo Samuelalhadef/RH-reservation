@@ -44,7 +44,8 @@
       "WebFetch(domain:www.education.gouv.fr)",
       "WebFetch(domain:www.service-public.gouv.fr)",
       "WebFetch(domain:vacances-scolaires.com)",
-      "WebFetch(domain:www.calendrier.best)"
+      "WebFetch(domain:www.calendrier.best)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

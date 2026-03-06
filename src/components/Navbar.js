@@ -42,6 +42,7 @@ const Navbar = () => {
   const navItems = [
     { label: 'Tableau de bord', path: '/dashboard' },
     { label: 'Mes demandes', path: '/mes-demandes' },
+    { label: 'Récupération', path: '/recuperation' },
     { label: 'Calendrier équipe', path: '/calendrier' },
   ];
 

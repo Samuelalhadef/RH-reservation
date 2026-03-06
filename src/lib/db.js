@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 5; // Incrémenter pour forcer re-migration
+let _migrationVersion = 6; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -186,6 +186,42 @@ async function runMigrations() {
     `);
   } catch (error) { /* already exists */ }
 
+  // Create demandes_recuperation table if not exists
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS demandes_recuperation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date_travail DATE NOT NULL,
+        nombre_heures REAL NOT NULL,
+        raison TEXT NOT NULL,
+        type_compensation TEXT NOT NULL CHECK(type_compensation IN ('remuneration', 'recuperation')),
+        signature TEXT,
+        document_data TEXT,
+        statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee')),
+        date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date_validation DATETIME,
+        validateur_id INTEGER,
+        commentaire TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (validateur_id) REFERENCES users(id)
+      )
+    `);
+  } catch (error) { /* already exists */ }
+
+  // Create soldes_recuperation table if not exists
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS soldes_recuperation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        heures_acquises REAL DEFAULT 0,
+        date_maj DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+  } catch (error) { /* already exists */ }
+
   // Performance indexes
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_demandes_user_id ON demandes_conges(user_id)',
@@ -197,6 +233,9 @@ async function runMigrations() {
     'CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_cet_hist_user ON cet_historique(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_demandes_cet_user ON demandes_cet(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_recup_user ON demandes_recuperation(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_recup_statut ON demandes_recuperation(statut)',
+    'CREATE INDEX IF NOT EXISTS idx_soldes_recup_user ON soldes_recuperation(user_id)',
   ];
   for (const idx of indexes) {
     try { await client.execute(idx); } catch (e) { /* ignore */ }
@@ -359,6 +398,38 @@ export const initDatabase = async () => {
         commentaire_rh TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (validateur_id) REFERENCES users(id)
+      )
+    `);
+
+    // Table demandes_recuperation
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS demandes_recuperation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date_travail DATE NOT NULL,
+        nombre_heures REAL NOT NULL,
+        raison TEXT NOT NULL,
+        type_compensation TEXT NOT NULL CHECK(type_compensation IN ('remuneration', 'recuperation')),
+        signature TEXT,
+        document_data TEXT,
+        statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee')),
+        date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date_validation DATETIME,
+        validateur_id INTEGER,
+        commentaire TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (validateur_id) REFERENCES users(id)
+      )
+    `);
+
+    // Table soldes_recuperation
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS soldes_recuperation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        heures_acquises REAL DEFAULT 0,
+        date_maj DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
