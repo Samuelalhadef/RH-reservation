@@ -30,9 +30,13 @@ export async function GET() {
       );
     }
 
+    const profile = result.rows[0];
+    // Ajouter 'type' pour cohérence avec le format du login (user.type)
+    profile.type = profile.type_utilisateur;
+
     const response = NextResponse.json({
       success: true,
-      user: result.rows[0]
+      user: profile
     });
     response.headers.set('Cache-Control', 'private, max-age=60');
     return response;

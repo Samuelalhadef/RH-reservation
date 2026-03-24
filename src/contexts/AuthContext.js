@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
       setUser(parsed);
-      // Vérifier que la session est encore valide
+      // Vérifier que la session est encore valide et rafraîchir le profil (rôle, etc.)
       fetch('/api/users/profile').then(res => {
         if (res.status === 401) {
           // Session expirée, déconnecter
@@ -32,6 +32,14 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('user');
           toast.error('Session expirée, veuillez vous reconnecter');
           router.push('/');
+        } else if (res.ok) {
+          return res.json().then(data => {
+            if (data.user) {
+              const updatedUser = { ...parsed, ...data.user };
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+          });
         }
       }).catch(() => {}).finally(() => setLoading(false));
     } else {
