@@ -1428,7 +1428,8 @@ export default function RHPage() {
                   <optgroup label="Ressources">
                     <option value="SÉCURITÉ">Sécurité / Police</option>
                   </optgroup>
-                  <optgroup label="Vie Locale (Carmen)">
+                  <optgroup label="Vie Locale">
+                    <option value="Vie Locale">Directeur Vie Locale</option>
                     <option value="C.L.S.H.">C.L.S.H. / Animation</option>
                     <option value="ÉCOLE ÉLÉM.">École Élémentaire</option>
                     <option value="ÉCOLE MAT.">École Maternelle</option>
@@ -1560,8 +1561,12 @@ export default function RHPage() {
                   )}
                   {newUser.service === 'Enfance' && (
                     <optgroup label="Enfance">
-                      <option value="Dir. Vie Locale">Directrice Vie Locale</option>
                       <option value="Directeur ACM">Directeur ACM</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'Vie Locale' && (
+                    <optgroup label="Vie Locale">
+                      <option value="Dir. Vie Locale">Directeur Vie Locale</option>
                     </optgroup>
                   )}
                 </select>
@@ -1585,7 +1590,7 @@ export default function RHPage() {
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
                   <option value="Directeur Vie Locale">Directeur Vie Locale</option>
-                  <option value="Responsable Vie Locale">Responsable Vie Locale</option>
+
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
                   <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>
@@ -1841,7 +1846,8 @@ export default function RHPage() {
                   <optgroup label="Ressources">
                     <option value="SÉCURITÉ">Sécurité / Police</option>
                   </optgroup>
-                  <optgroup label="Vie Locale (Carmen)">
+                  <optgroup label="Vie Locale">
+                    <option value="Vie Locale">Directeur Vie Locale</option>
                     <option value="C.L.S.H.">C.L.S.H. / Animation</option>
                     <option value="ÉCOLE ÉLÉM.">École Élémentaire</option>
                     <option value="ÉCOLE MAT.">École Maternelle</option>
@@ -1880,7 +1886,7 @@ export default function RHPage() {
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
                   <option value="Directeur Vie Locale">Directeur Vie Locale</option>
-                  <option value="Responsable Vie Locale">Responsable Vie Locale</option>
+
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
                   <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>

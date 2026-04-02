@@ -109,13 +109,27 @@ export async function PUT(request, { params }) {
       }
     }
 
+    // Auto-configurer niveau_validation selon le type de l'utilisateur modifié
+    const NIVEAU_PAR_TYPE = {
+      'Directeur Vie Locale': 2,
+      'Responsable Anim.': 1,
+      'Responsable Serv. Tech.': 1,
+      'Responsable': 1,
+      'Responsable Vie Locale': 1,
+    };
+    if (NIVEAU_PAR_TYPE[type_utilisateur]) {
+      await db.execute({
+        sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), ?) WHERE id = ?',
+        args: [NIVEAU_PAR_TYPE[type_utilisateur], id]
+      });
+    }
+
     // Auto-configurer niveau_validation du responsable assigné et de son supérieur
     if (responsable_id) {
       await db.execute({
         sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
         args: [responsable_id]
       });
-      // Si le responsable a lui-même un responsable, celui-ci devient niveau 2
       const parentResp = await db.execute({
         sql: 'SELECT responsable_id FROM users WHERE id = ?',
         args: [responsable_id]

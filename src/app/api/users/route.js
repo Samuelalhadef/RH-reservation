@@ -87,6 +87,21 @@ export async function POST(request) {
 
     console.log('Balance created successfully');
 
+    // Auto-configurer niveau_validation selon le type de l'utilisateur créé
+    const NIVEAU_PAR_TYPE = {
+      'Directeur Vie Locale': 2,
+      'Responsable Anim.': 1,
+      'Responsable Serv. Tech.': 1,
+      'Responsable': 1,
+      'Responsable Vie Locale': 1,
+    };
+    if (NIVEAU_PAR_TYPE[type_utilisateur]) {
+      await db.execute({
+        sql: 'UPDATE users SET niveau_validation = ? WHERE id = ?',
+        args: [NIVEAU_PAR_TYPE[type_utilisateur], userId]
+      });
+    }
+
     // Auto-configurer niveau_validation du responsable assigné et de son supérieur
     if (responsable_id) {
       await db.execute({

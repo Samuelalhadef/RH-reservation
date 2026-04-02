@@ -30,19 +30,13 @@ export async function POST(request, { params }) {
 
     const user = result.rows[0];
 
-    const tempPassword = Math.random().toString(36).slice(-10);
+    const tempPassword = 'Chartrettes';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     await db.execute({
       sql: 'UPDATE users SET mot_de_passe = ?, mot_de_passe_temporaire = 1 WHERE id = ?',
       args: [hashedPassword, id]
     });
-
-    await sendTemporaryPasswordEmail(
-      user.email,
-      `${user.prenom} ${user.nom}`,
-      tempPassword
-    );
 
     return NextResponse.json({
       success: true,
