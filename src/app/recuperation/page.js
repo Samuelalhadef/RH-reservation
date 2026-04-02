@@ -25,6 +25,10 @@ export default function RecuperationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [selectedDemande, setSelectedDemande] = useState(null);
+  const [showUtilForm, setShowUtilForm] = useState(false);
+  const [utilData, setUtilData] = useState({ date: '', heure_debut: '', heure_fin: '', raison: '' });
+  const [demandesUtil, setDemandesUtil] = useState([]);
+  const [heuresUtilisees, setHeuresUtilisees] = useState(0);
 
   // Signature canvas
   const canvasRef = useRef(null);
@@ -41,13 +45,16 @@ export default function RecuperationPage() {
 
   const fetchData = async () => {
     try {
-      const [recupRes, profileRes] = await Promise.all([
+      const [recupRes, profileRes, utilRes] = await Promise.all([
         fetch('/api/recuperation').then(r => r.json()),
-        fetch('/api/users/profile').then(r => r.json())
+        fetch('/api/users/profile').then(r => r.json()),
+        fetch('/api/recuperation/utilisation').then(r => r.json())
       ]);
       setDemandes(recupRes.demandes || []);
       setHeuresAcquises(recupRes.heures_acquises || 0);
       setProfile(profileRes.user || null);
+      setDemandesUtil(utilRes.demandes || []);
+      setHeuresUtilisees(utilRes.heures_utilisees || 0);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erreur lors du chargement des données');
@@ -216,27 +223,43 @@ export default function RecuperationPage() {
             <h1 className="text-2xl font-bold text-gray-800">Jours de récupération</h1>
             <p className="text-sm text-gray-600">Gérez vos demandes d'heures supplémentaires</p>
           </div>
-          <button
-            onClick={() => { setShowForm(true); setShowDocument(false); }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
-          >
-            + Nouvelle demande
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowForm(true); setShowDocument(false); setShowUtilForm(false); }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            >
+              + Déclarer des heures
+            </button>
+            <button
+              onClick={() => { setShowUtilForm(true); setShowForm(false); setShowDocument(false); }}
+              disabled={heuresAcquises - heuresUtilisees <= 0}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition text-sm font-medium"
+            >
+              Utiliser mes heures
+            </button>
+          </div>
         </div>
 
         {/* Solde de récupération */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <p className="text-sm text-gray-600 mb-1">Heures de récupération acquises</p>
+            <p className="text-sm text-gray-600 mb-1">Heures acquises</p>
             <p className="text-3xl font-bold text-blue-600">{heuresAcquises}h</p>
             <p className="text-xs text-gray-500 mt-1">
               Soit environ {(heuresAcquises / 7).toFixed(1)} jour(s)
             </p>
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+            <p className="text-sm text-gray-600 mb-1">Heures utilisées</p>
+            <p className="text-3xl font-bold text-orange-600">{heuresUtilisees}h</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Solde disponible : <span className="font-bold text-green-600">{heuresAcquises - heuresUtilisees}h</span>
+            </p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
             <p className="text-sm text-gray-600 mb-1">Demandes en attente</p>
             <p className="text-3xl font-bold text-yellow-600">
-              {demandes.filter(d => d.statut === 'en_attente').length}
+              {demandes.filter(d => d.statut === 'en_attente').length + demandesUtil.filter(d => d.statut === 'en_attente').length}
             </p>
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
@@ -246,6 +269,168 @@ export default function RecuperationPage() {
             </p>
           </div>
         </div>
+
+        {/* Formulaire d'utilisation des heures */}
+        {showUtilForm && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Utiliser mes heures de récupération</h2>
+              <button onClick={() => setShowUtilForm(false)} className="text-gray-500 hover:text-gray-700">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {(() => {
+              const solde = heuresAcquises - heuresUtilisees;
+              const today = new Date();
+              const minDate = new Date(today);
+              minDate.setDate(minDate.getDate() + 7);
+              const minDateStr = minDate.toISOString().split('T')[0];
+
+              // Calculer les heures entre debut et fin
+              const calcHeures = (hd, hf) => {
+                if (!hd || !hf) return 0;
+                const [h1, m1] = hd.split(':').map(Number);
+                const [h2, m2] = hf.split(':').map(Number);
+                const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+                return diff > 0 ? Math.round(diff / 30) * 0.5 : 0;
+              };
+              const heuresDemandees = calcHeures(utilData.heure_debut, utilData.heure_fin);
+
+              return (
+                <>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-orange-800">
+                      Solde disponible : <span className="font-bold">{solde}h</span> (soit environ {(solde / 7).toFixed(1)} jour(s))
+                    </p>
+                    <p className="text-xs text-orange-600 mt-1">
+                      La récupération doit être posée au minimum 7 jours à l'avance.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                      <input
+                        type="date"
+                        value={utilData.date}
+                        onChange={(e) => setUtilData({ ...utilData, date: e.target.value })}
+                        min={minDateStr}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Heure de début *</label>
+                      <select
+                        value={utilData.heure_debut}
+                        onChange={(e) => setUtilData({ ...utilData, heure_debut: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      >
+                        <option value="">-- Choisir --</option>
+                        {Array.from({ length: 27 }, (_, i) => {
+                          const h = Math.floor((i + 14) / 2);
+                          const m = (i + 14) % 2 === 0 ? '00' : '30';
+                          if (h > 19) return null;
+                          const val = `${String(h).padStart(2, '0')}:${m}`;
+                          return <option key={val} value={val}>{val}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Heure de fin *</label>
+                      <select
+                        value={utilData.heure_fin}
+                        onChange={(e) => setUtilData({ ...utilData, heure_fin: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      >
+                        <option value="">-- Choisir --</option>
+                        {Array.from({ length: 27 }, (_, i) => {
+                          const h = Math.floor((i + 14) / 2);
+                          const m = (i + 14) % 2 === 0 ? '00' : '30';
+                          if (h > 19) return null;
+                          const val = `${String(h).padStart(2, '0')}:${m}`;
+                          return <option key={val} value={val}>{val}</option>;
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {heuresDemandees > 0 && (
+                    <div className={`mt-3 p-3 rounded-lg text-sm font-medium ${heuresDemandees > solde ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                      Durée : {heuresDemandees}h ({utilData.heure_debut} → {utilData.heure_fin})
+                      {heuresDemandees > solde && ' — Solde insuffisant !'}
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Motif</label>
+                    <input
+                      type="text"
+                      value={utilData.raison}
+                      onChange={(e) => setUtilData({ ...utilData, raison: e.target.value })}
+                      placeholder="Ex: Rendez-vous personnel"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowUtilForm(false)}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!utilData.date || !utilData.heure_debut || !utilData.heure_fin) {
+                          toast.error('Veuillez remplir la date et les heures');
+                          return;
+                        }
+                        if (heuresDemandees <= 0) {
+                          toast.error('L\'heure de fin doit être après l\'heure de début');
+                          return;
+                        }
+                        if (heuresDemandees > solde) {
+                          toast.error('Solde insuffisant');
+                          return;
+                        }
+                        setSubmitting(true);
+                        try {
+                          const res = await fetch('/api/recuperation/utilisation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              date_debut: utilData.date,
+                              date_fin: utilData.date,
+                              nombre_heures: heuresDemandees,
+                              raison: utilData.raison ? `${utilData.raison} (${utilData.heure_debut} - ${utilData.heure_fin})` : `${utilData.heure_debut} - ${utilData.heure_fin}`
+                            })
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.message);
+                          toast.success('Demande d\'utilisation envoyée');
+                          setShowUtilForm(false);
+                          setUtilData({ date: '', heure_debut: '', heure_fin: '', raison: '' });
+                          fetchData();
+                        } catch (err) {
+                          toast.error(err.message);
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }}
+                      disabled={submitting || heuresDemandees <= 0 || heuresDemandees > solde}
+                      className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition text-sm font-medium"
+                    >
+                      {submitting ? 'Envoi...' : `Utiliser ${heuresDemandees}h`}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Formulaire de nouvelle demande */}
         {showForm && !showDocument && (
@@ -524,6 +709,41 @@ export default function RecuperationPage() {
         )}
 
         {/* Liste des demandes */}
+        {/* Demandes d'utilisation */}
+        {demandesUtil.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-orange-200 mb-6">
+            <div className="p-6 border-b border-orange-200">
+              <h2 className="text-lg font-bold text-gray-800">Mes demandes d'utilisation de récupération</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-orange-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Dates</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Heures</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Motif</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {demandesUtil.map((d) => (
+                    <tr key={d.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">{formatDateFR(d.date_debut)} → {formatDateFR(d.date_fin)}</td>
+                      <td className="px-4 py-3 font-bold">{d.nombre_heures}h</td>
+                      <td className="px-4 py-3 text-gray-600">{d.raison || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(d.statut)}`}>
+                          {formatStatus(d.statut)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-lg font-bold text-gray-800">Mes demandes de récupération</h2>

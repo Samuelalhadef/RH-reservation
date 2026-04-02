@@ -32,9 +32,30 @@ export async function GET() {
       args: []
     });
 
+    const utilResult = await db.execute({
+      sql: `
+        SELECT d.id, d.user_id, d.date_debut, d.date_fin, d.nombre_heures, d.raison,
+               d.statut, d.commentaire,
+               strftime('%d/%m/%Y', d.date_debut) as date_debut_fr,
+               strftime('%d/%m/%Y', d.date_fin) as date_fin_fr,
+               strftime('%d/%m/%Y', d.date_demande) as date_demande_fr,
+               strftime('%d/%m/%Y', d.date_validation) as date_validation_fr,
+               u.nom, u.prenom, u.service, u.poste,
+               v.nom as validateur_nom, v.prenom as validateur_prenom
+        FROM demandes_utilisation_recup d
+        JOIN users u ON d.user_id = u.id
+        LEFT JOIN users v ON d.validateur_id = v.id
+        ORDER BY
+          CASE d.statut WHEN 'en_attente' THEN 0 ELSE 1 END,
+          d.date_demande DESC
+      `,
+      args: []
+    });
+
     return NextResponse.json({
       success: true,
-      demandes: result.rows || []
+      demandes: result.rows || [],
+      demandes_utilisation: utilResult.rows || []
     });
   } catch (error) {
     console.error('Error fetching all recuperation requests:', error);

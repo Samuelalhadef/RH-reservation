@@ -57,6 +57,7 @@ export default function RHPage() {
   const [recalcLoading, setRecalcLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(null);
   const [recupRequests, setRecupRequests] = useState([]);
+  const [recupUtilRequests, setRecupUtilRequests] = useState([]);
   const [recupActionLoading, setRecupActionLoading] = useState(null);
   const [selectedRecupDoc, setSelectedRecupDoc] = useState(null);
 
@@ -109,6 +110,7 @@ export default function RHPage() {
         const response = await fetch('/api/recuperation/all');
         const data = await response.json();
         setRecupRequests(data.demandes || []);
+        setRecupUtilRequests(data.demandes_utilisation || []);
       } else if (activeTab === 'cet-balances') {
         const response = await fetch('/api/cet/all-balances');
         const data = await response.json();
@@ -341,6 +343,28 @@ export default function RHPage() {
     }
   };
 
+  const handleRecupUtilAction = async (requestId, action) => {
+    const commentaire = action === 'refuser' ? window.prompt('Motif du refus (optionnel) :') : null;
+    if (action === 'refuser' && commentaire === null) return;
+
+    setRecupActionLoading(`util-${requestId}`);
+    try {
+      const response = await fetch(`/api/recuperation/utilisation/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, commentaire }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRecupActionLoading(null);
+    }
+  };
+
   const handleRecalculateBalances = async () => {
     if (!window.confirm('Recalculer les soldes de tous les utilisateurs à partir des congés validés ?')) {
       return;
@@ -506,9 +530,9 @@ export default function RHPage() {
               }`}
             >
               Récupération
-              {recupRequests.filter(r => r.statut === 'en_attente').length > 0 && (
+              {(recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length) > 0 && (
                 <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500 text-white rounded-full">
-                  {recupRequests.filter(r => r.statut === 'en_attente').length}
+                  {recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length}
                 </span>
               )}
             </button>
@@ -1154,6 +1178,64 @@ export default function RHPage() {
                 ))}
               </div>
             )}
+          {/* Demandes d'utilisation de récupération */}
+            {recupUtilRequests.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  Demandes d'utilisation de récupération
+                </h2>
+                <div className="space-y-4">
+                  {recupUtilRequests.map((req) => (
+                    <div key={`util-${req.id}`} className={`border rounded-lg p-4 ${
+                      req.statut === 'en_attente' ? 'border-orange-200 bg-orange-50' : 'border-gray-200'
+                    }`}>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-800">{req.prenom} {req.nom}</span>
+                            {req.service && <span className="text-xs text-gray-500">({req.service})</span>}
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
+                              req.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-800' :
+                              req.statut === 'validee' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {req.statut === 'en_attente' ? 'En attente' : req.statut === 'validee' ? 'Validée' : 'Refusée'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-0.5">
+                            <p><strong>Dates :</strong> {req.date_debut_fr}{req.date_debut_fr !== req.date_fin_fr ? ` → ${req.date_fin_fr}` : ''} | <strong>Heures :</strong> {req.nombre_heures}h</p>
+                            {req.raison && <p><strong>Raison :</strong> {req.raison}</p>}
+                            <p className="text-xs text-gray-400">Demandé le {req.date_demande_fr}</p>
+                          </div>
+                          {req.commentaire && (
+                            <p className="text-xs text-gray-500 mt-1 italic">Commentaire : {req.commentaire}</p>
+                          )}
+                        </div>
+
+                        {req.statut === 'en_attente' && (
+                          <div className="flex gap-2 items-center">
+                            <button
+                              onClick={() => handleRecupUtilAction(req.id, 'valider')}
+                              disabled={recupActionLoading === `util-${req.id}`}
+                              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                            >
+                              {recupActionLoading === `util-${req.id}` ? '...' : 'Valider'}
+                            </button>
+                            <button
+                              onClick={() => handleRecupUtilAction(req.id, 'refuser')}
+                              disabled={recupActionLoading === `util-${req.id}`}
+                              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {recupActionLoading === `util-${req.id}` ? '...' : 'Refuser'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1326,29 +1408,168 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service
+                  Service *
                 </label>
-                <input
-                  type="text"
+                <select
                   value={newUser.service}
-                  onChange={(e) => setNewUser({ ...newUser, service: e.target.value })}
+                  onChange={(e) => {
+                    setNewUser({ ...newUser, service: e.target.value, poste: '', type_utilisateur: 'Employé', responsable_id: '' });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: ADMIN. GÉNÉRALE, C.L.S.H., SERVICES TECH."
-                />
+                >
+                  <option value="">-- Choisir un service --</option>
+                  <optgroup label="Direction">
+                    <option value="ADMIN. GÉNÉRALE">Administration Générale</option>
+                    <option value="Etat Civil">Etat Civil</option>
+                  </optgroup>
+                  <optgroup label="Services Techniques">
+                    <option value="SERVICES TECH.">Services Techniques</option>
+                  </optgroup>
+                  <optgroup label="Ressources">
+                    <option value="SÉCURITÉ">Sécurité / Police</option>
+                  </optgroup>
+                  <optgroup label="Vie Locale (Carmen)">
+                    <option value="C.L.S.H.">C.L.S.H. / Animation</option>
+                    <option value="ÉCOLE ÉLÉM.">École Élémentaire</option>
+                    <option value="ÉCOLE MAT.">École Maternelle</option>
+                    <option value="RESTAURATION">Cantine / Restauration</option>
+                    <option value="EMC">Vie Associative et Culturelle</option>
+                    <option value="communication">Communication</option>
+                    <option value="Enfance">Enfance</option>
+                  </optgroup>
+                </select>
               </div>
 
+              {newUser.service && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Poste
+                  Poste / Rôle *
                 </label>
-                <input
-                  type="text"
+                <select
                   value={newUser.poste}
-                  onChange={(e) => setNewUser({ ...newUser, poste: e.target.value })}
+                  onChange={(e) => {
+                    const poste = e.target.value;
+                    const dgs = allUsers.find(u => u.poste === 'DGS');
+                    const carmen = allUsers.find(u => u.poste?.includes('Dir. Vie Locale'));
+                    const respTech = allUsers.find(u => u.poste?.includes('Resp') && u.service === 'SERVICES TECH.');
+                    const respAnim = allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'));
+
+                    const POSTE_CONFIG = {
+                      'DGS': { type: 'DG', resp: '' },
+                      'Dir. Vie Locale': { type: 'Responsable Vie Locale', resp: dgs?.id },
+                      'Resp. Services Tech': { type: 'Responsable Serv. Tech.', resp: dgs?.id },
+                      'Resp. Centre Loisirs': { type: 'Responsable Anim.', resp: carmen?.id },
+                      'Resp. adj. ACM': { type: 'Responsable', resp: respAnim?.id },
+                      'Resp. RH': { type: 'RH', resp: dgs?.id },
+                      'Resp. Finances': { type: 'Responsable', resp: dgs?.id },
+                      'Resp. Urbanisme': { type: 'Responsable', resp: dgs?.id },
+                      'Resp. Social': { type: 'Responsable', resp: dgs?.id },
+                      'Responsable RMS': { type: 'Responsable', resp: carmen?.id },
+                      'Service Technique': { type: 'Service Technique', resp: respTech?.id },
+                      'Agent technique': { type: 'Service Technique', resp: respTech?.id },
+                      'Animateur': { type: 'Animateur', resp: respAnim?.id },
+                      'Animatrice': { type: 'Animateur', resp: respAnim?.id },
+                      'Adj. Anim. (ATSEM)': { type: 'ATSEM/Animation', resp: respAnim?.id },
+                      'Adj. d\'animation': { type: 'Animateur', resp: respAnim?.id },
+                      'Adj. Tech. Territ.': { type: 'Employé', resp: respAnim?.id },
+                      'Agent d\'entretien': { type: 'Entretien', resp: respAnim?.id },
+                      'Animateur Culturel': { type: 'Animateur Culturel', resp: carmen?.id },
+                      'Cantinière': { type: 'Employé', resp: carmen?.id },
+                      'Agent en communication': { type: 'Employé', resp: carmen?.id },
+                      'Policier Municipal': { type: 'Police Municipale', resp: dgs?.id },
+                      'Etat Civil': { type: 'Employé', resp: dgs?.id },
+                      'Facturation': { type: 'Administratif', resp: dgs?.id },
+                      'Administratif': { type: 'Administratif', resp: dgs?.id },
+                      'Alternant': { type: 'Alternant', resp: dgs?.id },
+                      'Directeur ACM': { type: 'Responsable', resp: carmen?.id },
+                    };
+                    const cfg = POSTE_CONFIG[poste] || {};
+                    setNewUser({
+                      ...newUser,
+                      poste,
+                      type_utilisateur: cfg.type || newUser.type_utilisateur,
+                      responsable_id: cfg.resp || '',
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: Resp. RH, Agent technique, DGS"
-                />
+                >
+                  <option value="">-- Choisir un poste --</option>
+                  {newUser.service === 'SERVICES TECH.' && (
+                    <optgroup label="Services Techniques">
+                      <option value="Resp. Services Tech">Responsable Services Techniques</option>
+                      <option value="Service Technique">Agent technique</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'C.L.S.H.' && (
+                    <optgroup label="Animation / C.L.S.H.">
+                      <option value="Resp. Centre Loisirs">Responsable Centre de Loisirs</option>
+                      <option value="Resp. adj. ACM">Responsable adjoint ACM</option>
+                      <option value="Directeur ACM">Directeur ACM</option>
+                      <option value="Animateur">Animateur</option>
+                      <option value="Animatrice">Animatrice</option>
+                      <option value="Adj. Anim. (ATSEM)">ATSEM / Adj. Animation</option>
+                      <option value="Adj. d'animation">Adjoint d'animation</option>
+                      <option value="Adj. Tech. Territ.">Adjoint Technique Territorial</option>
+                      <option value="Agent d'entretien">Agent d'entretien</option>
+                    </optgroup>
+                  )}
+                  {(newUser.service === 'ÉCOLE ÉLÉM.' || newUser.service === 'ÉCOLE MAT.') && (
+                    <optgroup label="Écoles">
+                      <option value="Adj. Anim. (ATSEM)">ATSEM / Adj. Animation</option>
+                      <option value="Adj. Tech. Territ.">Adjoint Technique Territorial</option>
+                      <option value="Agent d'entretien">Agent d'entretien</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'ADMIN. GÉNÉRALE' && (
+                    <optgroup label="Administration Générale">
+                      <option value="DGS">Directeur Général des Services</option>
+                      <option value="Resp. RH">Responsable RH</option>
+                      <option value="Resp. Finances">Responsable Finances</option>
+                      <option value="Resp. Urbanisme">Responsable Urbanisme</option>
+                      <option value="Resp. Social">Responsable Social / CCAS</option>
+                      <option value="Facturation">Facturation</option>
+                      <option value="Administratif">Administratif</option>
+                      <option value="Alternant">Alternant</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'SÉCURITÉ' && (
+                    <optgroup label="Sécurité">
+                      <option value="Policier Municipal">Policier Municipal</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'RESTAURATION' && (
+                    <optgroup label="Cantine / Restauration">
+                      <option value="Responsable RMS">Responsable Restauration</option>
+                      <option value="Cantinière">Cantinière / Agent de restauration</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'EMC' && (
+                    <optgroup label="Vie Associative">
+                      <option value="Animateur Culturel">Animateur Culturel</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'Etat Civil' && (
+                    <optgroup label="Etat Civil">
+                      <option value="Etat Civil">Agent Etat Civil</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'communication' && (
+                    <optgroup label="Communication">
+                      <option value="Agent en communication">Agent en communication</option>
+                    </optgroup>
+                  )}
+                  {newUser.service === 'Enfance' && (
+                    <optgroup label="Enfance">
+                      <option value="Dir. Vie Locale">Directrice Vie Locale</option>
+                      <option value="Directeur ACM">Directeur ACM</option>
+                    </optgroup>
+                  )}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Le poste détermine automatiquement le responsable hiérarchique
+                </p>
               </div>
+              )}
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1360,13 +1581,12 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Employé">Employé</option>
-                  <option value="Direction">Direction</option>
+                  <option value="DG">Direction Générale</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
-                  <option value="Responsable Service Technique">Responsable Service Technique</option>
-                  <option value="Responsable Animation">Responsable Animation</option>
-                  <option value="Responsable Urbanisme">Responsable Urbanisme</option>
                   <option value="Responsable Vie Locale">Responsable Vie Locale</option>
+                  <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
+                  <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
                   <option value="Animateur">Animateur</option>
@@ -1376,6 +1596,9 @@ export default function RHPage() {
                   <option value="Entretien">Entretien</option>
                   <option value="Alternant">Alternant</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Pré-rempli selon le poste, modifiable si besoin
+                </p>
               </div>
 
               <div className="mb-4">
@@ -1468,13 +1691,41 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Aucun (validation directe RH)</option>
-                  {allUsers.filter(u => u.actif !== 0).map((u) => (
-                    <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.type_utilisateur})</option>
-                  ))}
+                  {(() => {
+                    const responsables = allUsers.filter(u => u.actif !== 0 && (
+                      u.poste?.includes('Resp') || u.poste?.includes('DGS') || u.poste?.includes('Dir.')
+                    ));
+                    const autres = allUsers.filter(u => u.actif !== 0 && !responsables.find(r => r.id === u.id));
+                    return (
+                      <>
+                        <optgroup label="Responsables / Direction">
+                          {responsables.map(u => (
+                            <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.poste || u.type_utilisateur}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Autres agents">
+                          {autres.map(u => (
+                            <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.poste || u.type_utilisateur}</option>
+                          ))}
+                        </optgroup>
+                      </>
+                    );
+                  })()}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Le responsable validera les demandes de congés en premier
-                </p>
+                {newUser.responsable_id && (() => {
+                  const resp = allUsers.find(u => u.id === Number(newUser.responsable_id));
+                  const resp2 = resp ? allUsers.find(u => u.id === resp.responsable_id) : null;
+                  return (
+                    <p className="text-xs text-blue-600 mt-1 font-medium">
+                      Circuit : Agent → {resp?.prenom} {resp?.nom}{resp2 ? ` → ${resp2.prenom} ${resp2.nom}` : ''} → RH
+                    </p>
+                  );
+                })()}
+                {!newUser.responsable_id && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-rempli selon le service choisi
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -1550,15 +1801,55 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service
+                  Service *
                 </label>
-                <input
-                  type="text"
+                <select
                   value={editingUser.service || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, service: e.target.value })}
+                  onChange={(e) => {
+                    const svc = e.target.value;
+                    const SERVICE_CONFIG = {
+                      'SERVICES TECH.': { resp: allUsers.find(u => u.poste?.includes('Resp') && u.service === 'SERVICES TECH.')?.id },
+                      'C.L.S.H.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
+                      'ÉCOLE ÉLÉM.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
+                      'ÉCOLE MAT.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
+                      'RESTAURATION': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'ADMIN. GÉNÉRALE': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
+                      'EMC': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'SÉCURITÉ': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
+                      'Etat Civil': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
+                      'communication': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'Enfance': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                    };
+                    const cfg = SERVICE_CONFIG[svc] || {};
+                    setEditingUser({
+                      ...editingUser,
+                      service: svc,
+                      responsable_id: cfg.resp || editingUser.responsable_id,
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: ADMIN. GÉNÉRALE, C.L.S.H., SERVICES TECH."
-                />
+                >
+                  <option value="">-- Choisir un service --</option>
+                  <optgroup label="Direction">
+                    <option value="ADMIN. GÉNÉRALE">Administration Générale</option>
+                    <option value="Etat Civil">Etat Civil</option>
+                  </optgroup>
+                  <optgroup label="Services Techniques">
+                    <option value="SERVICES TECH.">Services Techniques</option>
+                  </optgroup>
+                  <optgroup label="Ressources">
+                    <option value="SÉCURITÉ">Sécurité / Police</option>
+                  </optgroup>
+                  <optgroup label="Vie Locale (Carmen)">
+                    <option value="C.L.S.H.">C.L.S.H. / Animation</option>
+                    <option value="ÉCOLE ÉLÉM.">École Élémentaire</option>
+                    <option value="ÉCOLE MAT.">École Maternelle</option>
+                    <option value="RESTAURATION">Cantine / Restauration</option>
+                    <option value="EMC">Vie Associative et Culturelle</option>
+                    <option value="communication">Communication</option>
+                    <option value="Enfance">Enfance</option>
+                  </optgroup>
+                </select>
               </div>
 
               <div className="mb-4">
@@ -1584,13 +1875,12 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Employé">Employé</option>
-                  <option value="Direction">Direction</option>
+                  <option value="DG">Direction Générale</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
-                  <option value="Responsable Service Technique">Responsable Service Technique</option>
-                  <option value="Responsable Animation">Responsable Animation</option>
-                  <option value="Responsable Urbanisme">Responsable Urbanisme</option>
                   <option value="Responsable Vie Locale">Responsable Vie Locale</option>
+                  <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
+                  <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
                   <option value="Animateur">Animateur</option>
@@ -1694,13 +1984,36 @@ export default function RHPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Aucun (validation directe RH)</option>
-                  {allUsers.filter(u => u.actif !== 0 && u.id !== editingUser.id).map((u) => (
-                    <option key={u.id} value={u.id}>{u.prenom} {u.nom} ({u.type_utilisateur})</option>
-                  ))}
+                  {(() => {
+                    const responsables = allUsers.filter(u => u.actif !== 0 && u.id !== editingUser.id && (
+                      u.poste?.includes('Resp') || u.poste?.includes('DGS') || u.poste?.includes('Dir.')
+                    ));
+                    const autres = allUsers.filter(u => u.actif !== 0 && u.id !== editingUser.id && !responsables.find(r => r.id === u.id));
+                    return (
+                      <>
+                        <optgroup label="Responsables / Direction">
+                          {responsables.map(u => (
+                            <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.poste || u.type_utilisateur}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Autres agents">
+                          {autres.map(u => (
+                            <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.poste || u.type_utilisateur}</option>
+                          ))}
+                        </optgroup>
+                      </>
+                    );
+                  })()}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Le responsable validera les demandes de congés en premier
-                </p>
+                {editingUser.responsable_id && (() => {
+                  const resp = allUsers.find(u => u.id === Number(editingUser.responsable_id));
+                  const resp2 = resp ? allUsers.find(u => u.id === resp.responsable_id) : null;
+                  return (
+                    <p className="text-xs text-blue-600 mt-1 font-medium">
+                      Circuit : Agent → {resp?.prenom} {resp?.nom}{resp2 ? ` → ${resp2.prenom} ${resp2.nom}` : ''} → RH
+                    </p>
+                  );
+                })()}
               </div>
 
               <div className="mb-4">

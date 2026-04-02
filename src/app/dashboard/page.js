@@ -96,9 +96,15 @@ export default function DashboardPage() {
                   <p className="text-sm text-gray-600 mb-1">Jours restants</p>
                   <p className="text-3xl font-bold text-blue-600">{profile?.jours_restants || 25}</p>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm text-gray-600">Jours pris</span>
-                  <span className="font-bold text-gray-800">{profile?.jours_pris || 0}</span>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Jours pris</span>
+                    <span className="font-bold text-gray-800">{profile?.jours_pris || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs text-orange-600">Recup. acquises</span>
+                    <span className="text-xs font-bold text-orange-600">{profile?.heures_recuperation || 0}h</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="text-sm text-gray-600">Jours reportés</span>

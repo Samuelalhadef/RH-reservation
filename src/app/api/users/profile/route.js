@@ -15,9 +15,11 @@ export async function GET() {
     const result = await db.execute({
       sql: `
         SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.service, u.poste, u.photo_profil, u.date_entree_mairie,
-               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement, sc.jours_compensateurs
+               sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement, sc.jours_compensateurs,
+               COALESCE(sr.heures_acquises, 0) as heures_recuperation
         FROM users u
         LEFT JOIN soldes_conges sc ON u.id = sc.user_id AND sc.annee = ?
+        LEFT JOIN soldes_recuperation sr ON u.id = sr.user_id
         WHERE u.id = ?
       `,
       args: [new Date().getFullYear(), user.userId]

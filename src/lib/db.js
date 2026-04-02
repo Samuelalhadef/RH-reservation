@@ -222,6 +222,27 @@ async function runMigrations() {
     `);
   } catch (error) { /* already exists */ }
 
+  // Create demandes_utilisation_recup table if not exists
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS demandes_utilisation_recup (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date_debut DATE NOT NULL,
+        date_fin DATE NOT NULL,
+        nombre_heures REAL NOT NULL,
+        raison TEXT,
+        statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee')),
+        date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date_validation DATETIME,
+        validateur_id INTEGER,
+        commentaire TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (validateur_id) REFERENCES users(id)
+      )
+    `);
+  } catch (e) { /* table already exists */ }
+
   // Performance indexes
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_demandes_user_id ON demandes_conges(user_id)',
