@@ -45,23 +45,29 @@ export async function GET(request) {
     const isRH = validator.type_utilisateur === 'RH' || validator.type_utilisateur === 'Direction' || validator.type_utilisateur === 'DG';
     const validatorLevel = validator.niveau_validation || 0;
 
+    const validatorType = validator.type_utilisateur;
+
     // Vérifier si ce validateur est responsable direct de certains agents (seulement si pas RH/DGS)
+    // Inclut les agents dont le responsable assigné a le même type_utilisateur que ce validateur
     const hasSubordinates = (!isRH && validatorLevel >= 1) ? (await db.execute({
-      sql: 'SELECT COUNT(*) as cnt FROM users WHERE responsable_id = ? AND actif = 1',
-      args: [userId]
+      sql: `SELECT COUNT(*) as cnt FROM users u
+            LEFT JOIN users r ON u.responsable_id = r.id
+            WHERE u.actif = 1 AND (u.responsable_id = ? OR r.type_utilisateur = ?)`,
+      args: [userId, validatorType]
     })).rows[0].cnt > 0 : false;
 
     // Vérifier si ce validateur est responsable niveau 2 (seulement si pas RH/DGS)
     const hasLevel2Subordinates = (!isRH && validatorLevel >= 2) ? (await db.execute({
       sql: `SELECT COUNT(*) as cnt FROM users u
             INNER JOIN users r ON u.responsable_id = r.id
-            WHERE r.responsable_id = ?`,
-      args: [userId]
+            WHERE r.responsable_id = ? OR r.type_utilisateur = (SELECT type_utilisateur FROM users WHERE id = ?)`,
+      args: [userId, userId]
     })).rows[0].cnt > 0 : false;
 
     let queries = [];
 
     // Priorité 1 : responsable direct (niveau 1) - PAS pour RH/DGS qui valident en final
+    // Montre les demandes des agents dont le responsable est ce validateur OU a le même type
     if (hasSubordinates) {
       queries.push({
         sql: `
@@ -74,12 +80,13 @@ export async function GET(request) {
             u.responsable_id
           FROM demandes_conges d
           INNER JOIN users u ON d.user_id = u.id
+          LEFT JOIN users r ON u.responsable_id = r.id
           WHERE d.statut = 'en_attente'
-          AND u.responsable_id = ?
+          AND (u.responsable_id = ? OR r.type_utilisateur = ?)
           AND (d.statut_niveau_1 IS NULL OR d.statut_niveau_1 != 'validee')
           ORDER BY d.date_demande ASC
         `,
-        args: [userId]
+        args: [userId, validatorType]
       });
     }
 

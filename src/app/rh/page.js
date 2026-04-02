@@ -1451,7 +1451,7 @@ export default function RHPage() {
                   onChange={(e) => {
                     const poste = e.target.value;
                     const dgs = allUsers.find(u => u.poste === 'DGS');
-                    const carmen = allUsers.find(u => u.poste?.includes('Dir. Vie Locale'));
+                    const carmen = allUsers.find(u => u.type_utilisateur === 'Directeur Vie Locale');
                     const respTech = allUsers.find(u => u.poste?.includes('Resp') && u.service === 'SERVICES TECH.');
                     const respAnim = allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'));
 
@@ -1475,7 +1475,7 @@ export default function RHPage() {
                       'Adj. Tech. Territ.': { type: 'Employé', resp: respAnim?.id },
                       'Agent d\'entretien': { type: 'Entretien', resp: respAnim?.id },
                       'Animateur Culturel': { type: 'Animateur Culturel', resp: carmen?.id },
-                      'Cantinière': { type: 'Employé', resp: carmen?.id },
+                      'Cantinière': { type: 'Cantinière', resp: carmen?.id },
                       'Agent en communication': { type: 'Employé', resp: carmen?.id },
                       'Policier Municipal': { type: 'Police Municipale', resp: dgs?.id },
                       'Etat Civil': { type: 'Employé', resp: dgs?.id },
@@ -1600,6 +1600,7 @@ export default function RHPage() {
                   <option value="ATSEM/Animation">ATSEM/Animation</option>
                   <option value="Police Municipale">Police Municipale</option>
                   <option value="Entretien">Entretien</option>
+                  <option value="Cantinière">Cantinière</option>
                   <option value="Alternant">Alternant</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
@@ -1818,13 +1819,13 @@ export default function RHPage() {
                       'C.L.S.H.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
                       'ÉCOLE ÉLÉM.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
                       'ÉCOLE MAT.': { resp: allUsers.find(u => u.poste?.includes('Resp. Centre') || u.poste?.includes('Resp Centre'))?.id },
-                      'RESTAURATION': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'RESTAURATION': { resp: allUsers.find(u => u.type_utilisateur === 'Directeur Vie Locale')?.id },
                       'ADMIN. GÉNÉRALE': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
-                      'EMC': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'EMC': { resp: allUsers.find(u => u.type_utilisateur === 'Directeur Vie Locale')?.id },
                       'SÉCURITÉ': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
                       'Etat Civil': { resp: allUsers.find(u => u.poste === 'DGS')?.id },
-                      'communication': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
-                      'Enfance': { resp: allUsers.find(u => u.poste?.includes('Dir. Vie Locale'))?.id },
+                      'communication': { resp: allUsers.find(u => u.type_utilisateur === 'Directeur Vie Locale')?.id },
+                      'Enfance': { resp: allUsers.find(u => u.type_utilisateur === 'Directeur Vie Locale')?.id },
                     };
                     const cfg = SERVICE_CONFIG[svc] || {};
                     setEditingUser({
@@ -1896,6 +1897,7 @@ export default function RHPage() {
                   <option value="ATSEM/Animation">ATSEM/Animation</option>
                   <option value="Police Municipale">Police Municipale</option>
                   <option value="Entretien">Entretien</option>
+                  <option value="Cantinière">Cantinière</option>
                   <option value="Alternant">Alternant</option>
                 </select>
               </div>

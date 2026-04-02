@@ -148,7 +148,23 @@ export async function canUserValidateLeave(validatorId, leave) {
   }
 
   // Vérifier d'abord si le validateur est responsable direct (niveau 1) — sauf si RH/DGS (valide en final)
-  if (!isRH && validatorLevel >= 1 && requesterData.responsable_id === validatorId) {
+  // Accepte aussi si le responsable assigné a le même type_utilisateur que le validateur
+  let isLevel1Validator = false;
+  if (!isRH && validatorLevel >= 1) {
+    if (requesterData.responsable_id === validatorId) {
+      isLevel1Validator = true;
+    } else if (requesterData.responsable_id) {
+      const assignedResp = await db.execute({
+        sql: 'SELECT type_utilisateur FROM users WHERE id = ?',
+        args: [requesterData.responsable_id]
+      });
+      if (assignedResp.rows.length > 0 && assignedResp.rows[0].type_utilisateur === validatorData.type_utilisateur) {
+        isLevel1Validator = true;
+      }
+    }
+  }
+
+  if (isLevel1Validator) {
     if (currentLevel === 0) {
       return {
         canValidate: true,

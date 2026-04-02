@@ -22,7 +22,7 @@ export async function POST(request) {
     const body = await request.json();
     console.log('Request body:', body);
 
-    const { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = body;
+    let { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = body;
 
     if (!nom || !prenom || !type_utilisateur) {
       return NextResponse.json(
@@ -57,6 +57,35 @@ export async function POST(request) {
     console.log('Generating password and hashing...');
     const tempPassword = 'Chartrettes';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // Auto-assignation du responsable si non fourni
+    if (!responsable_id) {
+      const RESP_PAR_TYPE = {
+        'Cantinière': 'Directeur Vie Locale',
+        'Animateur': 'Responsable Anim.',
+        'Animateur Culturel': 'Directeur Vie Locale',
+        'ATSEM/Animation': 'Responsable Anim.',
+        'Entretien': 'Responsable Anim.',
+        'Service Technique': 'Responsable Serv. Tech.',
+        'Police Municipale': 'DG',
+        'Responsable Serv. Tech.': 'DG',
+        'Responsable Anim.': 'Directeur Vie Locale',
+        'Directeur Vie Locale': 'DG',
+        'Responsable': 'DG',
+        'RH': 'DG',
+        'Administratif': 'DG',
+      };
+      const respType = RESP_PAR_TYPE[type_utilisateur];
+      if (respType) {
+        const respResult = await db.execute({
+          sql: 'SELECT id FROM users WHERE type_utilisateur = ? AND actif = 1 LIMIT 1',
+          args: [respType]
+        });
+        if (respResult.rows.length > 0) {
+          responsable_id = respResult.rows[0].id;
+        }
+      }
+    }
 
     console.log('Creating user in database...');
     const result = await db.execute({
