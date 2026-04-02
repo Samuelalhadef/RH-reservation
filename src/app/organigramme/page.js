@@ -62,7 +62,7 @@ function match(value, ...keywords) {
 // Adding a new user with the right service/poste will auto-place them.
 // ============================================================
 const ROLE_DGS = u => match(u.poste, 'DGS') || match(u.type_utilisateur, 'DG');
-const ROLE_DIR_VIE_LOCALE = u => match(u.poste, 'Dir. Vie Locale', 'Directrice Vie Locale', 'Directeur Vie Locale') || match(u.type_utilisateur, 'Responsable Vie Locale');
+const ROLE_DIR_VIE_LOCALE = u => match(u.poste, 'Dir. Vie Locale', 'Directrice Vie Locale', 'Directeur Vie Locale') || match(u.type_utilisateur, 'Directeur Vie Locale');
 const ROLE_RESP_TECH = u => match(u.service, 'SERVICES TECH') && match(u.poste, 'Resp');
 const ROLE_RESP_ANIM = u => match(u.service, 'C.L.S.H') && match(u.poste, 'Resp. Centre', 'Resp Centre');
 const ROLE_RESP_SOCIAL = u => match(u.poste, 'Resp. Social', 'Resp Social');

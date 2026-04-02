@@ -109,12 +109,23 @@ export async function PUT(request, { params }) {
       }
     }
 
-    // Auto-configurer niveau_validation du responsable assigné
+    // Auto-configurer niveau_validation du responsable assigné et de son supérieur
     if (responsable_id) {
       await db.execute({
         sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
         args: [responsable_id]
       });
+      // Si le responsable a lui-même un responsable, celui-ci devient niveau 2
+      const parentResp = await db.execute({
+        sql: 'SELECT responsable_id FROM users WHERE id = ?',
+        args: [responsable_id]
+      });
+      if (parentResp.rows.length > 0 && parentResp.rows[0].responsable_id) {
+        await db.execute({
+          sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 2) WHERE id = ?',
+          args: [parentResp.rows[0].responsable_id]
+        });
+      }
     }
 
     return NextResponse.json({

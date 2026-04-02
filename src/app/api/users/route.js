@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
-import { sendTemporaryPasswordEmail } from '@/lib/email';
+
 import { calculateLeaveBalance } from '@/lib/contractUtils';
 
 export async function POST(request) {
@@ -24,9 +24,9 @@ export async function POST(request) {
 
     const { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = body;
 
-    if (!nom || !prenom || !email || !type_utilisateur) {
+    if (!nom || !prenom || !type_utilisateur) {
       return NextResponse.json(
-        { success: false, message: 'Tous les champs sont requis' },
+        { success: false, message: 'Nom, prénom et type sont requis' },
         { status: 400 }
       );
     }
@@ -39,21 +39,23 @@ export async function POST(request) {
       );
     }
 
-    console.log('Checking existing user with email:', email);
-    const existingUser = await db.execute({
-      sql: 'SELECT id FROM users WHERE email = ?',
-      args: [email]
-    });
+    if (email) {
+      console.log('Checking existing user with email:', email);
+      const existingUser = await db.execute({
+        sql: 'SELECT id FROM users WHERE email = ?',
+        args: [email]
+      });
 
-    if (existingUser.rows.length > 0) {
-      return NextResponse.json(
-        { success: false, message: 'Cet email est déjà utilisé' },
-        { status: 400 }
-      );
+      if (existingUser.rows.length > 0) {
+        return NextResponse.json(
+          { success: false, message: 'Cet email est déjà utilisé' },
+          { status: 400 }
+        );
+      }
     }
 
     console.log('Generating password and hashing...');
-    const tempPassword = Math.random().toString(36).slice(-10);
+    const tempPassword = 'Chartrettes';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     console.log('Creating user in database...');
@@ -62,7 +64,7 @@ export async function POST(request) {
         INSERT INTO users (nom, prenom, email, mot_de_passe, type_utilisateur, service, poste, mot_de_passe_temporaire, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
       `,
-      args: [nom, prenom, email, hashedPassword, type_utilisateur, service || null, poste || null, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null, date_entree_mairie || null, quotite_travail || 100, responsable_id || null]
+      args: [nom, prenom, email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@mairie-chartrettes.fr`, hashedPassword, type_utilisateur, service || null, poste || null, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null, date_entree_mairie || null, quotite_travail || 100, responsable_id || null]
     });
 
     const userId = Number(result.lastInsertRowid);
@@ -85,20 +87,23 @@ export async function POST(request) {
 
     console.log('Balance created successfully');
 
-    // Auto-configurer niveau_validation du responsable assigné
+    // Auto-configurer niveau_validation du responsable assigné et de son supérieur
     if (responsable_id) {
       await db.execute({
         sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
         args: [responsable_id]
       });
-    }
-
-    // Envoyer l'email (ne pas bloquer si l'envoi échoue)
-    try {
-      await sendTemporaryPasswordEmail(email, `${prenom} ${nom}`, tempPassword);
-      console.log(`Email envoyé à ${email} avec le mot de passe temporaire`);
-    } catch (emailError) {
-      console.error('Erreur lors de l\'envoi de l\'email, mais l\'utilisateur est créé:', emailError);
+      // Si le responsable a lui-même un responsable, celui-ci devient niveau 2
+      const parentResp = await db.execute({
+        sql: 'SELECT responsable_id FROM users WHERE id = ?',
+        args: [responsable_id]
+      });
+      if (parentResp.rows.length > 0 && parentResp.rows[0].responsable_id) {
+        await db.execute({
+          sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 2) WHERE id = ?',
+          args: [parentResp.rows[0].responsable_id]
+        });
+      }
     }
 
     return NextResponse.json({

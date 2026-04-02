@@ -30,8 +30,10 @@ export async function GET(request) {
              v.nom as validateur_nom, v.prenom as validateur_prenom,
              v1.nom as validateur_n1_nom, v1.prenom as validateur_n1_prenom,
              v2.nom as validateur_n2_nom, v2.prenom as validateur_n2_prenom,
-             resp.nom as responsable_nom, resp.prenom as responsable_prenom,
-             resp2.nom as responsable_n2_nom, resp2.prenom as responsable_n2_prenom
+             CASE WHEN resp.type_utilisateur IN ('RH', 'Direction', 'DG') THEN NULL ELSE resp.nom END as responsable_nom,
+             CASE WHEN resp.type_utilisateur IN ('RH', 'Direction', 'DG') THEN NULL ELSE resp.prenom END as responsable_prenom,
+             CASE WHEN resp.type_utilisateur IN ('RH', 'Direction', 'DG') OR resp2.type_utilisateur IN ('RH', 'Direction', 'DG') THEN NULL ELSE resp2.nom END as responsable_n2_nom,
+             CASE WHEN resp.type_utilisateur IN ('RH', 'Direction', 'DG') OR resp2.type_utilisateur IN ('RH', 'Direction', 'DG') THEN NULL ELSE resp2.prenom END as responsable_n2_prenom
       FROM demandes_conges dc
       JOIN users u ON dc.user_id = u.id
       LEFT JOIN users v ON dc.validateur_id = v.id

@@ -41,12 +41,12 @@ const setupGuillaumeHierarchy = async () => {
     });
     console.log('\nGuillaume CONIN -> Animateur Culturel (responsable: Carmen)');
 
-    // 2. Mettre a jour Carmen : type = Responsable Vie Locale, niveau_validation = 1, responsable = DGS
+    // 2. Mettre a jour Carmen : type = Directeur Vie Locale, niveau_validation = 2, responsable = DGS
     await db.execute({
-      sql: 'UPDATE users SET type_utilisateur = ?, niveau_validation = 1, responsable_id = ? WHERE id = ?',
-      args: ['Responsable Vie Locale', dgsId, carmenId]
+      sql: 'UPDATE users SET type_utilisateur = ?, niveau_validation = 2, responsable_id = ? WHERE id = ?',
+      args: ['Directeur Vie Locale', dgsId, carmenId]
     });
-    console.log('Carmen DI STEFANO -> Responsable Vie Locale (niveau 1, responsable: DGS)');
+    console.log('Carmen DI STEFANO -> Directeur Vie Locale (niveau 2, responsable: DGS)');
 
     // 3. S'assurer que la DGS a le bon niveau de validation (niveau 2)
     await db.execute({
@@ -58,7 +58,7 @@ const setupGuillaumeHierarchy = async () => {
     // Afficher le circuit de validation
     console.log('\nCircuit de validation pour Guillaume:');
     console.log('  Guillaume CONIN (Animateur Culturel)');
-    console.log('    -> Carmen DI STEFANO (Responsable Vie Locale) [Niveau 1]');
+    console.log('    -> Carmen DI STEFANO (Directeur Vie Locale) [Niveau 1]');
     console.log(`    -> ${dgs.rows[0].prenom} ${dgs.rows[0].nom} (DGS) [Niveau 2]`);
     console.log('    -> RH [Validation finale]');
 

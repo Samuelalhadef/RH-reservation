@@ -151,7 +151,7 @@ export default function RHPage() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
 
-    if (!newUser.nom || !newUser.prenom || !newUser.email) {
+    if (!newUser.nom || !newUser.prenom) {
       toast.error('Tous les champs sont requis');
       return;
     }
@@ -606,7 +606,7 @@ export default function RHPage() {
                   <tbody className="divide-y divide-gray-200">
                     {allLeaves.map((leave) => {
                       // Déterminer où en est la validation
-                      const hasN1 = leave.responsable_id != null;
+                      const hasN1 = leave.responsable_nom != null;
                       const hasN2 = leave.responsable_n2_nom != null;
 
                       const n1Validated = leave.statut_niveau_1 === 'validee';
@@ -1395,14 +1395,14 @@ export default function RHPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
+                  Email
                 </label>
                 <input
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  placeholder="Optionnel"
                 />
               </div>
 
@@ -1456,7 +1456,7 @@ export default function RHPage() {
 
                     const POSTE_CONFIG = {
                       'DGS': { type: 'DG', resp: '' },
-                      'Dir. Vie Locale': { type: 'Responsable Vie Locale', resp: dgs?.id },
+                      'Dir. Vie Locale': { type: 'Directeur Vie Locale', resp: dgs?.id },
                       'Resp. Services Tech': { type: 'Responsable Serv. Tech.', resp: dgs?.id },
                       'Resp. Centre Loisirs': { type: 'Responsable Anim.', resp: carmen?.id },
                       'Resp. adj. ACM': { type: 'Responsable', resp: respAnim?.id },
@@ -1584,6 +1584,7 @@ export default function RHPage() {
                   <option value="DG">Direction Générale</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
+                  <option value="Directeur Vie Locale">Directeur Vie Locale</option>
                   <option value="Responsable Vie Locale">Responsable Vie Locale</option>
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
                   <option value="Responsable Anim.">Responsable Animation</option>
@@ -1878,6 +1879,7 @@ export default function RHPage() {
                   <option value="DG">Direction Générale</option>
                   <option value="RH">RH</option>
                   <option value="Responsable">Responsable</option>
+                  <option value="Directeur Vie Locale">Directeur Vie Locale</option>
                   <option value="Responsable Vie Locale">Responsable Vie Locale</option>
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
                   <option value="Responsable Anim.">Responsable Animation</option>

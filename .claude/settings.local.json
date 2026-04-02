@@ -54,7 +54,20 @@
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f{u[''''id'''']:3} | {u[''''prenom'''']:15} {u[''''nom'''']:15} | service: {u.get\\(''''service'''',''''''''\\):25} | poste: {u.get\\(''''poste'''',''''''''\\)}\\) for u in data.get\\(''''users'''',[]\\)]\")",
       "Bash(curl -s http://localhost:3099/rh)",
       "Bash(curl -s http://localhost:3099/dashboard)",
-      "Bash(curl -s http://localhost:3099/recuperation)"
+      "Bash(curl -s http://localhost:3099/recuperation)",
+      "Bash(turso --version)",
+      "Bash(curl -sSfL https://get.tur.so/install.sh)",
+      "Bash(bash)",
+      "Bash(scoop search:*)",
+      "Bash(winget search:*)",
+      "Bash(npm list:*)",
+      "Bash(powershell:*)",
+      "Bash(wsl --list)",
+      "Bash(wsl -d docker-desktop -- curl -sSfL https://get.tur.so/install.sh)",
+      "WebFetch(domain:docs.turso.tech)",
+      "WebFetch(domain:turso.tech)",
+      "Bash(wsl:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

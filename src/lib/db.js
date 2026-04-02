@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 6; // Incrémenter pour forcer re-migration
+let _migrationVersion = 7; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -59,6 +59,8 @@ async function runMigrations() {
       // Column already exists, ignore
     }
   }
+
+  // Migration: Rendre email nullable dans users (migration déjà appliquée, ne plus ré-exécuter)
 
   // Migration: Recréer demandes_conges pour ajouter 'annulee' dans la contrainte CHECK du statut
   try {
@@ -290,7 +292,7 @@ export const initDatabase = async () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nom TEXT NOT NULL,
         prenom TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE,
         mot_de_passe TEXT NOT NULL,
         type_utilisateur TEXT NOT NULL,
         mot_de_passe_temporaire INTEGER DEFAULT 0,
