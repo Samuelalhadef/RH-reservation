@@ -62,10 +62,11 @@ export async function POST(request) {
     if (!responsable_id) {
       const RESP_PAR_TYPE = {
         'Cantinière': 'Directeur Vie Locale',
-        'Animateur': 'Responsable Anim.',
+        'Animateur': 'Directeur Centre',
         'Animateur Culturel': 'Directeur Vie Locale',
-        'ATSEM/Animation': 'Responsable Anim.',
-        'Entretien': 'Responsable Anim.',
+        'ATSEM/Animation': 'Directeur Centre',
+        'Entretien': 'Directeur Centre',
+        'Directeur Centre': 'Directeur Vie Locale',
         'Service Technique': 'Responsable Serv. Tech.',
         'Police Municipale': 'DG',
         'Responsable Serv. Tech.': 'DG',
@@ -74,6 +75,8 @@ export async function POST(request) {
         'Responsable': 'DG',
         'RH': 'DG',
         'Administratif': 'DG',
+        'Communication': 'Directeur Vie Locale',
+        'Alternant': 'Directeur Vie Locale',
       };
       const respType = RESP_PAR_TYPE[type_utilisateur];
       if (respType) {
@@ -119,10 +122,10 @@ export async function POST(request) {
     // Auto-configurer niveau_validation selon le type de l'utilisateur créé
     const NIVEAU_PAR_TYPE = {
       'Directeur Vie Locale': 2,
+      'Directeur Centre': 1,
       'Responsable Anim.': 1,
       'Responsable Serv. Tech.': 1,
       'Responsable': 1,
-      'Responsable Vie Locale': 1,
     };
     if (NIVEAU_PAR_TYPE[type_utilisateur]) {
       await db.execute({

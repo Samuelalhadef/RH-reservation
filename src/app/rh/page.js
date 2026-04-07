@@ -16,6 +16,7 @@ export default function RHPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [allLeaves, setAllLeaves] = useState([]);
+  const [searchAll, setSearchAll] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -585,11 +586,31 @@ export default function RHPage() {
               </div>
             </div>
 
+            {/* Barre de recherche */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Rechercher par nom, prénom, type..."
+                value={searchAll}
+                onChange={(e) => setSearchAll(e.target.value)}
+                className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
+            </div>
+
             {allLeaves.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 Aucune demande
               </p>
-            ) : (
+            ) : (() => {
+              const q = searchAll.toLowerCase().trim();
+              const filtered = q ? allLeaves.filter(l =>
+                `${l.prenom} ${l.nom} ${l.type_utilisateur} ${l.type_conge || ''}`.toLowerCase().includes(q)
+              ) : allLeaves;
+              return filtered.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">
+                  Aucun résultat pour &quot;{searchAll}&quot;
+                </p>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
@@ -604,7 +625,7 @@ export default function RHPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {allLeaves.map((leave) => {
+                    {filtered.map((leave) => {
                       // Déterminer où en est la validation
                       const hasN1 = leave.responsable_nom != null;
                       const hasN2 = leave.responsable_n2_nom != null;
@@ -752,7 +773,8 @@ export default function RHPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1459,7 +1481,7 @@ export default function RHPage() {
                       'DGS': { type: 'DG', resp: '' },
                       'Dir. Vie Locale': { type: 'Directeur Vie Locale', resp: dgs?.id },
                       'Resp. Services Tech': { type: 'Responsable Serv. Tech.', resp: dgs?.id },
-                      'Resp. Centre Loisirs': { type: 'Responsable Anim.', resp: carmen?.id },
+                      'Resp. Centre Loisirs': { type: 'Directeur Centre', resp: carmen?.id },
                       'Resp. adj. ACM': { type: 'Responsable', resp: respAnim?.id },
                       'Resp. RH': { type: 'RH', resp: dgs?.id },
                       'Resp. Finances': { type: 'Responsable', resp: dgs?.id },
@@ -1592,6 +1614,7 @@ export default function RHPage() {
                   <option value="Directeur Vie Locale">Directeur Vie Locale</option>
 
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
+                  <option value="Directeur Centre">Directeur Centre</option>
                   <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>
@@ -1889,6 +1912,7 @@ export default function RHPage() {
                   <option value="Directeur Vie Locale">Directeur Vie Locale</option>
 
                   <option value="Responsable Serv. Tech.">Responsable Service Technique</option>
+                  <option value="Directeur Centre">Directeur Centre</option>
                   <option value="Responsable Anim.">Responsable Animation</option>
                   <option value="Administratif">Administratif</option>
                   <option value="Service Technique">Service Technique</option>

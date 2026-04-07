@@ -112,10 +112,10 @@ export async function PUT(request, { params }) {
     // Auto-configurer niveau_validation selon le type de l'utilisateur modifié
     const NIVEAU_PAR_TYPE = {
       'Directeur Vie Locale': 2,
+      'Directeur Centre': 1,
       'Responsable Anim.': 1,
       'Responsable Serv. Tech.': 1,
       'Responsable': 1,
-      'Responsable Vie Locale': 1,
     };
     if (NIVEAU_PAR_TYPE[type_utilisateur]) {
       await db.execute({

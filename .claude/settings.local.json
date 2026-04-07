@@ -67,7 +67,11 @@
       "WebFetch(domain:docs.turso.tech)",
       "WebFetch(domain:turso.tech)",
       "Bash(wsl:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(tar:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(npx -y @swc/cli swc src/app/rh/page.js -o /dev/null)"
     ],
     "deny": [],
     "ask": []

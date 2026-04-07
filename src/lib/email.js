@@ -1,13 +1,17 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 /**
  * Envoie un email de notification pour une demande de congés validée
  */
 export const sendLeaveApprovedEmail = async (userEmail, userName, startDate, endDate, days) => {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.FROM_EMAIL || 'RH Chartrettes <onboarding@resend.dev>',
       to: [userEmail],
       subject: 'Demande de congés validée',
@@ -41,7 +45,7 @@ export const sendLeaveApprovedEmail = async (userEmail, userName, startDate, end
  */
 export const sendLeaveRejectedEmail = async (userEmail, userName, startDate, endDate, reason) => {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.FROM_EMAIL || 'RH Chartrettes <onboarding@resend.dev>',
       to: [userEmail],
       subject: 'Demande de congés refusée',
@@ -75,7 +79,7 @@ export const sendLeaveRejectedEmail = async (userEmail, userName, startDate, end
  */
 export const sendNewLeaveRequestEmail = async (rhEmail, userName, startDate, endDate, days) => {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.FROM_EMAIL || 'RH Chartrettes <onboarding@resend.dev>',
       to: [rhEmail],
       subject: 'Nouvelle demande de congés à valider',
@@ -109,7 +113,7 @@ export const sendNewLeaveRequestEmail = async (rhEmail, userName, startDate, end
  */
 export const sendTemporaryPasswordEmail = async (userEmail, userName, tempPassword) => {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: process.env.FROM_EMAIL || 'RH Chartrettes <onboarding@resend.dev>',
       to: [userEmail],
       subject: 'Votre mot de passe temporaire',
