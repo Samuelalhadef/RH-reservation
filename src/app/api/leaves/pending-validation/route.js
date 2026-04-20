@@ -117,7 +117,8 @@ export async function GET(request) {
       });
     }
 
-    // Priorité 3 : RH voit les demandes prêtes pour validation finale
+    // Priorité 3 : RH voit TOUTES les demandes en attente (override hiérarchique)
+    // Permet de débloquer les demandes anciennes dont le circuit intermédiaire est inactif
     if (isRH) {
       queries.push({
         sql: `
@@ -137,10 +138,6 @@ export async function GET(request) {
           LEFT JOIN users v1 ON d.validateur_niveau_1_id = v1.id
           LEFT JOIN users v2 ON d.validateur_niveau_2_id = v2.id
           WHERE d.statut = 'en_attente'
-          AND (
-            u.responsable_id IS NULL
-            OR (u.responsable_id IS NOT NULL AND d.statut_niveau_1 = 'validee')
-          )
           ORDER BY d.date_demande ASC
         `,
         args: []

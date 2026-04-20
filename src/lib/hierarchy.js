@@ -205,21 +205,9 @@ export async function canUserValidateLeave(validatorId, leave) {
     }
   }
 
-  // RH peut valider uniquement en dernier (après tous les niveaux)
+  // RH peut valider à tout moment (override hiérarchique)
+  // Permet de débloquer les demandes dont le circuit intermédiaire est inactif
   if (isRH) {
-    // Vérifier si tous les niveaux précédents sont validés
-    if (requesterData.responsable_id) {
-      const circuit = await getValidationCircuit(leave.user_id);
-      const requiredLevels = circuit.niveaux.filter(n => n.type !== 'rh').length;
-
-      if (currentLevel < requiredLevels) {
-        return {
-          canValidate: false,
-          reason: `En attente de validation niveau ${currentLevel + 1}`
-        };
-      }
-    }
-
     return {
       canValidate: true,
       level: 'rh',
