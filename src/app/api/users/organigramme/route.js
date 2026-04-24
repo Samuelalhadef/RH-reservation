@@ -18,6 +18,9 @@ export async function GET() {
                u.responsable_id, u.photo_profil, u.actif
         FROM users u
         WHERE u.actif = 1
+          AND LOWER(u.nom) NOT LIKE '%testtest%'
+          AND LOWER(u.prenom) NOT LIKE '%testtest%'
+          AND NOT (LOWER(u.prenom) = 'test' AND LOWER(u.nom) = 'test')
         ORDER BY u.nom, u.prenom
       `,
       args: []

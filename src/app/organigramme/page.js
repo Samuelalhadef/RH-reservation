@@ -24,6 +24,7 @@ const COLORS = {
   vieAsso:       { bg: '#e7a6c7', text: '#5e1d44', border: '#cc6fa0' },
   restauration:  { bg: '#ffd9a8', text: '#6f3e0a', border: '#f0a865' },
   communication: { bg: '#c9d9f5', text: '#1e3a7a', border: '#7c9ce0' },
+  entretien:     { bg: '#c6e8e0', text: '#1f5650', border: '#7fc9b9' },
   agent:         { bg: '#e5e5e5', text: '#374151', border: '#b0b0b0' },
 };
 
@@ -70,10 +71,11 @@ const BRANCH_POLICE = u => match(u.service, 'SÉCURITÉ', 'SECURITE', 'Police') 
 const BRANCH_TECH = u => match(u.service, 'SERVICES TECH', 'technique');
 const BRANCH_VIE_ASSO = u => match(u.service, 'EMC') || match(u.type_utilisateur, 'Animateur Culturel');
 const BRANCH_CANTINE = u => match(u.service, 'RESTAURATION', 'restauration', 'cantine');
+const BRANCH_ENTRETIEN = u => match(u.type_utilisateur, 'Entretien') || match(u.poste, "Agent d'entretien", 'Agent d entretien');
 const BRANCH_ANIMATION = u =>
-  !BRANCH_VIE_ASSO(u) && !BRANCH_CANTINE(u) && (
+  !BRANCH_VIE_ASSO(u) && !BRANCH_CANTINE(u) && !BRANCH_ENTRETIEN(u) && (
     match(u.service, 'C.L.S.H', 'ÉCOLE', 'ECOLE', 'Enfance') ||
-    match(u.type_utilisateur, 'Animateur', 'ATSEM', 'Entretien')
+    match(u.type_utilisateur, 'Animateur', 'ATSEM')
   );
 const BRANCH_ADMIN = u => match(u.service, 'ADMIN. GÉNÉRALE', 'ADMIN. GENERALE', 'Etat Civil');
 const BRANCH_COMMUNICATION = u => match(u.service, 'communication') || match(u.poste, 'communication');
@@ -166,6 +168,11 @@ function buildOrgTree(users) {
   comUsers.forEach(u => placed.add(u.id));
   const comNodes = comUsers.map(u => userToNode(u, COLORS.communication));
 
+  // Entretien (rattaché à Carmen)
+  const entretienUsers = users.filter(u => !placed.has(u.id) && BRANCH_ENTRETIEN(u));
+  entretienUsers.forEach(u => placed.add(u.id));
+  const entretienNodes = entretienUsers.map(u => userToNode(u, COLORS.entretien));
+
   // Dir. Vie Locale
   const carmen = carmenUser
     ? place(carmenUser, COLORS.vieLocale)
@@ -174,6 +181,7 @@ function buildOrgTree(users) {
     svc('clsh', 'C.L.S.H. / Animation', COLORS.education, animChefNodes),
     svc('vie-asso', 'Vie Associative et Culturelle', COLORS.vieAsso, vieAssoNodes),
     svc('cantine', 'Cantine', COLORS.restauration, cantineNodes),
+    svc('entretien', 'Entretien', COLORS.entretien, entretienNodes),
     svc('communication', 'Communication', COLORS.communication, comNodes),
   ];
 
@@ -350,7 +358,7 @@ function OrgNode({ node }) {
         childCount={memberCount}
       />
       {hasChildren && !collapsed && (
-        <ul>
+        <ul className={node.children.every(c => !c.isService) ? 'org-col' : ''}>
           {node.children.map(child => (
             <OrgNode key={child.id} node={child} />
           ))}
@@ -485,7 +493,13 @@ export default function OrganigrammePage() {
   .org-tree li:only-child::after { border-top:none; }
   .org-tree > li::before, .org-tree > li::after { display:none; }
 
-  .org-card { display:flex; align-items:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:260px; height:48px; padding:4px 10px 4px 4px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+  .org-tree ul.org-col { flex-direction: column; align-items: center; padding-top: 14px; gap: 4px; }
+  .org-tree ul.org-col::before { height: 14px; }
+  .org-tree ul.org-col > li { padding: 0; }
+  .org-tree ul.org-col > li::before, .org-tree ul.org-col > li::after { display: none; }
+  .org-tree ul.org-col > li + li::before { display: block; content: ""; position: absolute; top: -4px; left: 50%; width: 2px; height: 4px; background: #94a3b8; border: none; border-radius: 0; transform: translateX(-1px); }
+
+  .org-card { position:relative; z-index:2; display:flex; align-items:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:260px; height:48px; padding:4px 10px 4px 4px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .org-card-avatar { flex-shrink:0; width:40px; height:40px; border-radius:50%; border:2px solid; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .org-card-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
   .org-card-initials { font-weight:800; font-size:11px; }
@@ -493,8 +507,9 @@ export default function OrganigrammePage() {
   .org-card-name { font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
   .org-card-role { font-size:0.62rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:1px 0 0; }
 
-  .org-svc { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:320px; min-height:34px; padding:6px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+  .org-svc { position:relative; z-index:2; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:320px; min-height:34px; padding:6px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .org-svc-label { font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; text-align:center; line-height:1.15; }
+  .org-collapse-btn { display: none !important; }
 
   @media print {
     html, body { width:584mm; height:410mm; }
@@ -627,9 +642,41 @@ export default function OrganigrammePage() {
         .org-tree li:only-child::after { border-top: none; }
         .org-tree > li::before, .org-tree > li::after { display: none; }
 
+        /* === Column layout: when all children are people, stack vertically === */
+        .org-tree ul.org-col {
+          flex-direction: column;
+          align-items: center;
+          padding-top: 14px;
+          gap: 4px;
+        }
+        .org-tree ul.org-col::before {
+          height: 14px;
+        }
+        .org-tree ul.org-col > li {
+          padding: 0;
+        }
+        .org-tree ul.org-col > li::before,
+        .org-tree ul.org-col > li::after {
+          display: none;
+        }
+        .org-tree ul.org-col > li + li::before {
+          display: block;
+          content: "";
+          position: absolute;
+          top: -4px;
+          left: 50%;
+          width: 2px;
+          height: 4px;
+          background: #94a3b8;
+          border: none;
+          border-radius: 0;
+          transform: translateX(-1px);
+        }
+
         /* === Person card (pastel pill) === */
         .org-card {
           position: relative;
+          z-index: 2;
           display: flex; align-items: center;
           border: 1.5px solid;
           border-radius: 999px;
@@ -671,6 +718,7 @@ export default function OrganigrammePage() {
         /* === Service banner === */
         .org-svc {
           position: relative;
+          z-index: 2;
           display: inline-flex; align-items: center; justify-content: center;
           border: 1.5px solid;
           border-radius: 999px;
