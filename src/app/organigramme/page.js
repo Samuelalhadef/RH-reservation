@@ -6,26 +6,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import toast from 'react-hot-toast';
 
-// Pastel color palette inspired by the paper reference
-// Each service has a soft fill + darker text/border tone
+// High-contrast service palette — each service has a clearly distinct hue
+// bg = saturated fill (still printable), text = deep on-color, border = mid tone
 const COLORS = {
-  maire:         { bg: '#bfe3d4', text: '#0f4c3a', border: '#7fc9a8' },
-  police:        { bg: '#bcd4ec', text: '#1e3a5f', border: '#7ca9d1' },
-  ccas:          { bg: '#f5c2d4', text: '#8a1e4a', border: '#e38aad' },
-  dgs:           { bg: '#c9e8cc', text: '#1f5f2e', border: '#87c892' },
-  vieLocale:     { bg: '#f5c2d4', text: '#8a1e4a', border: '#e38aad' },
-  technique:     { bg: '#f7b8a8', text: '#7a2a18', border: '#e88874' },
-  urbanisme:     { bg: '#c8e6a8', text: '#3d5e15', border: '#9ccc63' },
-  ressources:    { bg: '#e6cbe3', text: '#5e2e5a', border: '#c896c2' },
-  rh:            { bg: '#f7cbd3', text: '#7a2837', border: '#e8919e' },
-  finances:      { bg: '#f7cbd3', text: '#7a2837', border: '#e8919e' },
-  affaires:      { bg: '#fde8a8', text: '#6b4e0a', border: '#f0c95a' },
-  education:     { bg: '#f5b892', text: '#6f2f0e', border: '#e88b5a' },
-  vieAsso:       { bg: '#e7a6c7', text: '#5e1d44', border: '#cc6fa0' },
-  restauration:  { bg: '#ffd9a8', text: '#6f3e0a', border: '#f0a865' },
-  communication: { bg: '#c9d9f5', text: '#1e3a7a', border: '#7c9ce0' },
-  entretien:     { bg: '#c6e8e0', text: '#1f5650', border: '#7fc9b9' },
-  agent:         { bg: '#e5e5e5', text: '#374151', border: '#b0b0b0' },
+  maire:         { bg: '#7dd3c0', text: '#0b3d33', border: '#2fa58f' }, // teal
+  police:        { bg: '#7cb1e3', text: '#12335e', border: '#3a7bbf' }, // blue
+  ccas:          { bg: '#ec6fa3', text: '#5a0f33', border: '#c73a7a' }, // hot pink
+  dgs:           { bg: '#8fd98a', text: '#124a16', border: '#4fb149' }, // forest green
+  vieLocale:     { bg: '#d87ab8', text: '#531240', border: '#b0438e' }, // fuchsia
+  technique:     { bg: '#f0816a', text: '#5e170a', border: '#d14e34' }, // coral/red
+  urbanisme:     { bg: '#b8d967', text: '#2f481a', border: '#84b02c' }, // lime
+  ressources:    { bg: '#c99ac6', text: '#42204a', border: '#9a66a1' }, // violet
+  rh:            { bg: '#f5a3b2', text: '#5c1528', border: '#d26179' }, // rose
+  finances:      { bg: '#f7a38a', text: '#5e230e', border: '#d66a4c' }, // salmon
+  affaires:      { bg: '#f4d36a', text: '#5e430a', border: '#d1a929' }, // gold
+  education:     { bg: '#f5a25e', text: '#5e2906', border: '#d67624' }, // orange
+  vieAsso:       { bg: '#e87aad', text: '#4f0f34', border: '#c24484' }, // pink-magenta
+  restauration:  { bg: '#f2c16a', text: '#5e3d08', border: '#cf942a', }, // amber
+  communication: { bg: '#8f9ef0', text: '#1f2a6b', border: '#5667cf' }, // indigo
+  entretien:     { bg: '#6ed8c9', text: '#0f4a44', border: '#2aaa97' }, // cyan
+  agent:         { bg: '#c9c9c9', text: '#262e38', border: '#8e8e8e' }, // neutral gray
 };
 
 // Helpers
