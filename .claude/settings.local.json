@@ -71,7 +71,9 @@
       "Bash(tar:*)",
       "Bash(ssh:*)",
       "Bash(scp:*)",
-      "Bash(npx -y @swc/cli swc src/app/rh/page.js -o /dev/null)"
+      "Bash(npx -y @swc/cli swc src/app/rh/page.js -o /dev/null)",
+      "Bash(npx --yes esbuild --bundle=false --loader=jsx src/app/organigramme/page.js --outfile=/tmp/check.js)",
+      "Bash(npx --yes esbuild --bundle=false --loader:.js=jsx src/app/organigramme/page.js --outfile=/tmp/check.js)"
     ],
     "deny": [],
     "ask": []
