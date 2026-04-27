@@ -404,11 +404,11 @@ function normalize(s) {
     .filter((w) => w && !STOP_WORDS.has(w));
 }
 
-export function searchFaq(query, limit = 3) {
+export function searchFaqIn(dataset, query, limit = 3) {
   const tokens = normalize(query);
   if (tokens.length === 0) return [];
 
-  const scored = FAQ.map((entry) => {
+  const scored = dataset.map((entry) => {
     const haystack = normalize(`${entry.q} ${entry.keywords.join(' ')} ${entry.a}`);
     let score = 0;
     for (const t of tokens) {
@@ -426,4 +426,8 @@ export function searchFaq(query, limit = 3) {
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((s) => s.entry);
+}
+
+export function searchFaq(query, limit = 3) {
+  return searchFaqIn(FAQ, query, limit);
 }

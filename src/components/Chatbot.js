@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { FAQ, FAQ_CATEGORIES, searchFaq } from '@/lib/chatbot-faq';
+import { FAQ, FAQ_CATEGORIES, searchFaqIn } from '@/lib/chatbot-faq';
+import { FAQ_RH, FAQ_CATEGORIES_RH } from '@/lib/chatbot-faq-rh';
 
 const WELCOME = {
   role: 'bot',
@@ -10,12 +11,22 @@ const WELCOME = {
 };
 
 const Chatbot = () => {
-  const { user } = useAuth();
+  const { user, isRH } = useAuth();
+  const userIsRH = isRH();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [activeCat, setActiveCat] = useState(null);
   const scrollRef = useRef(null);
+
+  const allFaq = useMemo(
+    () => (userIsRH ? [...FAQ, ...FAQ_RH] : FAQ),
+    [userIsRH]
+  );
+  const allCategories = useMemo(
+    () => (userIsRH ? [...FAQ_CATEGORIES, ...FAQ_CATEGORIES_RH] : FAQ_CATEGORIES),
+    [userIsRH]
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -24,9 +35,8 @@ const Chatbot = () => {
   }, [messages, open]);
 
   const visibleQuestions = useMemo(() => {
-    const list = activeCat ? FAQ.filter((f) => f.cat === activeCat) : [];
-    return list;
-  }, [activeCat]);
+    return activeCat ? allFaq.filter((f) => f.cat === activeCat) : [];
+  }, [activeCat, allFaq]);
 
   if (!user) return null;
 
@@ -46,7 +56,7 @@ const Chatbot = () => {
     setInput('');
     setMessages((m) => [...m, { role: 'user', text }]);
 
-    const matches = searchFaq(text, 3);
+    const matches = searchFaqIn(allFaq, text, 3);
     setTimeout(() => {
       if (matches.length === 0) {
         setMessages((m) => [
@@ -107,8 +117,12 @@ const Chatbot = () => {
             style={{ background: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)' }}
           >
             <div>
-              <p className="font-semibold text-sm">Assistant Portail Agent</p>
-              <p className="text-xs opacity-90">50 réponses aux questions fréquentes</p>
+              <p className="font-semibold text-sm">
+                {userIsRH ? 'Assistant RH' : 'Assistant Portail Agent'}
+              </p>
+              <p className="text-xs opacity-90">
+                {allFaq.length} réponses aux questions fréquentes
+              </p>
             </div>
             <button
               onClick={reset}
@@ -149,7 +163,7 @@ const Chatbot = () => {
 
                 {m.showCategories && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {FAQ_CATEGORIES.map((c) => (
+                    {allCategories.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => setActiveCat(c.id)}
