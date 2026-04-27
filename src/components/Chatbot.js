@@ -5,28 +5,44 @@ import { useAuth } from '@/contexts/AuthContext';
 import { FAQ, FAQ_CATEGORIES, searchFaqIn } from '@/lib/chatbot-faq';
 import { FAQ_RH, FAQ_CATEGORIES_RH } from '@/lib/chatbot-faq-rh';
 
-const WELCOME = {
+const WELCOME_AUTH = {
   role: 'bot',
   text: "Bonjour ! Je suis l'assistant du Portail Agent. Posez-moi une question ou choisissez un sujet ci-dessous.",
 };
 
+const WELCOME_LOGIN = {
+  role: 'bot',
+  text: "Bonjour ! Besoin d'aide pour vous connecter ? Voici les questions les plus fréquentes.",
+};
+
 const Chatbot = () => {
   const { user, isRH } = useAuth();
-  const userIsRH = isRH();
+  const userIsRH = user ? isRH() : false;
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [activeCat, setActiveCat] = useState(null);
   const scrollRef = useRef(null);
 
-  const allFaq = useMemo(
-    () => (userIsRH ? [...FAQ, ...FAQ_RH] : FAQ),
-    [userIsRH]
-  );
-  const allCategories = useMemo(
-    () => (userIsRH ? [...FAQ_CATEGORIES, ...FAQ_CATEGORIES_RH] : FAQ_CATEGORIES),
-    [userIsRH]
-  );
+  const allFaq = useMemo(() => {
+    if (!user) return FAQ.filter((f) => f.cat === 'compte');
+    if (userIsRH) return [...FAQ, ...FAQ_RH];
+    return FAQ;
+  }, [user, userIsRH]);
+
+  const allCategories = useMemo(() => {
+    if (!user) return FAQ_CATEGORIES.filter((c) => c.id === 'compte');
+    if (userIsRH) return [...FAQ_CATEGORIES, ...FAQ_CATEGORIES_RH];
+    return FAQ_CATEGORIES;
+  }, [user, userIsRH]);
+
+  const welcome = user ? WELCOME_AUTH : WELCOME_LOGIN;
+  const [messages, setMessages] = useState([welcome]);
+
+  useEffect(() => {
+    setMessages([welcome]);
+    setActiveCat(user ? null : 'compte');
+    setInput('');
+  }, [user, welcome]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -38,15 +54,13 @@ const Chatbot = () => {
     return activeCat ? allFaq.filter((f) => f.cat === activeCat) : [];
   }, [activeCat, allFaq]);
 
-  if (!user) return null;
-
   const askQuestion = (entry) => {
     setMessages((m) => [
       ...m,
       { role: 'user', text: entry.q },
       { role: 'bot', text: entry.a },
     ]);
-    setActiveCat(null);
+    if (user) setActiveCat(null);
   };
 
   const handleSubmit = (e) => {
@@ -83,8 +97,8 @@ const Chatbot = () => {
   };
 
   const reset = () => {
-    setMessages([WELCOME]);
-    setActiveCat(null);
+    setMessages([welcome]);
+    setActiveCat(user ? null : 'compte');
     setInput('');
   };
 
@@ -118,7 +132,11 @@ const Chatbot = () => {
           >
             <div>
               <p className="font-semibold text-sm">
-                {userIsRH ? 'Assistant RH' : 'Assistant Portail Agent'}
+                {!user
+                  ? 'Aide à la connexion'
+                  : userIsRH
+                  ? 'Assistant RH'
+                  : 'Assistant Portail Agent'}
               </p>
               <p className="text-xs opacity-90">
                 {allFaq.length} réponses aux questions fréquentes
@@ -195,12 +213,14 @@ const Chatbot = () => {
             {/* Liste des questions de la catégorie active */}
             {activeCat && (
               <div className="space-y-1">
-                <button
-                  onClick={() => setActiveCat(null)}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  ← Retour aux sujets
-                </button>
+                {allCategories.length > 1 && (
+                  <button
+                    onClick={() => setActiveCat(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    ← Retour aux sujets
+                  </button>
+                )}
                 {visibleQuestions.map((entry) => (
                   <button
                     key={entry.id}
