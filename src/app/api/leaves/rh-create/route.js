@@ -34,7 +34,7 @@ export async function POST(request) {
     // Récupérer les jours fériés
     const startYear = new Date(date_debut).getFullYear();
     const endYear = new Date(date_fin).getFullYear();
-    const allHolidays = getFrenchHolidaysRange(startYear, endYear);
+    const allHolidays = await getFrenchHolidaysRange(startYear, endYear);
     const holidays = allHolidays
       .map(h => h.date)
       .filter(d => d >= date_debut && d <= date_fin);

@@ -15,7 +15,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get('year')) || new Date().getFullYear();
 
-    const holidays = getFrenchHolidays(year);
+    const holidays = await getFrenchHolidays(year);
 
     return NextResponse.json({
       success: true,

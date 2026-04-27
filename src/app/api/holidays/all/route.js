@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     const currentYear = new Date().getFullYear();
-    const holidays = getFrenchHolidaysRange(currentYear - 1, currentYear + 5);
+    const holidays = await getFrenchHolidaysRange(currentYear - 1, currentYear + 5);
 
     const response = NextResponse.json({
       success: true,
