@@ -150,13 +150,7 @@ function buildOrgTree(users) {
     return node;
   });
   const animAgentNodes = animUsers.map(u => userToNode(u, COLORS.education));
-  if (animRespNodes.length > 0 && animAgentNodes.length > 0) {
-    const perResp = Math.ceil(animAgentNodes.length / animRespNodes.length);
-    animRespNodes.forEach((resp, i) => {
-      resp.children = animAgentNodes.slice(i * perResp, (i + 1) * perResp);
-    });
-  }
-  const animChefNodes = animRespNodes.length > 0 ? animRespNodes : animAgentNodes;
+  const animChefNodes = [...animRespNodes, ...animAgentNodes];
 
   // Vie Associative
   const vieAssoUsers = users.filter(u => !placed.has(u.id) && BRANCH_VIE_ASSO(u));
@@ -500,10 +494,10 @@ export default function OrganigrammePage() {
   .page-footer .date { font-size: 11pt; color: #64748b; margin-top: 4px; }
 
   .org-tree { display:flex; justify-content:center; padding:0; margin:0; list-style:none; }
-  .org-tree ul { display:flex; justify-content:center; padding-top:22px; position:relative; list-style:none; margin:0; padding-left:0; padding-right:0; }
-  .org-tree li { display:flex; flex-direction:column; align-items:center; position:relative; padding:0 3px; }
-  .org-tree ul::before { content:""; position:absolute; top:0; left:50%; width:2px; height:22px; background:#94a3b8; }
-  .org-tree li::before, .org-tree li::after { content:""; position:absolute; top:0; width:50%; height:22px; border-top:2px solid #94a3b8; }
+  .org-tree ul { display:flex; justify-content:center; padding-top:30px; position:relative; list-style:none; margin:0; padding-left:0; padding-right:0; gap:14px; }
+  .org-tree li { display:flex; flex-direction:column; align-items:center; position:relative; padding:0 10px; }
+  .org-tree ul::before { content:""; position:absolute; top:0; left:50%; width:2px; height:30px; background:#94a3b8; }
+  .org-tree li::before, .org-tree li::after { content:""; position:absolute; top:0; width:50%; height:30px; border-top:2px solid #94a3b8; }
   .org-tree li::before { left:0; border-right:2px solid #94a3b8; border-radius:0 8px 0 0; }
   .org-tree li::after { right:0; }
   .org-tree li:first-child::before { border-top:none; border-top-right-radius:0; }
@@ -514,24 +508,24 @@ export default function OrganigrammePage() {
   .org-tree li:only-child::after { border-top:none; }
   .org-tree > li::before, .org-tree > li::after { display:none; }
 
-  .org-tree ul.org-col { flex-direction: column; align-items: center; padding-top: 14px; gap: 4px; }
-  .org-tree ul.org-col::before { height: 14px; }
+  .org-tree ul.org-col { flex-direction: column; align-items: center; padding-top: 18px; gap: 8px; }
+  .org-tree ul.org-col::before { height: 18px; }
   .org-tree ul.org-col > li { padding: 0; }
   .org-tree ul.org-col > li::before, .org-tree ul.org-col > li::after { display: none; }
-  .org-tree ul.org-col > li + li::before { display: block; content: ""; position: absolute; top: -4px; left: 50%; width: 2px; height: 4px; background: #94a3b8; border: none; border-radius: 0; transform: translateX(-1px); }
+  .org-tree ul.org-col > li + li::before { display: block; content: ""; position: absolute; top: -8px; left: 50%; width: 2px; height: 8px; background: #94a3b8; border: none; border-radius: 0; transform: translateX(-1px); }
 
-  .org-card { position:relative; z-index:2; display:flex; align-items:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:260px; height:48px; padding:4px 10px 4px 4px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
-  .org-card-avatar { flex-shrink:0; width:40px; height:40px; border-radius:50%; border:2px solid; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .org-card { position:relative; z-index:2; display:flex; align-items:center; border-radius:999px; border:2px solid; min-width:240px; max-width:340px; height:64px; padding:5px 14px 5px 5px; box-shadow:0 2px 5px rgba(0,0,0,0.14); }
+  .org-card-avatar { flex-shrink:0; width:54px; height:54px; border-radius:50%; border:2.5px solid; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .org-card-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
-  .org-card-initials { font-weight:800; font-size:11px; }
-  .org-card-text { padding-left:10px; padding-right:6px; min-width:0; flex:1; }
-  .org-card-name { font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
-  .org-card-role { font-size:0.62rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:1px 0 0; }
-  .org-card-wrap { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .org-card-badge { padding:2px 10px; border-radius:999px; font-size:0.55rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; white-space:nowrap; box-shadow:0 1px 2px rgba(0,0,0,0.18); }
+  .org-card-initials { font-weight:800; font-size:15px; }
+  .org-card-text { padding-left:13px; padding-right:8px; min-width:0; flex:1; }
+  .org-card-name { font-weight:800; font-size:0.95rem; text-transform:uppercase; letter-spacing:0.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
+  .org-card-role { font-size:0.78rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:2px 0 0; }
+  .org-card-wrap { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .org-card-badge { padding:3px 12px; border-radius:999px; font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; white-space:nowrap; box-shadow:0 1px 2px rgba(0,0,0,0.18); }
 
-  .org-svc { position:relative; z-index:2; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:320px; min-height:34px; padding:6px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
-  .org-svc-label { font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; text-align:center; line-height:1.15; }
+  .org-svc { position:relative; z-index:2; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:2px solid; min-width:230px; max-width:400px; min-height:44px; padding:8px 18px; box-shadow:0 2px 5px rgba(0,0,0,0.14); }
+  .org-svc-label { font-weight:800; font-size:0.95rem; text-transform:uppercase; letter-spacing:0.03em; text-align:center; line-height:1.15; }
   .org-collapse-btn { display: none !important; }
 
   @media print {
@@ -553,9 +547,9 @@ export default function OrganigrammePage() {
       var page = document.querySelector('.page');
       var scaler = document.getElementById('scaler');
       var availH = page.clientHeight - 90;
-      var sx = (page.clientWidth - 40) / scaler.scrollWidth;
+      var sx = (page.clientWidth - 20) / scaler.scrollWidth;
       var sy = availH / scaler.scrollHeight;
-      var s = Math.min(sx, sy, 1);
+      var s = Math.min(sx, sy, 1.6);
       scaler.style.transform = 'scale(' + s + ')';
       setTimeout(function(){ window.print(); }, 300);
     }
