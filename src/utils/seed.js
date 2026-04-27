@@ -52,17 +52,17 @@ const seed = async () => {
     console.log('\n📅 Initialisation des jours fériés...');
 
     const FRENCH_HOLIDAYS = [
-      { date: '2025-01-01', nom: 'Jour de l\'An', annee: 2025 },
-      { date: '2025-04-21', nom: 'Lundi de Pâques', annee: 2025 },
-      { date: '2025-05-01', nom: 'Fête du Travail', annee: 2025 },
-      { date: '2025-05-08', nom: 'Victoire 1945', annee: 2025 },
-      { date: '2025-05-29', nom: 'Ascension', annee: 2025 },
-      { date: '2025-06-09', nom: 'Lundi de Pentecôte', annee: 2025 },
-      { date: '2025-07-14', nom: 'Fête Nationale', annee: 2025 },
-      { date: '2025-08-15', nom: 'Assomption', annee: 2025 },
-      { date: '2025-11-01', nom: 'Toussaint', annee: 2025 },
-      { date: '2025-11-11', nom: 'Armistice 1918', annee: 2025 },
-      { date: '2025-12-25', nom: 'Noël', annee: 2025 },
+      { date: '2027-01-01', nom: 'Jour de l\'An', annee: 2027 },
+      { date: '2027-03-29', nom: 'Lundi de Pâques', annee: 2027 },
+      { date: '2027-05-01', nom: 'Fête du Travail', annee: 2027 },
+      { date: '2027-05-06', nom: 'Ascension', annee: 2027 },
+      { date: '2027-05-08', nom: 'Victoire 1945', annee: 2027 },
+      { date: '2027-05-17', nom: 'Lundi de Pentecôte', annee: 2027 },
+      { date: '2027-07-14', nom: 'Fête Nationale', annee: 2027 },
+      { date: '2027-08-15', nom: 'Assomption', annee: 2027 },
+      { date: '2027-11-01', nom: 'Toussaint', annee: 2027 },
+      { date: '2027-11-11', nom: 'Armistice 1918', annee: 2027 },
+      { date: '2027-12-25', nom: 'Noël', annee: 2027 },
     ];
 
     for (const holiday of FRENCH_HOLIDAYS) {

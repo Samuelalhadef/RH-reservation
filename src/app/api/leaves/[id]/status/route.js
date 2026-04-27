@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { formatDateFR } from '@/lib/dateUtils';
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from '@/lib/email';
-import { validateLeaveAtLevel } from '@/lib/hierarchy';
+import { validateLeaveAtLevel, forceValidateLeaveByRH } from '@/lib/hierarchy';
 import { notifyLeaveDecision, notifyLeaveProgress, sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
 
 export async function PUT(request, { params }) {
@@ -28,7 +28,7 @@ export async function PUT(request, { params }) {
 
     const validatorId = decoded.userId;
     const { id } = await params;
-    const { statut, commentaire_rh } = await request.json();
+    const { statut, commentaire_rh, force_rh } = await request.json();
 
     if (!statut || !['validee', 'refusee'].includes(statut)) {
       return NextResponse.json(
@@ -65,13 +65,11 @@ export async function PUT(request, { params }) {
     }
 
     // Utiliser le système de validation hiérarchique
+    // Si force_rh est demandé, la RH bypasse la hiérarchie (cas où un responsable est absent/malade)
     try {
-      const result = await validateLeaveAtLevel(
-        id,
-        validatorId,
-        statut,
-        commentaire_rh || ''
-      );
+      const result = force_rh
+        ? await forceValidateLeaveByRH(id, validatorId, statut, commentaire_rh || '')
+        : await validateLeaveAtLevel(id, validatorId, statut, commentaire_rh || '');
 
       // Récupérer le nom du validateur pour la notification
       const validatorResult = await db.execute({

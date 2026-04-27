@@ -61,6 +61,9 @@ export default function RHPage() {
   const [recupUtilRequests, setRecupUtilRequests] = useState([]);
   const [recupActionLoading, setRecupActionLoading] = useState(null);
   const [selectedRecupDoc, setSelectedRecupDoc] = useState(null);
+  const [forceValidateModal, setForceValidateModal] = useState(null); // { leave, action: 'valider'|'refuser' }
+  const [forceValidateComment, setForceValidateComment] = useState('');
+  const [forceValidateLoading, setForceValidateLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -418,6 +421,34 @@ export default function RHPage() {
     }
   };
 
+  const handleConfirmForceValidate = async () => {
+    if (!forceValidateModal) return;
+    const { leave, action } = forceValidateModal;
+    const statut = action === 'valider' ? 'validee' : 'refusee';
+    setForceValidateLoading(true);
+    try {
+      const response = await fetch(`/api/leaves/${leave.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          statut,
+          commentaire_rh: forceValidateComment,
+          force_rh: true
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success(data.message);
+      setForceValidateModal(null);
+      setForceValidateComment('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setForceValidateLoading(false);
+    }
+  };
+
   const handleCancelLeave = async (leaveId, employeeName) => {
     const motif = window.prompt(`Motif de l'annulation du congé de ${employeeName} :`);
     if (motif === null) return; // Annulé par l'utilisateur
@@ -754,18 +785,38 @@ export default function RHPage() {
                             {formatDateFR(leave.date_demande)}
                           </td>
                           <td className="px-4 py-3">
-                            {leave.statut !== 'annulee' && (
-                              <button
-                                onClick={() => handleCancelLeave(leave.id, `${leave.prenom} ${leave.nom}`)}
-                                disabled={cancelLoading === leave.id}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
-                              >
-                                {cancelLoading === leave.id ? '...' : 'Annuler'}
-                              </button>
-                            )}
-                            {leave.statut === 'annulee' && (
-                              <span className="text-xs text-gray-400">Annulée</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              {leave.statut === 'en_attente' && (
+                                <>
+                                  <button
+                                    onClick={() => { setForceValidateComment(''); setForceValidateModal({ leave, action: 'valider' }); }}
+                                    className="text-green-700 hover:text-green-900 text-sm font-medium text-left"
+                                    title="Valider directement (dernier recours si responsable absent)"
+                                  >
+                                    Valider directement
+                                  </button>
+                                  <button
+                                    onClick={() => { setForceValidateComment(''); setForceValidateModal({ leave, action: 'refuser' }); }}
+                                    className="text-orange-700 hover:text-orange-900 text-sm font-medium text-left"
+                                    title="Refuser directement (dernier recours si responsable absent)"
+                                  >
+                                    Refuser directement
+                                  </button>
+                                </>
+                              )}
+                              {leave.statut !== 'annulee' && (
+                                <button
+                                  onClick={() => handleCancelLeave(leave.id, `${leave.prenom} ${leave.nom}`)}
+                                  disabled={cancelLoading === leave.id}
+                                  className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 text-left"
+                                >
+                                  {cancelLoading === leave.id ? '...' : 'Annuler'}
+                                </button>
+                              )}
+                              {leave.statut === 'annulee' && (
+                                <span className="text-xs text-gray-400">Annulée</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2280,6 +2331,97 @@ export default function RHPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal validation directe (dernier recours) */}
+      {forceValidateModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => !forceValidateLoading && setForceValidateModal(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-gray-200 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <h3 className="font-bold text-gray-800 text-lg">
+                {forceValidateModal.action === 'valider' ? 'Validation directe' : 'Refus direct'} - Attention
+              </h3>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                <p className="text-sm text-yellow-800 font-semibold mb-1">
+                  Cette option est un dernier recours.
+                </p>
+                <p className="text-sm text-yellow-700">
+                  Elle ne doit être utilisée que si un responsable est absent ou malade
+                  et ne peut pas valider la demande lui-même.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
+                <p><span className="font-semibold">Agent :</span> {forceValidateModal.leave.prenom} {forceValidateModal.leave.nom}</p>
+                <p><span className="font-semibold">Période :</span> {formatDateFR(forceValidateModal.leave.date_debut)} → {formatDateFR(forceValidateModal.leave.date_fin)}</p>
+                <p><span className="font-semibold">Jours :</span> {forceValidateModal.leave.nombre_jours_ouvres}</p>
+                {forceValidateModal.leave.responsable_nom && (
+                  <p><span className="font-semibold">Responsable N1 :</span> {forceValidateModal.leave.responsable_prenom} {forceValidateModal.leave.responsable_nom}</p>
+                )}
+                {forceValidateModal.leave.responsable_n2_nom && (
+                  <p><span className="font-semibold">Responsable N2 :</span> {forceValidateModal.leave.responsable_n2_prenom} {forceValidateModal.leave.responsable_n2_nom}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Motif {forceValidateModal.action === 'refuser' ? '(obligatoire)' : '(recommandé)'}
+                </label>
+                <textarea
+                  value={forceValidateComment}
+                  onChange={(e) => setForceValidateComment(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Ex : Responsable N1 absent pour maladie, validation effectuée par la RH..."
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 p-4 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setForceValidateModal(null); setForceValidateComment(''); }}
+                disabled={forceValidateLoading}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmForceValidate}
+                disabled={
+                  forceValidateLoading ||
+                  (forceValidateModal.action === 'refuser' && !forceValidateComment.trim())
+                }
+                className={`px-4 py-2 text-white rounded-lg transition font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                  forceValidateModal.action === 'valider'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {forceValidateLoading
+                  ? 'En cours...'
+                  : forceValidateModal.action === 'valider'
+                    ? 'Valider'
+                    : 'Refuser'}
+              </button>
+            </div>
           </div>
         </div>
       )}

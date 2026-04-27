@@ -408,3 +408,150 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
 
   throw new Error('Niveau de validation invalide');
 }
+
+/**
+ * Validation/refus en force par la RH (bypass de la hiérarchie).
+ * À utiliser uniquement quand un responsable est absent/malade et ne peut pas valider.
+ * @param {number} leaveId - ID de la demande
+ * @param {number} validatorId - ID du validateur RH
+ * @param {string} decision - 'validee' ou 'refusee'
+ * @param {string} commentaire - Commentaire optionnel
+ * @returns {Promise<Object>}
+ */
+export async function forceValidateLeaveByRH(leaveId, validatorId, decision, commentaire = '') {
+  // Vérifier que le validateur est bien RH/Direction/DG
+  const validator = await db.execute({
+    sql: 'SELECT id, type_utilisateur FROM users WHERE id = ?',
+    args: [validatorId]
+  });
+  if (validator.rows.length === 0) {
+    throw new Error('Validateur non trouvé');
+  }
+  const t = validator.rows[0].type_utilisateur;
+  if (t !== 'RH' && t !== 'Direction' && t !== 'DG') {
+    throw new Error('Seuls les utilisateurs RH/Direction/DG peuvent forcer une validation');
+  }
+
+  const leaveResult = await db.execute({
+    sql: 'SELECT * FROM demandes_conges WHERE id = ?',
+    args: [leaveId]
+  });
+  if (leaveResult.rows.length === 0) {
+    throw new Error('Demande non trouvée');
+  }
+  const leave = leaveResult.rows[0];
+
+  if (leave.statut !== 'en_attente') {
+    throw new Error('Cette demande a déjà été traitée');
+  }
+
+  const now = new Date().toISOString();
+  const noteForce = '[RH - Validation directe (responsable absent)]';
+  const fullComment = commentaire
+    ? `${noteForce} ${commentaire}`
+    : noteForce;
+
+  if (decision === 'refusee') {
+    await db.execute({
+      sql: `
+        UPDATE demandes_conges
+        SET statut = 'refusee',
+            date_validation = ?,
+            validateur_id = ?,
+            commentaire_rh = ?
+        WHERE id = ?
+      `,
+      args: [now, validatorId, fullComment, leaveId]
+    });
+    return {
+      success: true,
+      message: 'Demande refusée directement par la RH',
+      newStatus: 'refusee',
+      isFinal: true
+    };
+  }
+
+  // Marquer les niveaux intermédiaires non validés comme validés par la RH
+  const circuit = await getValidationCircuit(leave.user_id);
+  const hasN1 = circuit.niveaux.some(n => n.niveau === 1);
+  const hasN2 = circuit.niveaux.some(n => n.niveau === 2);
+
+  if (hasN1 && leave.statut_niveau_1 !== 'validee') {
+    await db.execute({
+      sql: `
+        UPDATE demandes_conges
+        SET statut_niveau_1 = 'validee',
+            validateur_niveau_1_id = ?,
+            date_validation_niveau_1 = ?
+        WHERE id = ?
+      `,
+      args: [validatorId, now, leaveId]
+    });
+  }
+  if (hasN2 && leave.statut_niveau_2 !== 'validee') {
+    await db.execute({
+      sql: `
+        UPDATE demandes_conges
+        SET statut_niveau_2 = 'validee',
+            validateur_niveau_2_id = ?,
+            date_validation_niveau_2 = ?
+        WHERE id = ?
+      `,
+      args: [validatorId, now, leaveId]
+    });
+  }
+
+  // Validation finale
+  await db.execute({
+    sql: `
+      UPDATE demandes_conges
+      SET statut = 'validee',
+          date_validation = ?,
+          validateur_id = ?,
+          commentaire_rh = ?
+      WHERE id = ?
+    `,
+    args: [now, validatorId, fullComment, leaveId]
+  });
+
+  // Recalculer jours_pris à partir des congés validés
+  const currentYear = new Date().getFullYear();
+  const totalResult = await db.execute({
+    sql: `
+      SELECT COALESCE(SUM(nombre_jours_ouvres), 0) as total_pris
+      FROM demandes_conges
+      WHERE user_id = ? AND statut = 'validee'
+        AND strftime('%Y', date_debut) = ?
+    `,
+    args: [leave.user_id, String(currentYear)]
+  });
+  const totalPris = totalResult.rows[0]?.total_pris || 0;
+
+  const soldeResult = await db.execute({
+    sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs FROM soldes_conges WHERE user_id = ? AND annee = ?',
+    args: [leave.user_id, currentYear]
+  });
+  if (soldeResult.rows.length > 0) {
+    const s = soldeResult.rows[0];
+    const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + (s.jours_fractionnement || 0) + (s.jours_compensateurs || 0);
+    const restants = totalAcquis - totalPris;
+    await db.execute({
+      sql: `
+        UPDATE soldes_conges
+        SET jours_pris = ?,
+            jours_restants = ?
+        WHERE user_id = ? AND annee = ?
+      `,
+      args: [totalPris, restants, leave.user_id, currentYear]
+    });
+  }
+
+  await recalculateFractionnement(leave.user_id, currentYear);
+
+  return {
+    success: true,
+    message: 'Demande validée directement par la RH',
+    newStatus: 'validee',
+    isFinal: true
+  };
+}
