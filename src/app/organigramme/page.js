@@ -25,6 +25,7 @@ const COLORS = {
   restauration:  { bg: '#f2c16a', text: '#5e3d08', border: '#cf942a', }, // amber
   communication: { bg: '#8f9ef0', text: '#1f2a6b', border: '#5667cf' }, // indigo
   entretien:     { bg: '#6ed8c9', text: '#0f4a44', border: '#2aaa97' }, // cyan
+  respAnim:      { bg: '#a78bfa', text: '#3b1681', border: '#7c3aed' }, // purple — Resp. Centre de Loisir
   agent:         { bg: '#c9c9c9', text: '#262e38', border: '#8e8e8e' }, // neutral gray
 };
 
@@ -61,7 +62,7 @@ function match(value, ...keywords) {
 const ROLE_DGS = u => match(u.poste, 'DGS') || match(u.type_utilisateur, 'DG');
 const ROLE_DIR_VIE_LOCALE = u => match(u.poste, 'Dir. Vie Locale', 'Directrice Vie Locale', 'Directeur Vie Locale') || match(u.type_utilisateur, 'Directeur Vie Locale');
 const ROLE_RESP_TECH = u => match(u.service, 'SERVICES TECH') && match(u.poste, 'Resp');
-const ROLE_RESP_ANIM = u => match(u.service, 'C.L.S.H') && match(u.poste, 'Resp. Centre', 'Resp Centre');
+const ROLE_RESP_ANIM = u => match(u.service, 'C.L.S.H') && match(u.poste, 'Resp. Centre', 'Resp Centre', 'Resp. Adj', 'Resp Adj', 'Adjoint');
 const ROLE_RESP_SOCIAL = u => match(u.poste, 'Resp. Social', 'Resp Social');
 const ROLE_RESP_RH = u => match(u.poste, 'Resp. RH', 'Resp RH');
 const ROLE_RESP_FINANCES = u => match(u.poste, 'Resp. Finance', 'Resp Finance');
@@ -143,7 +144,11 @@ function buildOrgTree(users) {
   respsAnim.forEach(u => placed.add(u.id));
   const animUsers = users.filter(u => !placed.has(u.id) && BRANCH_ANIMATION(u));
   animUsers.forEach(u => placed.add(u.id));
-  const animRespNodes = respsAnim.map(u => place(u, COLORS.education));
+  const animRespNodes = respsAnim.map(u => {
+    const node = place(u, COLORS.respAnim);
+    node.badge = 'Responsable Centre de Loisir';
+    return node;
+  });
   const animAgentNodes = animUsers.map(u => userToNode(u, COLORS.education));
   if (animRespNodes.length > 0 && animAgentNodes.length > 0) {
     const perResp = Math.ceil(animAgentNodes.length / animRespNodes.length);
@@ -322,7 +327,7 @@ function OrgCard({ node, collapsed, onToggle, childCount }) {
   }
 
   // Person card: pastel pill with round avatar on left
-  return (
+  const card = (
     <div
       className="org-card"
       style={{ background: c.bg, borderColor: c.border, color: c.text }}
@@ -342,6 +347,22 @@ function OrgCard({ node, collapsed, onToggle, childCount }) {
       </div>
     </div>
   );
+
+  if (node.badge) {
+    return (
+      <div className="org-card-wrap">
+        <span
+          className="org-card-badge"
+          style={{ background: c.border, color: '#fff' }}
+        >
+          {node.badge}
+        </span>
+        {card}
+      </div>
+    );
+  }
+
+  return card;
 }
 
 function OrgNode({ node }) {
@@ -506,6 +527,8 @@ export default function OrganigrammePage() {
   .org-card-text { padding-left:10px; padding-right:6px; min-width:0; flex:1; }
   .org-card-name { font-weight:800; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
   .org-card-role { font-size:0.62rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:1px 0 0; }
+  .org-card-wrap { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .org-card-badge { padding:2px 10px; border-radius:999px; font-size:0.55rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; white-space:nowrap; box-shadow:0 1px 2px rgba(0,0,0,0.18); }
 
   .org-svc { position:relative; z-index:2; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1.5px solid; min-width:180px; max-width:320px; min-height:34px; padding:6px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .org-svc-label { font-weight:800; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; text-align:center; line-height:1.15; }
@@ -713,6 +736,24 @@ export default function OrganigrammePage() {
           font-size: 0.62rem; opacity: 0.85;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
           margin: 1px 0 0;
+        }
+        .org-card-wrap {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+        .org-card-badge {
+          padding: 2px 10px;
+          border-radius: 999px;
+          font-size: 0.55rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          white-space: nowrap;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.18);
         }
 
         /* === Service banner === */
