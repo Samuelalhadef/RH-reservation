@@ -24,10 +24,10 @@ export const AuthProvider = ({ children }) => {
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
       setUser(parsed);
-      // Vérifier que la session est encore valide et rafraîchir le profil (rôle, etc.)
+      setLoading(false);
+      // Refresh en arrière-plan (non bloquant) : vérifie session + photo + rôle
       fetch('/api/users/profile').then(res => {
         if (res.status === 401) {
-          // Session expirée, déconnecter
           setUser(null);
           localStorage.removeItem('user');
           toast.error('Session expirée, veuillez vous reconnecter');
@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
             }
           });
         }
-      }).catch(() => {}).finally(() => setLoading(false));
+      }).catch(() => {});
     } else {
       setLoading(false);
     }

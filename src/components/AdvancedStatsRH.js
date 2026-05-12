@@ -82,22 +82,30 @@ export default function AdvancedStatsRH() {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (allUsers.length === 0) {
       toast.error('Aucune donnée à exporter');
       return;
     }
-    exportToExcel(allUsers, selectedYear);
-    toast.success('Export Excel généré avec succès !');
+    try {
+      await exportToExcel(allUsers, selectedYear);
+      toast.success('Export Excel généré avec succès !');
+    } catch (e) {
+      toast.error('Erreur lors de la génération Excel');
+    }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (allUsers.length === 0) {
       toast.error('Aucune donnée à exporter');
       return;
     }
-    exportToPDF(allUsers, selectedYear);
-    toast.success('Export PDF généré avec succès !');
+    try {
+      await exportToPDF(allUsers, selectedYear);
+      toast.success('Export PDF généré avec succès !');
+    } catch (e) {
+      toast.error('Erreur lors de la génération PDF');
+    }
   };
 
   if (loading) {

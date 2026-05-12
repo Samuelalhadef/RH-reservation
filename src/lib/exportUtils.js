@@ -1,14 +1,9 @@
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Imports dynamiques : xlsx (~400KB) et jspdf (~200KB) ne sont chargés
+// qu'au clic sur Export, pour ne pas plomber le bundle initial mobile.
 
-/**
- * Exporte les données de congés au format Excel
- * @param {Array} users - Liste des utilisateurs avec leurs soldes
- * @param {number} year - Année concernée
- */
-export function exportToExcel(users, year) {
-  // Préparer les données pour Excel
+export async function exportToExcel(users, year) {
+  const XLSX = await import('xlsx');
+
   const data = users.map(user => ({
     'Nom': user.nom,
     'Prénom': user.prenom,
@@ -23,42 +18,30 @@ export function exportToExcel(users, year) {
     'Jours Fractionnement': user.jours_fractionnement || 0
   }));
 
-  // Créer le workbook
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
 
-  // Définir les largeurs de colonnes
-  const wscols = [
-    { wch: 15 }, // Nom
-    { wch: 15 }, // Prénom
-    { wch: 20 }, // Service
-    { wch: 25 }, // Poste
-    { wch: 20 }, // Type
-    { wch: 10 }, // Contrat
-    { wch: 12 }, // Jours Acquis
-    { wch: 12 }, // Jours Pris
-    { wch: 12 }, // Jours Restants
-    { wch: 12 }, // Jours Reportés
-    { wch: 15 }  // Jours Fractionnement
+  ws['!cols'] = [
+    { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 20 },
+    { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }
   ];
-  ws['!cols'] = wscols;
 
-  // Ajouter la feuille au workbook
   XLSX.utils.book_append_sheet(wb, ws, `Congés ${year}`);
-
-  // Télécharger le fichier
   XLSX.writeFile(wb, `conges_mairie_chartrettes_${year}.xlsx`);
 }
 
-/**
- * Exporte les données de congés au format PDF
- * @param {Array} users - Liste des utilisateurs avec leurs soldes
- * @param {number} year - Année concernée
- */
-export function exportToPDF(users, year) {
+async function loadJsPdf() {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+  return { jsPDF, autoTable };
+}
+
+export async function exportToPDF(users, year) {
+  const { jsPDF, autoTable } = await loadJsPdf();
   const doc = new jsPDF('landscape');
 
-  // En-tête
   doc.setFontSize(18);
   doc.text('Mon Portail Agent - Chartrettes', 14, 15);
   doc.setFontSize(14);
@@ -66,7 +49,6 @@ export function exportToPDF(users, year) {
   doc.setFontSize(10);
   doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, 14, 32);
 
-  // Préparer les données pour le tableau
   const tableData = users.map(user => [
     `${user.prenom} ${user.nom}`,
     user.service || '-',
@@ -79,46 +61,28 @@ export function exportToPDF(users, year) {
     user.jours_fractionnement || 0
   ]);
 
-  // Ajouter le tableau
   autoTable(doc, {
     startY: 40,
     head: [[
-      'Agent',
-      'Service',
-      'Poste',
-      'Contrat',
-      'Acquis',
-      'Pris',
-      'Restants',
-      'Reportés',
-      'Fract.'
+      'Agent', 'Service', 'Poste', 'Contrat',
+      'Acquis', 'Pris', 'Restants', 'Reportés', 'Fract.'
     ]],
     body: tableData,
-    styles: {
-      fontSize: 8,
-      cellPadding: 2
-    },
-    headStyles: {
-      fillColor: [41, 128, 185],
-      textColor: 255,
-      fontStyle: 'bold'
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245]
-    },
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
     columnStyles: {
-      0: { cellWidth: 45 }, // Agent
-      1: { cellWidth: 35 }, // Service
-      2: { cellWidth: 45 }, // Poste
-      3: { cellWidth: 20 }, // Contrat
-      4: { cellWidth: 20, halign: 'center' }, // Acquis
-      5: { cellWidth: 20, halign: 'center' }, // Pris
-      6: { cellWidth: 20, halign: 'center' }, // Restants
-      7: { cellWidth: 20, halign: 'center' }, // Reportés
-      8: { cellWidth: 20, halign: 'center' }  // Fract.
+      0: { cellWidth: 45 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 20 },
+      4: { cellWidth: 20, halign: 'center' },
+      5: { cellWidth: 20, halign: 'center' },
+      6: { cellWidth: 20, halign: 'center' },
+      7: { cellWidth: 20, halign: 'center' },
+      8: { cellWidth: 20, halign: 'center' }
     },
     didDrawPage: function(data) {
-      // Pied de page
       const pageCount = doc.internal.getNumberOfPages();
       doc.setFontSize(8);
       doc.text(
@@ -130,7 +94,6 @@ export function exportToPDF(users, year) {
     }
   });
 
-  // Ajouter les totaux en bas
   const finalY = doc.lastAutoTable.finalY + 10;
   const totalAcquis = users.reduce((sum, u) => sum + (u.jours_acquis || 0), 0);
   const totalPris = users.reduce((sum, u) => sum + (u.jours_pris || 0), 0);
@@ -143,26 +106,18 @@ export function exportToPDF(users, year) {
   doc.text(`Jours pris: ${totalPris}`, 120, finalY);
   doc.text(`Jours restants: ${totalRestants}`, 180, finalY);
 
-  // Télécharger le PDF
   doc.save(`conges_mairie_chartrettes_${year}.pdf`);
 }
 
-/**
- * Exporte le détail des congés d'un agent spécifique au format PDF
- * @param {Object} user - Données de l'utilisateur
- * @param {Array} leaves - Liste des demandes de congés
- * @param {number} year - Année concernée
- */
-export function exportUserLeavesToPDF(user, leaves, year) {
+export async function exportUserLeavesToPDF(user, leaves, year) {
+  const { jsPDF, autoTable } = await loadJsPdf();
   const doc = new jsPDF();
 
-  // En-tête
   doc.setFontSize(18);
   doc.text('Mon Portail Agent - Chartrettes', 14, 15);
   doc.setFontSize(14);
   doc.text(`Fiche de Congés ${year}`, 14, 25);
 
-  // Informations de l'agent
   doc.setFontSize(10);
   doc.setFont(undefined, 'bold');
   doc.text('Agent:', 14, 35);
@@ -179,7 +134,6 @@ export function exportUserLeavesToPDF(user, leaves, year) {
   doc.setFont(undefined, 'normal');
   doc.text(user.poste || '-', 35, 49);
 
-  // Solde de congés
   doc.setFontSize(12);
   doc.setFont(undefined, 'bold');
   doc.text('Solde de congés:', 14, 60);
@@ -191,7 +145,6 @@ export function exportUserLeavesToPDF(user, leaves, year) {
   doc.text(`Jours restants: ${user.jours_restants || 0}`, 20, 80);
   doc.text(`Jours reportés: ${user.jours_reportes || 0}`, 20, 86);
 
-  // Tableau des demandes
   if (leaves && leaves.length > 0) {
     const tableData = leaves.map(leave => [
       new Date(leave.date_debut).toLocaleDateString('fr-FR'),
@@ -206,15 +159,8 @@ export function exportUserLeavesToPDF(user, leaves, year) {
       startY: 95,
       head: [['Date début', 'Date fin', 'Jours', 'Statut', 'Motif']],
       body: tableData,
-      styles: {
-        fontSize: 9,
-        cellPadding: 3
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 30 },
         1: { cellWidth: 30 },
@@ -228,7 +174,6 @@ export function exportUserLeavesToPDF(user, leaves, year) {
     doc.text('Aucune demande de congés pour cette année.', 14, 100);
   }
 
-  // Pied de page
   doc.setFontSize(8);
   doc.text(
     `Document généré le ${new Date().toLocaleDateString('fr-FR')}`,
@@ -236,6 +181,5 @@ export function exportUserLeavesToPDF(user, leaves, year) {
     doc.internal.pageSize.height - 10
   );
 
-  // Télécharger le PDF
   doc.save(`fiche_conges_${user.nom}_${user.prenom}_${year}.pdf`);
 }

@@ -2,12 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import ChangePasswordModal from '@/components/ChangePasswordModal';
-import LeaveCalendar from '@/components/LeaveCalendar';
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
+
+const LeaveCalendar = dynamic(() => import('@/components/LeaveCalendar'), {
+  ssr: false,
+  loading: () => (
+    <div className="py-16 text-center text-gray-400 text-sm">Chargement du calendrier…</div>
+  ),
+});
+
+const ChangePasswordModal = dynamic(() => import('@/components/ChangePasswordModal'), {
+  ssr: false,
+});
 
 export default function DashboardPage() {
   const { user, refreshProfile, isAuthenticated } = useAuth();

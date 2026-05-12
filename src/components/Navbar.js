@@ -1,35 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import NotificationButton from './NotificationButton';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
+
+const NotificationButton = dynamic(() => import('./NotificationButton'), {
+  ssr: false,
+  loading: () => <div className="w-9 h-9" />,
+});
 
 const Navbar = () => {
   const { user, logout, isRH } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [profilePhoto, setProfilePhoto] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    // Charger la photo de profil
-    const fetchPhoto = async () => {
-      try {
-        const res = await fetch('/api/users/profile');
-        const data = await res.json();
-        if (data.user?.photo_profil) {
-          setProfilePhoto(data.user.photo_profil);
-        }
-      } catch (error) {
-        // ignore fetch error
-      }
-    };
-
-    if (user) {
-      fetchPhoto();
-    }
-  }, [user]);
+  const profilePhoto = user?.photo_profil || null;
 
   const handleLogout = () => {
     logout();
@@ -62,7 +50,15 @@ const Navbar = () => {
           {/* Logo + titre */}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-gray-200">
-              <img src="/images/logo.png" alt="Logo" className="w-full h-full object-cover" />
+              <Image
+                src="/images/logo.png"
+                alt="Logo"
+                width={40}
+                height={40}
+                priority
+                sizes="40px"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-bold text-gray-800">Mon Portail Agent</h1>
@@ -104,7 +100,7 @@ const Navbar = () => {
                 }}
               >
                 {profilePhoto ? (
-                  <img src={profilePhoto} alt="Photo" className="w-full h-full object-cover" />
+                  <img src={profilePhoto} alt="Photo" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-white text-sm font-semibold">
                     {user?.prenom?.[0]}{user?.nom?.[0]}
@@ -162,7 +158,14 @@ const Navbar = () => {
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg overflow-hidden border border-gray-200">
-              <img src="/images/logo.png" alt="Logo" className="w-full h-full object-cover" />
+              <Image
+                src="/images/logo.png"
+                alt="Logo"
+                width={32}
+                height={32}
+                sizes="32px"
+                className="w-full h-full object-cover"
+              />
             </div>
             <span className="font-bold text-gray-800">Menu</span>
           </div>

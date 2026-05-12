@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -57,7 +58,15 @@ export default function LoginPage() {
         <div className="bg-primary-600 text-white p-6">
           <div className="flex items-center justify-center gap-4 mb-2">
             <div className="w-14 h-14 rounded-lg overflow-hidden bg-white shadow">
-              <img src="/images/logo.png" alt="Logo" className="w-full h-full object-cover" />
+              <Image
+                src="/images/logo.png"
+                alt="Logo"
+                width={56}
+                height={56}
+                priority
+                sizes="56px"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-center">Mon Portail Agent</h1>

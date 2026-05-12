@@ -1,36 +1,54 @@
 import { Inter } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/contexts/AuthContext';
-import Chatbot from '@/components/Chatbot';
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import ChatbotLazy from '@/components/ChatbotLazy';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  adjustFontFallback: true,
+});
 
 export const metadata = {
   title: 'Mon Portail Agent - Chartrettes',
   description: 'Portail agent pour la gestion des congés - Mairie de Chartrettes',
   manifest: '/manifest.json',
+  applicationName: 'Portail Agent',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Portail Agent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    apple: '/icons/icon-152x152.png',
   },
   other: {
     'mobile-web-app-capable': 'yes',
   },
 };
 
+export const viewport = {
+  themeColor: '#0ea5e9',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="fr">
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
-        <meta name="theme-color" content="#0ea5e9" />
-      </head>
       <body className={inter.className}>
         <AuthProvider>
           {children}
-          <Chatbot />
+          <ServiceWorkerRegister />
+          <ChatbotLazy />
           <Toaster
             position="top-right"
             toastOptions={{

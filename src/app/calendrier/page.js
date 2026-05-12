@@ -2,9 +2,16 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import TeamCalendar from '@/components/TeamCalendar';
+
+const TeamCalendar = dynamic(() => import('@/components/TeamCalendar'), {
+  ssr: false,
+  loading: () => (
+    <div className="py-16 text-center text-gray-400 text-sm">Chargement du calendrier équipe…</div>
+  ),
+});
 
 export default function CalendrierPage() {
   const { isAuthenticated } = useAuth();
