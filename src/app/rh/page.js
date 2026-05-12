@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
@@ -61,6 +61,18 @@ export default function RHPage() {
   const [recupUtilRequests, setRecupUtilRequests] = useState([]);
   const [recupActionLoading, setRecupActionLoading] = useState(null);
   const [selectedRecupDoc, setSelectedRecupDoc] = useState(null);
+  const [recupBalances, setRecupBalances] = useState([]);
+  const [rhRecupForm, setRhRecupForm] = useState({
+    user_id: '',
+    date_debut: '',
+    date_fin: '',
+    nombre_heures: '',
+    raison: ''
+  });
+  const [rhRecupLoading, setRhRecupLoading] = useState(false);
+  const [recupSubTab, setRecupSubTab] = useState('pending'); // pending | declarations | utilisations | balances | place
+  const [recupSearch, setRecupSearch] = useState('');
+  const [recupStatusFilter, setRecupStatusFilter] = useState('toutes'); // toutes | en_attente | validee | refusee
   const [forceValidateModal, setForceValidateModal] = useState(null); // { leave, action: 'valider'|'refuser' }
   const [forceValidateComment, setForceValidateComment] = useState('');
   const [forceValidateLoading, setForceValidateLoading] = useState(false);
@@ -111,10 +123,15 @@ export default function RHPage() {
         const data = await response.json();
         setCetRequests(data.demandes || []);
       } else if (activeTab === 'recup-requests') {
-        const response = await fetch('/api/recuperation/all');
-        const data = await response.json();
-        setRecupRequests(data.demandes || []);
-        setRecupUtilRequests(data.demandes_utilisation || []);
+        const [allRes, balRes, usersRes] = await Promise.all([
+          fetch('/api/recuperation/all').then(r => r.json()),
+          fetch('/api/recuperation/all-balances').then(r => r.json()),
+          fetch('/api/users/all').then(r => r.json())
+        ]);
+        setRecupRequests(allRes.demandes || []);
+        setRecupUtilRequests(allRes.demandes_utilisation || []);
+        setRecupBalances(balRes.balances || []);
+        setAllUsers(usersRes.users || []);
       } else if (activeTab === 'cet-balances') {
         const response = await fetch('/api/cet/all-balances');
         const data = await response.json();
@@ -1183,133 +1200,27 @@ export default function RHPage() {
         )}
 
         {activeTab === 'recup-requests' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Demandes de récupération d'heures
-            </h2>
-
-            {recupRequests.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">Aucune demande de récupération</p>
-            ) : (
-              <div className="space-y-4">
-                {recupRequests.map((req) => (
-                  <div key={req.id} className={`border rounded-lg p-4 ${
-                    req.statut === 'en_attente' ? 'border-orange-200 bg-orange-50' : 'border-gray-200'
-                  }`}>
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-gray-800">{req.prenom} {req.nom}</span>
-                          {req.service && <span className="text-xs text-gray-500">({req.service})</span>}
-                          <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                            req.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-800' :
-                            req.statut === 'validee' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {req.statut === 'en_attente' ? 'En attente' : req.statut === 'validee' ? 'Validée' : 'Refusée'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-0.5">
-                          <p><strong>Date travail :</strong> {req.date_travail_fr} | <strong>Heures :</strong> {req.nombre_heures}h</p>
-                          <p><strong>Raison :</strong> {req.raison}</p>
-                          <p><strong>Type :</strong> {req.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération en congé'}</p>
-                          <p className="text-xs text-gray-400">Demandé le {req.date_demande_fr}</p>
-                        </div>
-                        {req.commentaire && (
-                          <p className="text-xs text-gray-500 mt-1 italic">Commentaire : {req.commentaire}</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 items-center">
-                        <button
-                          onClick={() => setSelectedRecupDoc(req)}
-                          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                        >
-                          Voir document
-                        </button>
-                        {req.statut === 'en_attente' && (
-                          <>
-                            <button
-                              onClick={() => handleRecupAction(req.id, 'valider')}
-                              disabled={recupActionLoading === req.id}
-                              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                            >
-                              {recupActionLoading === req.id ? '...' : 'Valider'}
-                            </button>
-                            <button
-                              onClick={() => handleRecupAction(req.id, 'refuser')}
-                              disabled={recupActionLoading === req.id}
-                              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
-                            >
-                              {recupActionLoading === req.id ? '...' : 'Refuser'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          {/* Demandes d'utilisation de récupération */}
-            {recupUtilRequests.length > 0 && (
-              <div className="mt-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  Demandes d'utilisation de récupération
-                </h2>
-                <div className="space-y-4">
-                  {recupUtilRequests.map((req) => (
-                    <div key={`util-${req.id}`} className={`border rounded-lg p-4 ${
-                      req.statut === 'en_attente' ? 'border-orange-200 bg-orange-50' : 'border-gray-200'
-                    }`}>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-gray-800">{req.prenom} {req.nom}</span>
-                            {req.service && <span className="text-xs text-gray-500">({req.service})</span>}
-                            <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                              req.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-800' :
-                              req.statut === 'validee' ? 'bg-green-100 text-green-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {req.statut === 'en_attente' ? 'En attente' : req.statut === 'validee' ? 'Validée' : 'Refusée'}
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-600 space-y-0.5">
-                            <p><strong>Dates :</strong> {req.date_debut_fr}{req.date_debut_fr !== req.date_fin_fr ? ` → ${req.date_fin_fr}` : ''} | <strong>Heures :</strong> {req.nombre_heures}h</p>
-                            {req.raison && <p><strong>Raison :</strong> {req.raison}</p>}
-                            <p className="text-xs text-gray-400">Demandé le {req.date_demande_fr}</p>
-                          </div>
-                          {req.commentaire && (
-                            <p className="text-xs text-gray-500 mt-1 italic">Commentaire : {req.commentaire}</p>
-                          )}
-                        </div>
-
-                        {req.statut === 'en_attente' && (
-                          <div className="flex gap-2 items-center">
-                            <button
-                              onClick={() => handleRecupUtilAction(req.id, 'valider')}
-                              disabled={recupActionLoading === `util-${req.id}`}
-                              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                            >
-                              {recupActionLoading === `util-${req.id}` ? '...' : 'Valider'}
-                            </button>
-                            <button
-                              onClick={() => handleRecupUtilAction(req.id, 'refuser')}
-                              disabled={recupActionLoading === `util-${req.id}`}
-                              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
-                            >
-                              {recupActionLoading === `util-${req.id}` ? '...' : 'Refuser'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <RecuperationRHView
+            recupRequests={recupRequests}
+            recupUtilRequests={recupUtilRequests}
+            recupBalances={recupBalances}
+            recupSubTab={recupSubTab}
+            setRecupSubTab={setRecupSubTab}
+            recupSearch={recupSearch}
+            setRecupSearch={setRecupSearch}
+            recupStatusFilter={recupStatusFilter}
+            setRecupStatusFilter={setRecupStatusFilter}
+            recupActionLoading={recupActionLoading}
+            handleRecupAction={handleRecupAction}
+            handleRecupUtilAction={handleRecupUtilAction}
+            setSelectedRecupDoc={setSelectedRecupDoc}
+            rhRecupForm={rhRecupForm}
+            setRhRecupForm={setRhRecupForm}
+            rhRecupLoading={rhRecupLoading}
+            setRhRecupLoading={setRhRecupLoading}
+            setRecupBalances={setRecupBalances}
+            fetchData={fetchData}
+          />
         )}
 
         {/* Modal document récupération */}
@@ -1429,6 +1340,7 @@ export default function RHPage() {
             </form>
           </div>
         )}
+
       </div>
 
       {/* Modal de création d'utilisateur */}
@@ -2425,6 +2337,974 @@ export default function RHPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================
+// Récupération RH - Interface refondue
+// =============================================================
+
+const RECUP_MONTH_NAMES = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+];
+
+function getInitials(prenom, nom) {
+  return `${(prenom || '').charAt(0)}${(nom || '').charAt(0)}`.toUpperCase();
+}
+
+function avatarColor(id) {
+  const colors = [
+    'from-blue-500 to-indigo-600',
+    'from-emerald-500 to-teal-600',
+    'from-orange-500 to-rose-500',
+    'from-purple-500 to-pink-600',
+    'from-amber-500 to-orange-600',
+    'from-cyan-500 to-blue-600',
+  ];
+  return colors[(Number(id) || 0) % colors.length];
+}
+
+function RecupStatusBadge({ statut }) {
+  const config = {
+    en_attente: { label: 'En attente', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200', dot: 'bg-amber-500' },
+    validee: { label: 'Validée', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500' },
+    refusee: { label: 'Refusée', bg: 'bg-rose-50', text: 'text-rose-700', ring: 'ring-rose-200', dot: 'bg-rose-500' },
+    annulee: { label: 'Annulée', bg: 'bg-gray-50', text: 'text-gray-700', ring: 'ring-gray-200', dot: 'bg-gray-400' },
+  };
+  const c = config[statut] || config.en_attente;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${c.bg} ${c.text} ring-1 ${c.ring}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}></span>
+      {c.label}
+    </span>
+  );
+}
+
+function RecupSubTab({ active, onClick, children, count, icon }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition ${
+        active
+          ? 'bg-white text-orange-700 shadow-sm ring-1 ring-orange-100'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+      }`}
+    >
+      {icon}
+      {children}
+      {count !== undefined && count > 0 && (
+        <span className={`ml-1 px-1.5 py-0.5 text-[11px] rounded-full font-bold ${
+          active ? 'bg-orange-100 text-orange-700' : 'bg-gray-200 text-gray-700'
+        }`}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function RecupFilterPill({ active, onClick, children, dot }) {
+  const dotColors = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', rose: 'bg-rose-500' };
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition ${
+        active
+          ? 'bg-orange-600 text-white shadow-sm shadow-orange-200'
+          : 'bg-white text-gray-600 hover:text-gray-900 ring-1 ring-gray-200'
+      }`}
+    >
+      {dot && <span className={`w-1.5 h-1.5 rounded-full ${dotColors[dot]}`}></span>}
+      {children}
+    </button>
+  );
+}
+
+function RecuperationRHView({
+  recupRequests, recupUtilRequests, recupBalances,
+  recupSubTab, setRecupSubTab,
+  recupSearch, setRecupSearch,
+  recupStatusFilter, setRecupStatusFilter,
+  recupActionLoading, handleRecupAction, handleRecupUtilAction,
+  setSelectedRecupDoc,
+  rhRecupForm, setRhRecupForm, rhRecupLoading, setRhRecupLoading,
+  setRecupBalances, fetchData
+}) {
+  // Stats globales
+  const pendingAcq = recupRequests.filter(r => r.statut === 'en_attente').length;
+  const pendingUtil = recupUtilRequests.filter(r => r.statut === 'en_attente').length;
+  const totalPending = pendingAcq + pendingUtil;
+  const totalHeuresAcq = recupRequests
+    .filter(r => r.statut === 'validee')
+    .reduce((s, r) => s + (Number(r.nombre_heures) || 0), 0);
+  const totalHeuresUtil = recupUtilRequests
+    .filter(r => r.statut === 'validee')
+    .reduce((s, r) => s + (Number(r.nombre_heures) || 0), 0);
+  const agentsAvecSolde = recupBalances.filter(b => b.heures_disponibles > 0).length;
+
+  // Filtrage
+  const matchesSearch = (req) => {
+    if (!recupSearch.trim()) return true;
+    const q = recupSearch.toLowerCase();
+    return (
+      (req.prenom || '').toLowerCase().includes(q) ||
+      (req.nom || '').toLowerCase().includes(q) ||
+      (req.service || '').toLowerCase().includes(q)
+    );
+  };
+  const matchesStatus = (req) =>
+    recupStatusFilter === 'toutes' ? true : req.statut === recupStatusFilter;
+
+  // Pending unifié (les deux types)
+  const pendingItems = useMemo(() => {
+    const acq = recupRequests
+      .filter(r => r.statut === 'en_attente')
+      .filter(matchesSearch)
+      .map(r => ({ ...r, _kind: 'acquisition' }));
+    const util = recupUtilRequests
+      .filter(r => r.statut === 'en_attente')
+      .filter(matchesSearch)
+      .map(r => ({ ...r, _kind: 'utilisation' }));
+    return [...acq, ...util].sort((a, b) =>
+      new Date(b.date_demande || 0).getTime() - new Date(a.date_demande || 0).getTime()
+    );
+  }, [recupRequests, recupUtilRequests, recupSearch]);
+
+  // Filtré + groupé par mois pour vues historiques
+  const groupByMonth = (items, dateField) => {
+    const filtered = items.filter(matchesSearch).filter(matchesStatus);
+    const sorted = [...filtered].sort((a, b) => {
+      const da = new Date(a[dateField] || 0).getTime();
+      const db = new Date(b[dateField] || 0).getTime();
+      return db - da;
+    });
+    const groups = {};
+    sorted.forEach(item => {
+      const d = new Date(item[dateField]);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      if (!groups[key]) {
+        groups[key] = {
+          label: `${RECUP_MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`,
+          items: [],
+          totalHeures: 0
+        };
+      }
+      groups[key].items.push(item);
+      groups[key].totalHeures += Number(item.nombre_heures) || 0;
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  };
+
+  const declarationsGroupes = useMemo(
+    () => groupByMonth(recupRequests, 'date_travail'),
+    [recupRequests, recupSearch, recupStatusFilter]
+  );
+  const utilisationsGroupes = useMemo(
+    () => groupByMonth(recupUtilRequests, 'date_debut'),
+    [recupUtilRequests, recupSearch, recupStatusFilter]
+  );
+
+  // Soldes filtrés
+  const filteredBalances = useMemo(() => {
+    const filtered = recupBalances.filter(b => {
+      if (!recupSearch.trim()) return true;
+      const q = recupSearch.toLowerCase();
+      return (
+        (b.prenom || '').toLowerCase().includes(q) ||
+        (b.nom || '').toLowerCase().includes(q) ||
+        (b.service || '').toLowerCase().includes(q)
+      );
+    });
+    return [...filtered].sort((a, b) => b.heures_disponibles - a.heures_disponibles);
+  }, [recupBalances, recupSearch]);
+
+  return (
+    <div className="space-y-6">
+      {/* ===== HERO ===== */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-pink-500 text-white shadow-xl">
+        <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-amber-300/20 rounded-full blur-3xl"></div>
+
+        <div className="relative p-6 sm:p-8">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Gestion RH
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Récupérations</h1>
+          <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+            Validez les heures déclarées, planifiez les récupérations et suivez les soldes de chaque agent.
+          </p>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+            <RecupHeroStat label="À traiter" value={totalPending} icon="bell" highlight={totalPending > 0} />
+            <RecupHeroStat label="Heures déclarées (validées)" value={`${totalHeuresAcq}h`} icon="trending-up" />
+            <RecupHeroStat label="Heures utilisées" value={`${totalHeuresUtil}h`} icon="calendar" />
+            <RecupHeroStat label="Agents avec solde" value={agentsAvecSolde} icon="users" />
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Bloc principal ===== */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Sous-onglets */}
+        <div className="border-b border-gray-100 bg-gradient-to-b from-orange-50/50 to-transparent px-3 py-3">
+          <nav className="flex gap-1 overflow-x-auto">
+            <RecupSubTab
+              active={recupSubTab === 'pending'}
+              onClick={() => setRecupSubTab('pending')}
+              count={totalPending}
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              }
+            >
+              À traiter
+            </RecupSubTab>
+            <RecupSubTab
+              active={recupSubTab === 'declarations'}
+              onClick={() => setRecupSubTab('declarations')}
+              count={recupRequests.length}
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              }
+            >
+              Heures déclarées
+            </RecupSubTab>
+            <RecupSubTab
+              active={recupSubTab === 'utilisations'}
+              onClick={() => setRecupSubTab('utilisations')}
+              count={recupUtilRequests.length}
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              }
+            >
+              Utilisations
+            </RecupSubTab>
+            <RecupSubTab
+              active={recupSubTab === 'balances'}
+              onClick={() => setRecupSubTab('balances')}
+              count={recupBalances.length}
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              }
+            >
+              Soldes
+            </RecupSubTab>
+            <RecupSubTab
+              active={recupSubTab === 'place'}
+              onClick={() => setRecupSubTab('place')}
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              }
+            >
+              Placer pour un agent
+            </RecupSubTab>
+          </nav>
+        </div>
+
+        {/* Barre de filtres */}
+        {recupSubTab !== 'place' && (
+          <div className="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50/50">
+            <div className="relative flex-1 min-w-[220px] max-w-md">
+              <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={recupSearch}
+                onChange={(e) => setRecupSearch(e.target.value)}
+                placeholder="Rechercher un agent…"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+              />
+            </div>
+
+            {(recupSubTab === 'declarations' || recupSubTab === 'utilisations') && (
+              <div className="flex flex-wrap items-center gap-2">
+                <RecupFilterPill active={recupStatusFilter === 'toutes'} onClick={() => setRecupStatusFilter('toutes')}>
+                  Toutes
+                </RecupFilterPill>
+                <RecupFilterPill active={recupStatusFilter === 'en_attente'} onClick={() => setRecupStatusFilter('en_attente')} dot="amber">
+                  En attente
+                </RecupFilterPill>
+                <RecupFilterPill active={recupStatusFilter === 'validee'} onClick={() => setRecupStatusFilter('validee')} dot="emerald">
+                  Validées
+                </RecupFilterPill>
+                <RecupFilterPill active={recupStatusFilter === 'refusee'} onClick={() => setRecupStatusFilter('refusee')} dot="rose">
+                  Refusées
+                </RecupFilterPill>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contenus */}
+        <div className="p-4 sm:p-6">
+          {recupSubTab === 'pending' && (
+            <PendingView
+              items={pendingItems}
+              recupActionLoading={recupActionLoading}
+              handleRecupAction={handleRecupAction}
+              handleRecupUtilAction={handleRecupUtilAction}
+              setSelectedRecupDoc={setSelectedRecupDoc}
+            />
+          )}
+          {recupSubTab === 'declarations' && (
+            <DeclarationsView
+              groupes={declarationsGroupes}
+              recupActionLoading={recupActionLoading}
+              handleRecupAction={handleRecupAction}
+              setSelectedRecupDoc={setSelectedRecupDoc}
+            />
+          )}
+          {recupSubTab === 'utilisations' && (
+            <UtilisationsView
+              groupes={utilisationsGroupes}
+              recupActionLoading={recupActionLoading}
+              handleRecupUtilAction={handleRecupUtilAction}
+            />
+          )}
+          {recupSubTab === 'balances' && (
+            <BalancesView balances={filteredBalances} />
+          )}
+          {recupSubTab === 'place' && (
+            <PlaceRecupForm
+              recupBalances={recupBalances}
+              rhRecupForm={rhRecupForm}
+              setRhRecupForm={setRhRecupForm}
+              rhRecupLoading={rhRecupLoading}
+              setRhRecupLoading={setRhRecupLoading}
+              setRecupBalances={setRecupBalances}
+              fetchData={fetchData}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecupHeroStat({ label, value, icon, highlight }) {
+  const icons = {
+    bell: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />,
+    'trending-up': <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />,
+    calendar: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />,
+    users: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />,
+  };
+  return (
+    <div className={`relative bg-white/15 backdrop-blur-sm rounded-xl p-3 border ${highlight ? 'border-white/40 ring-2 ring-white/30' : 'border-white/20'}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-white/80 text-[11px] uppercase tracking-wider font-medium">{label}</p>
+          <p className="text-2xl font-bold mt-1 tabular-nums">{value}</p>
+        </div>
+        <div className="p-1.5 bg-white/15 rounded-lg">
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {icons[icon]}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentAvatar({ user_id, prenom, nom, size = 'md' }) {
+  const sizes = {
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-10 h-10 text-sm',
+    lg: 'w-12 h-12 text-base'
+  };
+  return (
+    <div className={`flex-shrink-0 ${sizes[size]} bg-gradient-to-br ${avatarColor(user_id)} rounded-full flex items-center justify-center text-white font-bold shadow-sm`}>
+      {getInitials(prenom, nom)}
+    </div>
+  );
+}
+
+function PendingEmptyState() {
+  return (
+    <div className="text-center py-12">
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 mb-3">
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <p className="font-medium text-gray-700">Tout est traité</p>
+      <p className="text-sm text-gray-500 mt-1">Aucune demande en attente.</p>
+    </div>
+  );
+}
+
+function PendingView({ items, recupActionLoading, handleRecupAction, handleRecupUtilAction, setSelectedRecupDoc }) {
+  if (items.length === 0) return <PendingEmptyState />;
+
+  return (
+    <div className="space-y-3">
+      {items.map(item => (
+        <div
+          key={`${item._kind}-${item.id}`}
+          className="group p-4 bg-white rounded-xl ring-1 ring-amber-100 hover:ring-amber-300 hover:shadow-md transition-all"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            {/* Agent */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <AgentAvatar user_id={item.user_id} prenom={item.prenom} nom={item.nom} size="lg" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-gray-800 truncate">{item.prenom} {item.nom}</p>
+                  <span className={`px-2 py-0.5 text-[11px] font-medium rounded-full ${
+                    item._kind === 'acquisition'
+                      ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100'
+                      : 'bg-orange-50 text-orange-700 ring-1 ring-orange-100'
+                  }`}>
+                    {item._kind === 'acquisition' ? 'Déclaration' : 'Utilisation'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 truncate">
+                  {item.service || 'Service non renseigné'}
+                  {item.poste && ` · ${item.poste}`}
+                </p>
+              </div>
+            </div>
+
+            {/* Détails */}
+            <div className="flex items-center gap-4 px-2">
+              <div className="text-center">
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-2xl font-bold text-gray-800 tabular-nums">{item.nombre_heures}</span>
+                  <span className="text-xs text-gray-500">h</span>
+                </div>
+                <p className="text-[11px] text-gray-400 uppercase tracking-wider">heures</p>
+              </div>
+
+              <div className="text-sm">
+                {item._kind === 'acquisition' ? (
+                  <>
+                    <p className="text-gray-700"><span className="text-gray-400">Travail :</span> {item.date_travail_fr}</p>
+                    <p className="text-gray-700">
+                      <span className="text-gray-400">Type :</span>{' '}
+                      <span className={`font-medium ${item.type_compensation === 'remuneration' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                        {item.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération'}
+                      </span>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-700">
+                      <span className="text-gray-400">Du :</span> {item.date_debut_fr}
+                      {item.date_debut_fr !== item.date_fin_fr && ` → ${item.date_fin_fr}`}
+                    </p>
+                    <p className="text-xs text-gray-400">Demande du {item.date_demande_fr}</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 lg:ml-auto">
+              {item._kind === 'acquisition' && (
+                <button
+                  onClick={() => setSelectedRecupDoc(item)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                  title="Voir le document signé"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Document
+                </button>
+              )}
+              <button
+                onClick={() =>
+                  item._kind === 'acquisition'
+                    ? handleRecupAction(item.id, 'refuser')
+                    : handleRecupUtilAction(item.id, 'refuser')
+                }
+                disabled={recupActionLoading === item.id || recupActionLoading === `util-${item.id}`}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 ring-1 ring-rose-200 rounded-lg transition disabled:opacity-50"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Refuser
+              </button>
+              <button
+                onClick={() =>
+                  item._kind === 'acquisition'
+                    ? handleRecupAction(item.id, 'valider')
+                    : handleRecupUtilAction(item.id, 'valider')
+                }
+                disabled={recupActionLoading === item.id || recupActionLoading === `util-${item.id}`}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition disabled:opacity-50"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Valider
+              </button>
+            </div>
+          </div>
+
+          {item.raison && (
+            <div className="mt-3 ml-14 pl-3 border-l-2 border-amber-200 text-sm text-gray-600 italic">
+              {item.raison}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MonthSectionHeader({ label, totalHeures, count }) {
+  return (
+    <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">{label}</h3>
+        <span className="text-xs text-gray-400">·</span>
+        <span className="text-xs text-gray-500">{count} demande{count > 1 ? 's' : ''}</span>
+      </div>
+      <span className="text-xs font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">
+        Total · {totalHeures}h
+      </span>
+    </div>
+  );
+}
+
+function DeclarationsView({ groupes, recupActionLoading, handleRecupAction, setSelectedRecupDoc }) {
+  if (groupes.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 text-gray-400 mb-3">
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+        <p className="font-medium text-gray-700">Aucune déclaration</p>
+        <p className="text-sm text-gray-500 mt-1">Ajustez vos filtres pour voir plus de résultats.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {groupes.map(([key, group]) => (
+        <div key={key}>
+          <MonthSectionHeader label={group.label} totalHeures={group.totalHeures} count={group.items.length} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {group.items.map(req => (
+              <div
+                key={req.id}
+                className={`p-4 bg-white rounded-xl ring-1 transition-all hover:shadow-md ${
+                  req.statut === 'en_attente'
+                    ? 'ring-amber-200 hover:ring-amber-300 bg-amber-50/30'
+                    : 'ring-gray-100 hover:ring-gray-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <AgentAvatar user_id={req.user_id} prenom={req.prenom} nom={req.nom} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 truncate">{req.prenom} {req.nom}</p>
+                        <p className="text-xs text-gray-500 truncate">{req.service || '—'}</p>
+                      </div>
+                      <RecupStatusBadge statut={req.statut} />
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-sm">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {req.nombre_heures}h
+                      </span>
+                      <span className="text-xs text-gray-600">{req.date_travail_fr}</span>
+                      <span className={`px-2 py-0.5 text-[11px] font-medium rounded-full ${
+                        req.type_compensation === 'remuneration'
+                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
+                          : 'bg-blue-50 text-blue-700 ring-1 ring-blue-100'
+                      }`}>
+                        {req.type_compensation === 'remuneration' ? 'Rémunération' : 'Récupération'}
+                      </span>
+                    </div>
+                    {req.raison && (
+                      <p className="text-xs text-gray-600 mt-2 line-clamp-2">{req.raison}</p>
+                    )}
+                    {req.commentaire && (
+                      <p className="text-xs text-gray-500 italic mt-1.5 border-l-2 border-gray-200 pl-2">
+                        {req.commentaire}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => setSelectedRecupDoc(req)}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Voir document
+                  </button>
+                  {req.statut === 'en_attente' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRecupAction(req.id, 'refuser')}
+                        disabled={recupActionLoading === req.id}
+                        className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-md disabled:opacity-50"
+                      >
+                        Refuser
+                      </button>
+                      <button
+                        onClick={() => handleRecupAction(req.id, 'valider')}
+                        disabled={recupActionLoading === req.id}
+                        className="px-2.5 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md disabled:opacity-50"
+                      >
+                        Valider
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function UtilisationsView({ groupes, recupActionLoading, handleRecupUtilAction }) {
+  if (groupes.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 text-gray-400 mb-3">
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <p className="font-medium text-gray-700">Aucune utilisation</p>
+        <p className="text-sm text-gray-500 mt-1">Ajustez vos filtres pour voir plus de résultats.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {groupes.map(([key, group]) => (
+        <div key={key}>
+          <MonthSectionHeader label={group.label} totalHeures={group.totalHeures} count={group.items.length} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {group.items.map(req => (
+              <div
+                key={req.id}
+                className={`p-4 bg-white rounded-xl ring-1 transition-all hover:shadow-md ${
+                  req.statut === 'en_attente'
+                    ? 'ring-amber-200 hover:ring-amber-300 bg-amber-50/30'
+                    : 'ring-gray-100 hover:ring-gray-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <AgentAvatar user_id={req.user_id} prenom={req.prenom} nom={req.nom} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 truncate">{req.prenom} {req.nom}</p>
+                        <p className="text-xs text-gray-500 truncate">{req.service || '—'}</p>
+                      </div>
+                      <RecupStatusBadge statut={req.statut} />
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-sm">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-orange-50 text-orange-700 rounded-lg font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {req.nombre_heures}h
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        {req.date_debut_fr}
+                        {req.date_debut_fr !== req.date_fin_fr && ` → ${req.date_fin_fr}`}
+                      </span>
+                    </div>
+                    {req.raison && (
+                      <p className="text-xs text-gray-600 mt-2 line-clamp-2">{req.raison}</p>
+                    )}
+                    {req.commentaire && (
+                      <p className="text-xs text-gray-500 italic mt-1.5 border-l-2 border-gray-200 pl-2">
+                        {req.commentaire}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {req.statut === 'en_attente' && (
+                  <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => handleRecupUtilAction(req.id, 'refuser')}
+                      disabled={recupActionLoading === `util-${req.id}`}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-md disabled:opacity-50"
+                    >
+                      Refuser
+                    </button>
+                    <button
+                      onClick={() => handleRecupUtilAction(req.id, 'valider')}
+                      disabled={recupActionLoading === `util-${req.id}`}
+                      className="px-2.5 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md disabled:opacity-50"
+                    >
+                      Valider
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BalancesView({ balances }) {
+  if (balances.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="font-medium text-gray-700">Aucun agent trouvé</p>
+        <p className="text-sm text-gray-500 mt-1">Ajustez votre recherche.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {balances.map(b => {
+        const pct = b.heures_acquises > 0
+          ? Math.min(100, Math.round((b.heures_utilisees / b.heures_acquises) * 100))
+          : 0;
+        return (
+          <div
+            key={b.id}
+            className="p-4 bg-white rounded-xl ring-1 ring-gray-100 hover:ring-orange-200 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <AgentAvatar user_id={b.id} prenom={b.prenom} nom={b.nom} />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-800 truncate">{b.prenom} {b.nom}</p>
+                <p className="text-xs text-gray-500 truncate">{b.service || '—'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-gray-500">Disponible</span>
+                <span className="text-2xl font-bold text-orange-700 tabular-nums">{b.heures_disponibles}h</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all"
+                  style={{ width: `${pct}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-500 pt-1">
+                <span>Acquises : <strong className="text-gray-700">{b.heures_acquises}h</strong></span>
+                <span>Utilisées : <strong className="text-gray-700">{b.heures_utilisees}h</strong></span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlaceRecupForm({ recupBalances, rhRecupForm, setRhRecupForm, rhRecupLoading, setRhRecupLoading, setRecupBalances, fetchData }) {
+  const selectedBalance = recupBalances.find(b => String(b.id) === String(rhRecupForm.user_id));
+  const dispo = selectedBalance ? selectedBalance.heures_disponibles : null;
+  const heuresVal = parseFloat(rhRecupForm.nombre_heures);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!rhRecupForm.user_id || !rhRecupForm.date_debut || !rhRecupForm.date_fin || !rhRecupForm.nombre_heures) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+    if (new Date(rhRecupForm.date_debut) > new Date(rhRecupForm.date_fin)) {
+      toast.error('La date de début doit être avant la date de fin');
+      return;
+    }
+    if (isNaN(heuresVal) || heuresVal <= 0) {
+      toast.error('Le nombre d\'heures doit être positif');
+      return;
+    }
+    setRhRecupLoading(true);
+    try {
+      const response = await fetch('/api/recuperation/utilisation/rh-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rhRecupForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      toast.success('Récupération placée et validée');
+      setRhRecupForm({ user_id: '', date_debut: '', date_fin: '', nombre_heures: '', raison: '' });
+      const balRes = await fetch('/api/recuperation/all-balances').then(r => r.json());
+      setRecupBalances(balRes.balances || []);
+      if (fetchData) fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRhRecupLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-gradient-to-br from-orange-50 to-rose-50 border border-orange-100 rounded-xl p-4 mb-6 flex items-start gap-3">
+        <div className="p-2 bg-orange-600 text-white rounded-lg flex-shrink-0">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div className="text-sm">
+          <p className="font-semibold text-orange-900">Placer une récupération directement validée</p>
+          <p className="text-orange-700 text-xs mt-0.5">
+            Aucune contrainte de délai : la date peut être dans le passé, le présent ou le futur.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Agent *</label>
+          <select
+            value={rhRecupForm.user_id}
+            onChange={(e) => setRhRecupForm({ ...rhRecupForm, user_id: e.target.value })}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+            required
+          >
+            <option value="">Sélectionner un agent</option>
+            {recupBalances.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.prenom} {b.nom} {b.service ? `(${b.service})` : ''} — {b.heures_disponibles}h disponibles
+              </option>
+            ))}
+          </select>
+
+          {selectedBalance && (
+            <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3 mb-2">
+                <AgentAvatar user_id={selectedBalance.id} prenom={selectedBalance.prenom} nom={selectedBalance.nom} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {selectedBalance.prenom} {selectedBalance.nom}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{selectedBalance.service || '—'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 bg-blue-50 rounded-md">
+                  <p className="text-[10px] text-blue-700 uppercase tracking-wider font-medium">Acquises</p>
+                  <p className="text-sm font-bold text-blue-700">{selectedBalance.heures_acquises}h</p>
+                </div>
+                <div className="p-2 bg-amber-50 rounded-md">
+                  <p className="text-[10px] text-amber-700 uppercase tracking-wider font-medium">Utilisées</p>
+                  <p className="text-sm font-bold text-amber-700">{selectedBalance.heures_utilisees}h</p>
+                </div>
+                <div className="p-2 bg-emerald-50 rounded-md">
+                  <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-medium">Dispo.</p>
+                  <p className="text-sm font-bold text-emerald-700">{selectedBalance.heures_disponibles}h</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début *</label>
+            <input
+              type="date"
+              value={rhRecupForm.date_debut}
+              onChange={(e) => setRhRecupForm({ ...rhRecupForm, date_debut: e.target.value })}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de fin *</label>
+            <input
+              type="date"
+              value={rhRecupForm.date_fin}
+              onChange={(e) => setRhRecupForm({ ...rhRecupForm, date_fin: e.target.value })}
+              min={rhRecupForm.date_debut}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre d'heures *</label>
+          <input
+            type="number"
+            step="0.5"
+            min="0.5"
+            value={rhRecupForm.nombre_heures}
+            onChange={(e) => setRhRecupForm({ ...rhRecupForm, nombre_heures: e.target.value })}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            placeholder="Ex : 3.5"
+            required
+          />
+          {dispo !== null && heuresVal > 0 && heuresVal > dispo && (
+            <p className="text-xs text-rose-600 mt-1.5 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Dépasse le solde disponible ({dispo}h)
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Motif (optionnel)</label>
+          <textarea
+            value={rhRecupForm.raison}
+            onChange={(e) => setRhRecupForm({ ...rhRecupForm, raison: e.target.value })}
+            rows={3}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            placeholder="Motif de la récupération..."
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={rhRecupLoading}
+          className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-rose-600 hover:from-orange-700 hover:to-rose-700 text-white py-3 rounded-xl font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          {rhRecupLoading ? (
+            'Enregistrement…'
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Placer et valider la récupération
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 }
