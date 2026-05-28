@@ -35,8 +35,19 @@ export default function RecuperationPage() {
   const [demandesUtil, setDemandesUtil] = useState([]);
   const [heuresUtilisees, setHeuresUtilisees] = useState(0);
 
+  // États pour la parentalité (maternité / paternité / adoption)
+  const [demandesParentalite, setDemandesParentalite] = useState([]);
+  const [showParentaliteForm, setShowParentaliteForm] = useState(false);
+  const [parentaliteData, setParentaliteData] = useState({
+    type: 'maternite',
+    date_debut: '',
+    date_fin: '',
+    motif: '',
+    document_data: ''
+  });
+
   // Nouveaux states UI
-  const [activeTab, setActiveTab] = useState('acquises'); // 'acquises' | 'utilisation'
+  const [activeTab, setActiveTab] = useState('acquises'); // 'acquises' | 'utilisation' | 'parentalite'
   const [filterStatut, setFilterStatut] = useState('toutes'); // toutes | en_attente | validee | refusee
   const [sortOrder, setSortOrder] = useState('desc'); // desc | asc
 
@@ -55,21 +66,65 @@ export default function RecuperationPage() {
 
   const fetchData = async () => {
     try {
-      const [recupRes, profileRes, utilRes] = await Promise.all([
+      const [recupRes, profileRes, utilRes, parentaliteRes] = await Promise.all([
         fetch('/api/recuperation').then(r => r.json()),
         fetch('/api/users/profile').then(r => r.json()),
-        fetch('/api/recuperation/utilisation').then(r => r.json())
+        fetch('/api/recuperation/utilisation').then(r => r.json()),
+        fetch('/api/parentalite').then(r => r.json())
       ]);
       setDemandes(recupRes.demandes || []);
       setHeuresAcquises(recupRes.heures_acquises || 0);
       setProfile(profileRes.user || null);
       setDemandesUtil(utilRes.demandes || []);
       setHeuresUtilisees(utilRes.heures_utilisees || 0);
+      setDemandesParentalite(parentaliteRes.demandes || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erreur lors du chargement des données');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitParentalite = async () => {
+    if (!parentaliteData.type || !parentaliteData.date_debut || !parentaliteData.date_fin) {
+      toast.error('Veuillez remplir le type et les dates');
+      return;
+    }
+    if (new Date(parentaliteData.date_fin) < new Date(parentaliteData.date_debut)) {
+      toast.error('La date de fin doit être après la date de début');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/parentalite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parentaliteData)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast.success('Demande envoyée à la RH');
+      setShowParentaliteForm(false);
+      setParentaliteData({ type: 'maternite', date_debut: '', date_fin: '', motif: '', document_data: '' });
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelParentalite = async (id) => {
+    if (!confirm('Annuler cette demande ?')) return;
+    try {
+      const res = await fetch(`/api/parentalite/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast.success('Demande annulée');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -456,6 +511,18 @@ export default function RecuperationPage() {
               >
                 Mon utilisation
               </TabButton>
+              <TabButton
+                active={activeTab === 'parentalite'}
+                onClick={() => setActiveTab('parentalite')}
+                icon={
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                }
+                count={demandesParentalite.length}
+              >
+                Parentalité
+              </TabButton>
             </nav>
           </div>
 
@@ -516,8 +583,28 @@ export default function RecuperationPage() {
             {activeTab === 'utilisation' && (
               <DemandesUtilisation groupes={utilisationsGroupees} />
             )}
+            {activeTab === 'parentalite' && (
+              <DemandesParentalite
+                demandes={demandesParentalite}
+                filterStatut={filterStatut}
+                sortOrder={sortOrder}
+                onNewRequest={() => setShowParentaliteForm(true)}
+                onCancel={handleCancelParentalite}
+              />
+            )}
           </div>
         </div>
+
+        {/* ===== Formulaire parentalité ===== */}
+        {showParentaliteForm && (
+          <ParentaliteForm
+            data={parentaliteData}
+            setData={setParentaliteData}
+            submitting={submitting}
+            onSubmit={handleSubmitParentalite}
+            onClose={() => setShowParentaliteForm(false)}
+          />
+        )}
       </div>
 
       {/* Modal de visualisation du document */}
@@ -1472,6 +1559,287 @@ function DocumentModal({ demande, profile, onClose }) {
               <strong>Commentaire :</strong> {demande.commentaire}
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Parentalité (maternité / paternité / adoption)
+// =============================================================
+
+const PARENTALITE_TYPES = {
+  maternite: {
+    label: 'Congé maternité',
+    duree: '16 semaines (modulable selon le rang)',
+    badge: 'bg-pink-100 text-pink-700',
+    btnActive: 'border-pink-500 bg-pink-50 text-pink-700',
+  },
+  paternite: {
+    label: 'Congé paternité',
+    duree: '25 jours calendaires (+ 7 si naissances multiples)',
+    badge: 'bg-sky-100 text-sky-700',
+    btnActive: 'border-sky-500 bg-sky-50 text-sky-700',
+  },
+  adoption: {
+    label: 'Congé adoption',
+    duree: '16 semaines (selon situation familiale)',
+    badge: 'bg-violet-100 text-violet-700',
+    btnActive: 'border-violet-500 bg-violet-50 text-violet-700',
+  },
+};
+
+function DemandesParentalite({ demandes, filterStatut, sortOrder, onNewRequest, onCancel }) {
+  const filtered = demandes
+    .filter(d => filterStatut === 'toutes' ? true : d.statut === filterStatut)
+    .sort((a, b) => {
+      const da = new Date(a.date_debut).getTime();
+      const db = new Date(b.date_debut).getTime();
+      return sortOrder === 'desc' ? db - da : da - db;
+    });
+
+  return (
+    <div>
+      <div className="mb-5 flex items-start justify-between gap-3 bg-gradient-to-r from-pink-50 to-violet-50 border border-pink-100 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-pink-600 rounded-lg text-white flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800">Congé maternité, paternité ou adoption</p>
+            <p className="text-xs text-gray-600 mt-1">
+              Faites votre demande à la RH avec les dates prévues. Vous pouvez joindre un justificatif (certificat médical, acte de naissance…) maintenant ou plus tard.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onNewRequest}
+          className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Nouvelle demande
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          <p className="text-sm">Aucune demande de parentalité</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(d => {
+            const meta = PARENTALITE_TYPES[d.type] || PARENTALITE_TYPES.maternite;
+            const statutColor =
+              d.statut === 'validee' ? 'bg-emerald-100 text-emerald-700' :
+              d.statut === 'refusee' ? 'bg-rose-100 text-rose-700' :
+              d.statut === 'annulee' ? 'bg-gray-100 text-gray-600' :
+              'bg-amber-100 text-amber-700';
+            const statutLabel =
+              d.statut === 'validee' ? 'Validée' :
+              d.statut === 'refusee' ? 'Refusée' :
+              d.statut === 'annulee' ? 'Annulée' :
+              'En attente';
+            return (
+              <div key={d.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${meta.badge}`}>
+                        {meta.label}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statutColor}`}>
+                        {statutLabel}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-900 font-medium">
+                      Du {d.date_debut_fr} au {d.date_fin_fr}
+                      <span className="text-gray-500 font-normal"> · {d.nombre_jours} jour(s)</span>
+                    </p>
+                    {d.motif && (
+                      <p className="text-xs text-gray-600 mt-1 italic">« {d.motif} »</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Demande déposée le {d.date_demande_fr}
+                      {d.date_validation_fr && ` · Traitée le ${d.date_validation_fr}`}
+                      {d.validateur_prenom && ` par ${d.validateur_prenom} ${d.validateur_nom}`}
+                    </p>
+                    {d.commentaire_rh && (
+                      <p className="mt-2 text-xs italic text-gray-600 bg-gray-50 p-2 rounded">
+                        <strong>RH :</strong> {d.commentaire_rh}
+                      </p>
+                    )}
+                  </div>
+                  {d.statut === 'en_attente' && (
+                    <button
+                      onClick={() => onCancel(d.id)}
+                      className="px-3 py-1.5 text-xs font-medium text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition"
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParentaliteForm({ data, setData, submitting, onSubmit, onClose }) {
+  const meta = PARENTALITE_TYPES[data.type] || PARENTALITE_TYPES.maternite;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setData({ ...data, document_data: '' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Le fichier ne doit pas dépasser 5 Mo');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setData({ ...data, document_data: ev.target.result });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const nombreJours = data.date_debut && data.date_fin
+    ? Math.max(0, Math.round((new Date(data.date_fin) - new Date(data.date_debut)) / 86400000) + 1)
+    : 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-pink-50 to-violet-50 px-6 py-4 border-b border-pink-100 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-pink-600 rounded-lg text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-800">Demande de congé parental</h2>
+                <p className="text-xs text-gray-500">La RH validera votre demande directement</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1.5 hover:bg-white rounded-lg text-gray-500 hover:text-gray-700 transition">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Type de congé *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {Object.entries(PARENTALITE_TYPES).map(([key, t]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setData({ ...data, type: key })}
+                  className={`px-4 py-3 rounded-xl border-2 text-sm font-semibold transition ${
+                    data.type === key
+                      ? t.btnActive
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {t.label.replace('Congé ', '')}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Durée légale indicative : <strong>{meta.duree}</strong>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début *</label>
+              <input
+                type="date"
+                value={data.date_debut}
+                onChange={(e) => setData({ ...data, date_debut: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de fin *</label>
+              <input
+                type="date"
+                value={data.date_fin}
+                onChange={(e) => setData({ ...data, date_fin: e.target.value })}
+                min={data.date_debut || undefined}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition"
+              />
+            </div>
+          </div>
+
+          {nombreJours > 0 && (
+            <div className="bg-pink-50 border-l-4 border-pink-500 p-3 rounded text-sm text-pink-800">
+              Durée du congé : <strong>{nombreJours} jour(s) calendaires</strong>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Motif / précisions (optionnel)</label>
+            <textarea
+              value={data.motif}
+              onChange={(e) => setData({ ...data, motif: e.target.value })}
+              rows={3}
+              placeholder="Date prévisionnelle d'accouchement, rang de l'enfant, naissances multiples…"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Justificatif (optionnel)
+            </label>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Certificat médical, acte de naissance, attestation… (PDF ou image, max 5 Mo). Peut être fourni plus tard.
+            </p>
+            {data.document_data && (
+              <p className="text-xs text-emerald-600 mt-1 font-medium">✓ Document joint</p>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition font-semibold disabled:opacity-50"
+            >
+              {submitting ? 'Envoi…' : 'Envoyer à la RH'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

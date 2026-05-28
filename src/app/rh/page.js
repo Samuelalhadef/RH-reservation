@@ -62,6 +62,10 @@ export default function RHPage() {
   const [recupActionLoading, setRecupActionLoading] = useState(null);
   const [selectedRecupDoc, setSelectedRecupDoc] = useState(null);
   const [recupBalances, setRecupBalances] = useState([]);
+  const [parentaliteRequests, setParentaliteRequests] = useState([]);
+  const [parentaliteActionLoading, setParentaliteActionLoading] = useState(null);
+  const [parentaliteForceModal, setParentaliteForceModal] = useState(null); // { demande, action }
+  const [parentaliteForceComment, setParentaliteForceComment] = useState('');
   const [rhRecupForm, setRhRecupForm] = useState({
     user_id: '',
     date_debut: '',
@@ -88,14 +92,16 @@ export default function RHPage() {
   }, [activeTab, isAuthenticated, isRH, router]);
 
   const fetchData = async () => {
-    // Toujours charger le nombre de demandes CET et récup pour les badges
+    // Toujours charger le nombre de demandes CET, récup et parentalité pour les badges
     try {
-      const [cetRes, recupRes] = await Promise.all([
+      const [cetRes, recupRes, parentaliteRes] = await Promise.all([
         fetch('/api/cet/requests').then(r => r.json()),
-        fetch('/api/recuperation/all').then(r => r.json())
+        fetch('/api/recuperation/all').then(r => r.json()),
+        fetch('/api/parentalite/all').then(r => r.json())
       ]);
       setCetRequests(cetRes.demandes || []);
       setRecupRequests(recupRes.demandes || []);
+      setParentaliteRequests(parentaliteRes.demandes || []);
     } catch (e) { /* ignore */ }
 
     if (activeTab === 'stats') {
@@ -136,6 +142,10 @@ export default function RHPage() {
         const response = await fetch('/api/cet/all-balances');
         const data = await response.json();
         setCetBalances(data.balances || []);
+      } else if (activeTab === 'parentalite') {
+        const response = await fetch('/api/parentalite/all');
+        const data = await response.json();
+        setParentaliteRequests(data.demandes || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -530,6 +540,10 @@ export default function RHPage() {
             <MainTab active={activeTab === 'recup-requests'} onClick={() => setActiveTab('recup-requests')} color="orange" count={recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Récupération
+            </MainTab>
+            <MainTab active={activeTab === 'parentalite'} onClick={() => setActiveTab('parentalite')} color="pink" count={parentaliteRequests.filter(r => r.statut === 'en_attente').length}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+              Parentalité
             </MainTab>
             <MainTab active={activeTab === 'create-leave'} onClick={() => setActiveTab('create-leave')} color="emerald">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -1264,6 +1278,15 @@ export default function RHPage() {
         {/* Modal document récupération */}
         {selectedRecupDoc && (
           <RecupDocumentModal demande={selectedRecupDoc} onClose={() => setSelectedRecupDoc(null)} />
+        )}
+
+        {activeTab === 'parentalite' && (
+          <ParentaliteRHSection
+            demandes={parentaliteRequests}
+            actionLoading={parentaliteActionLoading}
+            setActionLoading={setParentaliteActionLoading}
+            onRefresh={fetchData}
+          />
         )}
 
         {activeTab === 'create-leave' && (
@@ -2480,6 +2503,7 @@ function MainTab({ active, onClick, children, count, color = 'blue' }) {
     amber: { activeBg: 'bg-amber-50', activeText: 'text-amber-700', activeRing: 'ring-amber-100', activeBadge: 'bg-amber-100 text-amber-700' },
     orange: { activeBg: 'bg-orange-50', activeText: 'text-orange-700', activeRing: 'ring-orange-100', activeBadge: 'bg-orange-100 text-orange-700' },
     emerald: { activeBg: 'bg-emerald-50', activeText: 'text-emerald-700', activeRing: 'ring-emerald-100', activeBadge: 'bg-emerald-100 text-emerald-700' },
+    pink: { activeBg: 'bg-pink-50', activeText: 'text-pink-700', activeRing: 'ring-pink-100', activeBadge: 'bg-pink-100 text-pink-700' },
   };
   const c = colorMap[color] || colorMap.blue;
   return (
@@ -3606,6 +3630,266 @@ function RecupDocumentModal({ demande, onClose }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Section RH : gestion des demandes de parentalité
+// =============================================================
+
+const PARENTALITE_LABELS = {
+  maternite: { label: 'Maternité', badge: 'bg-pink-100 text-pink-700' },
+  paternite: { label: 'Paternité', badge: 'bg-sky-100 text-sky-700' },
+  adoption:  { label: 'Adoption',  badge: 'bg-violet-100 text-violet-700' },
+};
+
+function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRefresh }) {
+  const [filter, setFilter] = useState('en_attente'); // en_attente | validee | refusee | toutes
+  const [search, setSearch] = useState('');
+  const [commentModal, setCommentModal] = useState(null); // { demande, action }
+  const [comment, setComment] = useState('');
+  const [docModal, setDocModal] = useState(null); // demande
+
+  const filtered = demandes.filter(d => {
+    if (filter !== 'toutes' && d.statut !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const name = `${d.prenom || ''} ${d.nom || ''}`.toLowerCase();
+      if (!name.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const enAttenteCount = demandes.filter(d => d.statut === 'en_attente').length;
+  const valideesCount  = demandes.filter(d => d.statut === 'validee').length;
+  const refuseesCount  = demandes.filter(d => d.statut === 'refusee').length;
+
+  const handleAction = async (id, action, commentaire = '') => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/parentalite/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, commentaire })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast.success(action === 'valider' ? 'Demande validée' : 'Demande refusée');
+      setCommentModal(null);
+      setComment('');
+      onRefresh();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* HERO */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-violet-500 text-white shadow-xl">
+        <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-pink-300/20 rounded-full blur-3xl"></div>
+        <div className="relative p-6 sm:p-8">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              Congés légaux
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Parentalité</h1>
+          <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+            Validez les demandes de congés maternité, paternité ou adoption.
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+            <RecupHeroStat label="En attente" value={enAttenteCount} icon="bell" />
+            <RecupHeroStat label="Validées" value={valideesCount} icon="trending-up" />
+            <RecupHeroStat label="Refusées" value={refuseesCount} icon="calendar" />
+            <RecupHeroStat label="Total" value={demandes.length} icon="users" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Rechercher un agent…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm"
+          />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm bg-white"
+          >
+            <option value="en_attente">En attente</option>
+            <option value="validee">Validées</option>
+            <option value="refusee">Refusées</option>
+            <option value="toutes">Toutes</option>
+          </select>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p className="text-sm">Aucune demande</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map(d => {
+              const meta = PARENTALITE_LABELS[d.type] || PARENTALITE_LABELS.maternite;
+              const statutBadge =
+                d.statut === 'validee' ? 'bg-emerald-100 text-emerald-700' :
+                d.statut === 'refusee' ? 'bg-rose-100 text-rose-700' :
+                d.statut === 'annulee' ? 'bg-gray-100 text-gray-600' :
+                'bg-amber-100 text-amber-700';
+              const statutLabel =
+                d.statut === 'validee' ? 'Validée' :
+                d.statut === 'refusee' ? 'Refusée' :
+                d.statut === 'annulee' ? 'Annulée' :
+                'En attente';
+
+              return (
+                <div key={d.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">{d.prenom} {d.nom}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${meta.badge}`}>
+                          {meta.label}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statutBadge}`}>
+                          {statutLabel}
+                        </span>
+                        {d.service && (
+                          <span className="text-xs text-gray-500">· {d.service}</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700">
+                        Du <strong>{d.date_debut_fr}</strong> au <strong>{d.date_fin_fr}</strong>
+                        <span className="text-gray-500"> · {d.nombre_jours} jour(s) calendaires</span>
+                      </p>
+                      {d.motif && (
+                        <p className="text-xs text-gray-600 mt-1 italic">« {d.motif} »</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        Demande déposée le {d.date_demande_fr}
+                        {d.date_validation_fr && ` · Traitée le ${d.date_validation_fr}`}
+                        {d.validateur_prenom && ` par ${d.validateur_prenom} ${d.validateur_nom}`}
+                      </p>
+                      {d.commentaire_rh && (
+                        <p className="mt-2 text-xs italic text-gray-600 bg-gray-50 p-2 rounded">
+                          <strong>Commentaire RH :</strong> {d.commentaire_rh}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {d.document_data && (
+                        <button
+                          onClick={() => setDocModal(d)}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                        >
+                          Voir justificatif
+                        </button>
+                      )}
+                      {d.statut === 'en_attente' && (
+                        <>
+                          <button
+                            onClick={() => { setCommentModal({ demande: d, action: 'valider' }); setComment(''); }}
+                            disabled={actionLoading === d.id}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
+                          >
+                            Valider
+                          </button>
+                          <button
+                            onClick={() => { setCommentModal({ demande: d, action: 'refuser' }); setComment(''); }}
+                            disabled={actionLoading === d.id}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition disabled:opacity-50"
+                          >
+                            Refuser
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal commentaire validation / refus */}
+      {commentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              {commentModal.action === 'valider' ? 'Valider la demande' : 'Refuser la demande'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {commentModal.demande.prenom} {commentModal.demande.nom} ·{' '}
+              {PARENTALITE_LABELS[commentModal.demande.type]?.label}
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Commentaire {commentModal.action === 'refuser' ? '(recommandé)' : '(optionnel)'}
+            </label>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm resize-none"
+              placeholder="Précisions à l'attention de l'agent…"
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => { setCommentModal(null); setComment(''); }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleAction(commentModal.demande.id, commentModal.action, comment)}
+                disabled={actionLoading === commentModal.demande.id}
+                className={`flex-1 px-4 py-2 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50 ${
+                  commentModal.action === 'valider' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {commentModal.action === 'valider' ? 'Confirmer la validation' : 'Confirmer le refus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal justificatif */}
+      {docModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setDocModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">
+                Justificatif — {docModal.prenom} {docModal.nom}
+              </h3>
+              <button onClick={() => setDocModal(null)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-auto max-h-[75vh] flex justify-center bg-gray-50">
+              {docModal.document_data?.startsWith('data:application/pdf') ? (
+                <iframe src={docModal.document_data} className="w-full h-[70vh]" title="Justificatif" />
+              ) : (
+                <img src={docModal.document_data} alt="Justificatif" className="max-w-full max-h-[70vh] object-contain" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

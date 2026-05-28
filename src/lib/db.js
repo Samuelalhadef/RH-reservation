@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 8; // Incrémenter pour forcer re-migration
+let _migrationVersion = 9; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -259,6 +259,29 @@ async function runMigrations() {
     `);
   } catch (e) { /* table already exists */ }
 
+  // Create demandes_parentalite table if not exists (congés maternité / paternité)
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS demandes_parentalite (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption')),
+        date_debut DATE NOT NULL,
+        date_fin DATE NOT NULL,
+        nombre_jours INTEGER,
+        motif TEXT,
+        document_data TEXT,
+        statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee', 'annulee')),
+        date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date_validation DATETIME,
+        validateur_id INTEGER,
+        commentaire_rh TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (validateur_id) REFERENCES users(id)
+      )
+    `);
+  } catch (e) { /* table already exists */ }
+
   // Performance indexes
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_demandes_user_id ON demandes_conges(user_id)',
@@ -273,6 +296,8 @@ async function runMigrations() {
     'CREATE INDEX IF NOT EXISTS idx_demandes_recup_user ON demandes_recuperation(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_demandes_recup_statut ON demandes_recuperation(statut)',
     'CREATE INDEX IF NOT EXISTS idx_soldes_recup_user ON soldes_recuperation(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_parentalite_user ON demandes_parentalite(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_demandes_parentalite_statut ON demandes_parentalite(statut)',
   ];
   for (const idx of indexes) {
     try { await client.execute(idx); } catch (e) { /* ignore */ }
@@ -467,6 +492,27 @@ export const initDatabase = async () => {
         heures_acquises REAL DEFAULT 0,
         date_maj DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Table demandes_parentalite (congés maternité / paternité / adoption)
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS demandes_parentalite (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption')),
+        date_debut DATE NOT NULL,
+        date_fin DATE NOT NULL,
+        nombre_jours INTEGER,
+        motif TEXT,
+        document_data TEXT,
+        statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee', 'annulee')),
+        date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+        date_validation DATETIME,
+        validateur_id INTEGER,
+        commentaire_rh TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (validateur_id) REFERENCES users(id)
       )
     `);
 
