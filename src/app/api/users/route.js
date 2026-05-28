@@ -39,6 +39,11 @@ export async function POST(request) {
       );
     }
 
+    // Mi-temps : forcer la quotité à 50%
+    if (type_contrat === 'Mi-temps') {
+      quotite_travail = 50;
+    }
+
     if (email) {
       console.log('Checking existing user with email:', email);
       const existingUser = await db.execute({

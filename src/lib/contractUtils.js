@@ -107,7 +107,7 @@ export function calculateCDDTotalLeaveBalance(dateDebut, dateFin) {
 /**
  * Calcule le nombre total de jours acquis selon le type de contrat et la quotité de travail
  *
- * @param {string} typeContrat - 'CDI' ou 'CDD'
+ * @param {string} typeContrat - 'CDI', 'CDD' ou 'Mi-temps'
  * @param {string} dateDebut - Date de début du contrat CDD
  * @param {string} dateFin - Date de fin du contrat CDD
  * @param {number} annee - Année de référence
@@ -119,12 +119,18 @@ export function calculateLeaveBalance(typeContrat, dateDebut, dateFin, annee, qu
   if (typeContrat === 'CDD') {
     joursBase = calculateCDDLeaveBalance(dateDebut, dateFin, annee);
   } else {
-    // Pour les CDI, 25 jours par an
+    // Pour les CDI et Mi-temps, 25 jours par an (proratisés ensuite par la quotité)
     joursBase = 25;
   }
 
+  // Mi-temps : forcer la quotité à 50% si non précisée ou supérieure
+  let quotiteEffective = quotiteTravail || 100;
+  if (typeContrat === 'Mi-temps') {
+    quotiteEffective = 50;
+  }
+
   // Proratiser selon la quotité de travail
-  const quotite = Math.max(0, Math.min(100, quotiteTravail || 100));
+  const quotite = Math.max(0, Math.min(100, quotiteEffective));
   const joursAcquis = joursBase * (quotite / 100);
   return Math.round(joursAcquis * 100) / 100;
 }

@@ -14,7 +14,7 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    const { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = await request.json();
+    let { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = await request.json();
 
     if (!nom || !prenom || !email || !type_utilisateur) {
       return NextResponse.json(
@@ -29,6 +29,11 @@ export async function PUT(request, { params }) {
         { success: false, message: 'Les dates de début et fin sont requises pour un CDD' },
         { status: 400 }
       );
+    }
+
+    // Mi-temps : forcer la quotité à 50%
+    if (type_contrat === 'Mi-temps') {
+      quotite_travail = 50;
     }
 
     const existing = await db.execute({

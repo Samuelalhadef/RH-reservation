@@ -867,10 +867,11 @@ export default function RHPage() {
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
                   <RecupHeroStat label="Agents au total" value={users?.length || 0} icon="users" />
                   <RecupHeroStat label="CDI" value={users?.filter(u => (u.type_contrat || 'CDI') === 'CDI').length || 0} icon="calendar" />
                   <RecupHeroStat label="CDD" value={users?.filter(u => u.type_contrat === 'CDD').length || 0} icon="calendar" />
+                  <RecupHeroStat label="Mi-temps" value={users?.filter(u => u.type_contrat === 'Mi-temps').length || 0} icon="calendar" />
                   <RecupHeroStat label="Responsables" value={users?.filter(u => Number(u.niveau_validation) > 0).length || 0} icon="trending-up" />
                 </div>
               </div>
@@ -913,13 +914,22 @@ export default function RHPage() {
                         <td className="px-4 py-3 text-sm">{user.type_utilisateur}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                            user.type_contrat === 'CDD' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
+                            user.type_contrat === 'CDD'
+                              ? 'bg-orange-100 text-orange-800'
+                              : user.type_contrat === 'Mi-temps'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-green-100 text-green-800'
                           }`}>
                             {user.type_contrat || 'CDI'}
                           </span>
                           {user.type_contrat === 'CDD' && user.date_fin_contrat && (
                             <div className="text-xs text-gray-500 mt-1">
                               Fin: {new Date(user.date_fin_contrat).toLocaleDateString('fr-FR')}
+                            </div>
+                          )}
+                          {user.type_contrat === 'Mi-temps' && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              50% (12,5 j/an)
                             </div>
                           )}
                         </td>
@@ -1690,12 +1700,25 @@ export default function RHPage() {
                 </label>
                 <select
                   value={newUser.type_contrat}
-                  onChange={(e) => setNewUser({ ...newUser, type_contrat: e.target.value })}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setNewUser({
+                      ...newUser,
+                      type_contrat: newType,
+                      quotite_travail: newType === 'Mi-temps' ? 50 : newUser.quotite_travail,
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="CDI">CDI</option>
                   <option value="CDD">CDD</option>
+                  <option value="Mi-temps">Mi-temps (50%)</option>
                 </select>
+                {newUser.type_contrat === 'Mi-temps' && (
+                  <p className="text-xs text-purple-600 mt-1">
+                    Quotité de travail automatiquement fixée à 50% (12,5 jours/an)
+                  </p>
+                )}
               </div>
 
               {newUser.type_contrat === 'CDD' && (
@@ -1987,12 +2010,25 @@ export default function RHPage() {
                 </label>
                 <select
                   value={editingUser.type_contrat || 'CDI'}
-                  onChange={(e) => setEditingUser({ ...editingUser, type_contrat: e.target.value })}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setEditingUser({
+                      ...editingUser,
+                      type_contrat: newType,
+                      quotite_travail: newType === 'Mi-temps' ? 50 : (editingUser.quotite_travail || 100),
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="CDI">CDI</option>
                   <option value="CDD">CDD</option>
+                  <option value="Mi-temps">Mi-temps (50%)</option>
                 </select>
+                {editingUser.type_contrat === 'Mi-temps' && (
+                  <p className="text-xs text-purple-600 mt-1">
+                    Quotité de travail automatiquement fixée à 50% (12,5 jours/an)
+                  </p>
+                )}
               </div>
 
               {editingUser.type_contrat === 'CDD' && (
