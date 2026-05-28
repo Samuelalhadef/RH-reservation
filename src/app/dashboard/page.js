@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 
 const LeaveCalendar = dynamic(() => import('@/components/LeaveCalendar'), {
@@ -69,8 +68,6 @@ export default function DashboardPage() {
     );
   }
 
-  const upcomingLeaves = (myLeaves || []).filter(l => new Date(l.date_debut) >= new Date());
-  const validatedCount = (myLeaves || []).filter(l => l.statut === 'validee').length;
   const pendingCount = (myLeaves || []).filter(l => l.statut === 'en_attente').length;
 
   return (
@@ -130,77 +127,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Panneau latéral gauche */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-b from-blue-50/50 to-transparent">
-                <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  Mon solde
-                </h2>
-              </div>
-              <div className="p-5 space-y-2.5">
-                <div className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-                  <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-                  <p className="relative text-xs uppercase tracking-wider text-white/80 mb-1">Jours restants</p>
-                  <p className="relative text-3xl font-bold">{profile?.jours_restants || 25}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <SoldeMini label="Pris" value={profile?.jours_pris || 0} color="gray" />
-                  <SoldeMini label="Reportés" value={profile?.jours_reportes || 0} color="amber" />
-                  <SoldeMini label="Fract." value={profile?.jours_fractionnement || 0} color="emerald" />
-                  <SoldeMini label="Comp." value={profile?.jours_compensateurs || 0} color="indigo" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-b from-emerald-50/50 to-transparent">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Mes prochains congés
-                </h3>
-              </div>
-              <div className="p-5">
-                {upcomingLeaves.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">Aucun congé prévu</p>
-                ) : (
-                  <div className="space-y-2">
-                    {upcomingLeaves.slice(0, 5).map((leave) => (
-                      <div key={leave.id} className="p-3 rounded-xl ring-1 ring-gray-100 hover:ring-blue-200 hover:bg-blue-50/30 transition">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full uppercase tracking-wider ${getStatusColor(leave.statut)}`}>
-                            {formatStatus(leave.statut)}
-                          </span>
-                          <span className="text-xs font-bold text-gray-700">{leave.nombre_jours_ouvres}j</span>
-                        </div>
-                        <p className="text-sm font-semibold text-gray-900">{formatDateFR(leave.date_debut)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-blue-50/50 to-transparent">
+            <h2 className="text-xl font-bold text-gray-900">Calendrier des congés</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Cliquez sur les dates pour créer une nouvelle demande
+            </p>
           </div>
-
-          {/* Grand calendrier */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-blue-50/50 to-transparent">
-                <h2 className="text-xl font-bold text-gray-900">Calendrier des congés</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  Cliquez sur les dates pour créer une nouvelle demande
-                </p>
-              </div>
-              <div className="p-4 sm:p-6">
-                <LeaveCalendar onLeaveCreated={fetchData} />
-              </div>
-            </div>
+          <div className="p-4 sm:p-6">
+            <LeaveCalendar onLeaveCreated={fetchData} />
           </div>
         </div>
       </div>
@@ -232,17 +167,3 @@ function DashStat({ label, value, icon, highlight }) {
   );
 }
 
-function SoldeMini({ label, value, color }) {
-  const colors = {
-    gray: 'bg-gray-50 text-gray-700',
-    amber: 'bg-amber-50 text-amber-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    indigo: 'bg-indigo-50 text-indigo-700',
-  };
-  return (
-    <div className={`${colors[color]} rounded-lg px-2.5 py-2`}>
-      <p className="text-[10px] uppercase tracking-wider font-medium opacity-80">{label}</p>
-      <p className="text-lg font-bold">{value}</p>
-    </div>
-  );
-}
