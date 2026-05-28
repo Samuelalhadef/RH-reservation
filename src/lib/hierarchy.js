@@ -555,3 +555,241 @@ export async function forceValidateLeaveByRH(leaveId, validatorId, decision, com
     isFinal: true
   };
 }
+
+/**
+ * Vérifie si un utilisateur peut valider une demande de récupération.
+ * Réutilise canUserValidateLeave car la logique est identique (basée sur user_id, statut, statut_niveau_1, statut_niveau_2).
+ */
+export async function canUserValidateRecuperation(validatorId, demande) {
+  return canUserValidateLeave(validatorId, demande);
+}
+
+/**
+ * Valide une demande de récupération (déclaration d'heures sup OU utilisation) à un niveau donné.
+ * @param {number} demandeId
+ * @param {number} validatorId
+ * @param {string} decision - 'validee' ou 'refusee'
+ * @param {string} commentaire
+ * @param {string} table - 'demandes_recuperation' ou 'demandes_utilisation_recup'
+ */
+export async function validateRecuperationAtLevel(demandeId, validatorId, decision, commentaire = '', table = 'demandes_recuperation') {
+  if (!['demandes_recuperation', 'demandes_utilisation_recup'].includes(table)) {
+    throw new Error('Table non supportée');
+  }
+
+  const demandeResult = await db.execute({
+    sql: `SELECT * FROM ${table} WHERE id = ?`,
+    args: [demandeId]
+  });
+
+  if (demandeResult.rows.length === 0) {
+    throw new Error('Demande non trouvée');
+  }
+
+  const demande = demandeResult.rows[0];
+  const validation = await canUserValidateLeave(validatorId, demande);
+
+  if (!validation.canValidate) {
+    throw new Error(validation.reason);
+  }
+
+  const now = new Date().toISOString();
+
+  if (decision === 'refusee') {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut = 'refusee',
+                date_validation = ?,
+                validateur_id = ?,
+                commentaire = ?
+            WHERE id = ?`,
+      args: [now, validatorId, commentaire, demandeId]
+    });
+    return { success: true, message: 'Demande refusée', newStatus: 'refusee', isFinal: true };
+  }
+
+  if (validation.isFinal) {
+    if (demande.statut === 'validee') {
+      return { success: true, message: 'Demande déjà validée', newStatus: 'validee', isFinal: true };
+    }
+
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut = 'validee',
+                date_validation = ?,
+                validateur_id = ?,
+                commentaire = ?
+            WHERE id = ?`,
+      args: [now, validatorId, commentaire, demandeId]
+    });
+
+    // Si déclaration validée et type récupération, recalculer le solde
+    if (table === 'demandes_recuperation' && demande.type_compensation === 'recuperation') {
+      const totalResult = await db.execute({
+        sql: `SELECT COALESCE(SUM(nombre_heures), 0) as total
+              FROM demandes_recuperation
+              WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'`,
+        args: [demande.user_id]
+      });
+      const totalHeures = totalResult.rows[0]?.total || 0;
+
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
+        args: [demande.user_id]
+      });
+      await db.execute({
+        sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
+        args: [totalHeures, demande.user_id]
+      });
+    }
+
+    return { success: true, message: 'Demande validée définitivement', newStatus: 'validee', isFinal: true };
+  }
+
+  if (validation.level === 1) {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut_niveau_1 = 'validee',
+                validateur_niveau_1_id = ?,
+                date_validation_niveau_1 = ?
+            WHERE id = ?`,
+      args: [validatorId, now, demandeId]
+    });
+
+    const circuit = await getValidationCircuit(demande.user_id);
+    const hasLevel2 = circuit.niveaux.some(n => n.niveau === 2);
+
+    return {
+      success: true,
+      message: hasLevel2 ? 'Demande validée - En attente validation niveau 2' : 'Demande validée - En attente validation RH',
+      newStatus: 'en_attente',
+      nextLevel: hasLevel2 ? 2 : 'rh'
+    };
+  }
+
+  if (validation.level === 2) {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut_niveau_2 = 'validee',
+                validateur_niveau_2_id = ?,
+                date_validation_niveau_2 = ?
+            WHERE id = ?`,
+      args: [validatorId, now, demandeId]
+    });
+    return {
+      success: true,
+      message: 'Demande validée - En attente validation RH',
+      newStatus: 'en_attente',
+      nextLevel: 'rh'
+    };
+  }
+
+  throw new Error('Niveau de validation invalide');
+}
+
+/**
+ * Validation/refus en force par la RH d'une demande de récupération.
+ * À utiliser quand un responsable est absent.
+ */
+export async function forceValidateRecuperationByRH(demandeId, validatorId, decision, commentaire = '', table = 'demandes_recuperation') {
+  if (!['demandes_recuperation', 'demandes_utilisation_recup'].includes(table)) {
+    throw new Error('Table non supportée');
+  }
+
+  const validator = await db.execute({
+    sql: 'SELECT id, type_utilisateur FROM users WHERE id = ?',
+    args: [validatorId]
+  });
+  if (validator.rows.length === 0) {
+    throw new Error('Validateur non trouvé');
+  }
+  const t = validator.rows[0].type_utilisateur;
+  if (t !== 'RH' && t !== 'Direction' && t !== 'DG') {
+    throw new Error('Seuls les utilisateurs RH/Direction/DG peuvent forcer une validation');
+  }
+
+  const demandeResult = await db.execute({
+    sql: `SELECT * FROM ${table} WHERE id = ?`,
+    args: [demandeId]
+  });
+  if (demandeResult.rows.length === 0) {
+    throw new Error('Demande non trouvée');
+  }
+  const demande = demandeResult.rows[0];
+
+  if (demande.statut !== 'en_attente') {
+    throw new Error('Cette demande a déjà été traitée');
+  }
+
+  const now = new Date().toISOString();
+  const noteForce = '[RH - Validation directe (responsable absent)]';
+  const fullComment = commentaire ? `${noteForce} ${commentaire}` : noteForce;
+
+  if (decision === 'refusee') {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut = 'refusee',
+                date_validation = ?,
+                validateur_id = ?,
+                commentaire = ?
+            WHERE id = ?`,
+      args: [now, validatorId, fullComment, demandeId]
+    });
+    return { success: true, message: 'Demande refusée directement par la RH', newStatus: 'refusee', isFinal: true };
+  }
+
+  const circuit = await getValidationCircuit(demande.user_id);
+  const hasN1 = circuit.niveaux.some(n => n.niveau === 1);
+  const hasN2 = circuit.niveaux.some(n => n.niveau === 2);
+
+  if (hasN1 && demande.statut_niveau_1 !== 'validee') {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut_niveau_1 = 'validee',
+                validateur_niveau_1_id = ?,
+                date_validation_niveau_1 = ?
+            WHERE id = ?`,
+      args: [validatorId, now, demandeId]
+    });
+  }
+  if (hasN2 && demande.statut_niveau_2 !== 'validee') {
+    await db.execute({
+      sql: `UPDATE ${table}
+            SET statut_niveau_2 = 'validee',
+                validateur_niveau_2_id = ?,
+                date_validation_niveau_2 = ?
+            WHERE id = ?`,
+      args: [validatorId, now, demandeId]
+    });
+  }
+
+  await db.execute({
+    sql: `UPDATE ${table}
+          SET statut = 'validee',
+              date_validation = ?,
+              validateur_id = ?,
+              commentaire = ?
+          WHERE id = ?`,
+    args: [now, validatorId, fullComment, demandeId]
+  });
+
+  if (table === 'demandes_recuperation' && demande.type_compensation === 'recuperation') {
+    const totalResult = await db.execute({
+      sql: `SELECT COALESCE(SUM(nombre_heures), 0) as total
+            FROM demandes_recuperation
+            WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'`,
+      args: [demande.user_id]
+    });
+    const totalHeures = totalResult.rows[0]?.total || 0;
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
+      args: [demande.user_id]
+    });
+    await db.execute({
+      sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
+      args: [totalHeures, demande.user_id]
+    });
+  }
+
+  return { success: true, message: 'Demande validée directement par la RH', newStatus: 'validee', isFinal: true };
+}

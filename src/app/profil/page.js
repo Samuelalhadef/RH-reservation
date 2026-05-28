@@ -245,16 +245,18 @@ export default function ProfilPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50/30 to-slate-50">
       <Navbar />
 
-      <div className="container mx-auto px-4 sm:px-6 py-6 overflow-x-hidden">
-        {/* Header avec photo */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
-          <div className="flex items-center gap-4 sm:gap-6">
+      <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden">
+        {/* HERO violet/pink avec avatar */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 text-white shadow-xl">
+          <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-pink-300/20 rounded-full blur-3xl"></div>
+          <div className="relative p-6 sm:p-8 flex items-center gap-4 sm:gap-6">
             <div className="relative group flex-shrink-0">
               <div
-                className="w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center overflow-hidden cursor-pointer border-4 border-white shadow-lg"
+                className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center overflow-hidden cursor-pointer ring-4 ring-white/30 shadow-2xl"
                 style={{
                   background: profileImage ? 'transparent' : 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)'
                 }}
@@ -263,13 +265,13 @@ export default function ProfilPage() {
                 {profileImage ? (
                   <img src={profileImage} alt="Photo de profil" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-white text-3xl font-semibold">
+                  <span className="text-white text-2xl sm:text-4xl font-bold">
                     {user?.prenom?.[0]}{user?.nom?.[0]}
                   </span>
                 )}
               </div>
               <div
-                className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,33 +287,36 @@ export default function ProfilPage() {
                 className="hidden"
               />
               {uploadingImage && (
-                <div className="absolute inset-0 bg-white bg-opacity-75 rounded-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="absolute inset-0 bg-white/75 rounded-2xl flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="text-lg sm:text-2xl font-bold text-gray-800">{user?.prenom} {user?.nom}</h1>
-              <p className="text-gray-500">{profile?.type_utilisateur}</p>
-              {profile?.service && <p className="text-sm text-gray-400">{profile.service}</p>}
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-[10px] font-medium uppercase tracking-wider mb-1.5">
+                Mon profil
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">{user?.prenom} {user?.nom}</h1>
+              <p className="text-white/80 text-sm mt-0.5">{profile?.type_utilisateur}</p>
+              {profile?.service && <p className="text-white/60 text-xs">{profile.service}</p>}
             </div>
           </div>
         </div>
 
-        {/* Onglets */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="flex overflow-x-auto border-b border-gray-200 -mb-px">
+        {/* Onglets pilule */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2">
+          <div className="flex gap-1 overflow-x-auto">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition ${
                   activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-100'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                 </svg>
                 {tab.label}
@@ -324,7 +329,7 @@ export default function ProfilPage() {
         {activeTab === 'profil' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Informations personnelles */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Informations personnelles</h3>
 
               <div className="space-y-3">
@@ -359,7 +364,7 @@ export default function ProfilPage() {
             </div>
 
             {/* Sécurité */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Sécurité</h3>
 
               <div className="space-y-4">
@@ -398,7 +403,7 @@ export default function ProfilPage() {
         {activeTab === 'conges' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Solde de congés */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Mon solde de congés</h3>
 
               <div className="space-y-4">
@@ -437,7 +442,7 @@ export default function ProfilPage() {
             </div>
 
             {/* CET */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -603,7 +608,7 @@ export default function ProfilPage() {
         {activeTab === 'documentation' && (
           <div className="space-y-6">
             {/* CET Documentation */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -645,7 +650,7 @@ export default function ProfilPage() {
             </div>
 
             {/* Fractionnement Documentation */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -715,7 +720,7 @@ export default function ProfilPage() {
             </div>
 
             {/* Règles générales */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

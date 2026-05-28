@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
+import { getValidationCircuit } from '@/lib/hierarchy';
 
 // GET - Récupérer mes demandes d'utilisation de récupération
 export async function GET() {
@@ -99,6 +101,32 @@ export async function POST(request) {
             VALUES (?, ?, ?, ?, ?)`,
       args: [user.userId, date_debut, date_fin, heures, raison || '']
     });
+
+    // Notifier le premier validateur du circuit
+    try {
+      const userInfo = await db.execute({
+        sql: 'SELECT nom, prenom FROM users WHERE id = ?',
+        args: [user.userId]
+      });
+      const userName = userInfo.rows[0] ? `${userInfo.rows[0].prenom} ${userInfo.rows[0].nom}` : 'Un agent';
+      const circuit = await getValidationCircuit(user.userId);
+      const firstStep = circuit.niveaux[0];
+      if (firstStep && firstStep.type !== 'rh' && firstStep.validateur_id) {
+        await sendPushToUser(firstStep.validateur_id, {
+          title: 'Nouvelle demande d\'utilisation de récupération',
+          body: `${userName} souhaite utiliser des heures de récupération`,
+          url: '/validation',
+          tag: 'recup-util-request'
+        });
+      } else {
+        await sendPushToRH({
+          title: 'Nouvelle demande d\'utilisation de récupération',
+          body: `${userName} souhaite utiliser des heures de récupération`,
+          url: '/validation',
+          tag: 'recup-util-request'
+        });
+      }
+    } catch (e) { /* ignore */ }
 
     return NextResponse.json({ success: true, message: 'Demande d\'utilisation envoyée' });
   } catch (error) {

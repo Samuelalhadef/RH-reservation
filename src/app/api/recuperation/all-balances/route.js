@@ -28,7 +28,8 @@ export async function GET() {
         LEFT JOIN soldes_recuperation sr ON u.id = sr.user_id
         WHERE u.actif = 1
         ORDER BY u.nom, u.prenom
-      `
+      `,
+      args: []
     });
 
     const balances = (result.rows || []).map(r => ({

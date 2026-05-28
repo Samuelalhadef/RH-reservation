@@ -623,7 +623,7 @@ export default function OrganigrammePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#f3efe5' }}>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-violet-50/40 to-slate-50">
       <Navbar />
 
       <style>{`
@@ -832,44 +832,57 @@ export default function OrganigrammePage() {
         }
       `}</style>
 
-      {/* Top bar */}
-      <div className="px-4 sm:px-6 pt-6 pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/calendrier')}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <h1 className="text-xl sm:text-2xl font-black text-gray-800 tracking-wide">
-              Organigramme <span className="text-gray-500">Mairie de Chartrettes</span>
-            </h1>
-          </div>
+      {/* HERO violet */}
+      <div className="container mx-auto px-4 sm:px-6 pt-6">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 text-white shadow-xl">
+          <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-fuchsia-300/20 rounded-full blur-3xl"></div>
+          <div className="relative p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/calendrier')}
+                  className="p-2 bg-white/15 hover:bg-white/25 rounded-xl transition backdrop-blur-sm"
+                  title="Retour"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-white/15 backdrop-blur-sm rounded-full text-[10px] font-medium uppercase tracking-wider">
+                      Hiérarchie
+                    </span>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Organigramme</h1>
+                  <p className="text-white/80 text-xs mt-0.5">Mairie de Chartrettes</p>
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowExportModal(true)}
-              disabled={exporting || !tree}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg transition text-sm font-medium"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Imprimer / PDF
-            </button>
-            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-              <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.2))} className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-              </button>
-              <button onClick={() => { setZoom(0.7); setScroll({ x: 0, y: 0 }); }} className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition font-medium">
-                {Math.round(zoom * 100)}%
-              </button>
-              <button onClick={() => setZoom(z => Math.min(z + 0.1, 2))} className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  disabled={exporting || !tree}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-white/15 hover:bg-white/25 disabled:opacity-50 backdrop-blur-sm border border-white/30 text-white rounded-xl transition text-sm font-semibold"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Imprimer / PDF
+                </button>
+                <div className="flex items-center gap-1 bg-white/15 backdrop-blur-sm border border-white/30 rounded-xl p-1">
+                  <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.2))} className="p-1.5 text-white hover:bg-white/15 rounded-lg transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                  </button>
+                  <button onClick={() => { setZoom(0.7); setScroll({ x: 0, y: 0 }); }} className="px-2 py-1 text-xs text-white hover:bg-white/15 rounded-lg transition font-semibold">
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button onClick={() => setZoom(z => Math.min(z + 0.1, 2))} className="p-1.5 text-white hover:bg-white/15 rounded-lg transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

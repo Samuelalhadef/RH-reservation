@@ -351,7 +351,7 @@ export default function RHPage() {
       const response = await fetch(`/api/recuperation/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, commentaire }),
+        body: JSON.stringify({ action, commentaire, force_rh: true }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
@@ -373,7 +373,7 @@ export default function RHPage() {
       const response = await fetch(`/api/recuperation/utilisation/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, commentaire }),
+        body: JSON.stringify({ action, commentaire, force_rh: true }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
@@ -503,148 +503,122 @@ export default function RHPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
-          Interface RH
-        </h1>
-
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="flex border-b overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'all'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* Barre d'onglets principale - style pilule */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2">
+          <nav className="flex gap-1 overflow-x-auto">
+            <MainTab active={activeTab === 'all'} onClick={() => setActiveTab('all')} color="blue">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
               Toutes les demandes
-            </button>
-
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'stats'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              📊 Statistiques avancées
-            </button>
-
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'users'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              Gestion des utilisateurs
-            </button>
-
-            <button
-              onClick={() => setActiveTab('cet-requests')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'cet-requests'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
+            </MainTab>
+            <MainTab active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} color="indigo">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              Statistiques
+            </MainTab>
+            <MainTab active={activeTab === 'users'} onClick={() => setActiveTab('users')} color="violet">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Utilisateurs
+            </MainTab>
+            <MainTab active={activeTab === 'cet-requests'} onClick={() => setActiveTab('cet-requests')} color="amber" count={cetRequests.filter(r => r.statut === 'en_attente').length}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Demandes CET
-              {cetRequests.filter(r => r.statut === 'en_attente').length > 0 && (
-                <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
-                  {cetRequests.filter(r => r.statut === 'en_attente').length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('cet-balances')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'cet-balances'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
+            </MainTab>
+            <MainTab active={activeTab === 'cet-balances'} onClick={() => setActiveTab('cet-balances')} color="amber">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
               Soldes CET
-            </button>
-
-            <button
-              onClick={() => setActiveTab('recup-requests')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'recup-requests'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
+            </MainTab>
+            <MainTab active={activeTab === 'recup-requests'} onClick={() => setActiveTab('recup-requests')} color="orange" count={recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Récupération
-              {(recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length) > 0 && (
-                <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500 text-white rounded-full">
-                  {recupRequests.filter(r => r.statut === 'en_attente').length + recupUtilRequests.filter(r => r.statut === 'en_attente').length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('create-leave')}
-              className={`px-6 py-3 font-medium whitespace-nowrap ${
-                activeTab === 'create-leave'
-                  ? 'border-b-2 border-primary-600 text-primary-600'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
+            </MainTab>
+            <MainTab active={activeTab === 'create-leave'} onClick={() => setActiveTab('create-leave')} color="emerald">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Créer un congé
-            </button>
-          </div>
+            </MainTab>
+          </nav>
         </div>
 
         {activeTab === 'stats' && (
-          <div>
-            <AdvancedStatsRH />
+          <div className="space-y-6">
+            {/* HERO indigo */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-500 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-indigo-300/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Analyse RH
+                  </span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Statistiques avancées</h1>
+                <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                  Visualisez les tendances, les soldes et l&apos;activité de l&apos;ensemble du personnel.
+                </p>
+              </div>
+            </div>
+
+            {/* Contenu */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-4 sm:p-6">
+              <AdvancedStatsRH />
+            </div>
           </div>
         )}
 
         {activeTab === 'all' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Toutes les demandes - Suivi de validation
-            </h2>
-
-            {/* Légende */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs font-semibold text-gray-700 mb-2">Légende du circuit de validation :</p>
-              <div className="flex flex-wrap gap-4 text-xs">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span className="text-gray-600">En attente</span>
+          <div className="space-y-6">
+            {/* HERO bleu */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-sky-500 to-cyan-500 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-sky-300/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Suivi global
+                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <span className="text-gray-600">Bloqué ici</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">Validé</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-gray-600">Refusé</span>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Toutes les demandes</h1>
+                <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                  Suivez le circuit de validation de toutes les demandes de congé en un coup d&apos;œil.
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                  <RecupHeroStat label="Total demandes" value={allLeaves.length} icon="calendar" />
+                  <RecupHeroStat label="En attente" value={allLeaves.filter(l => l.statut === 'en_attente').length} icon="bell" highlight={allLeaves.filter(l => l.statut === 'en_attente').length > 0} />
+                  <RecupHeroStat label="Validées" value={allLeaves.filter(l => l.statut === 'validee').length} icon="trending-up" />
+                  <RecupHeroStat label="Refusées" value={allLeaves.filter(l => l.statut === 'refusee').length} icon="users" />
                 </div>
               </div>
             </div>
 
-            {/* Barre de recherche */}
-            <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Rechercher par nom, prénom, type..."
-                value={searchAll}
-                onChange={(e) => setSearchAll(e.target.value)}
-                className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Légende + recherche */}
+              <div className="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4 border-b border-gray-100 bg-gray-50/50">
+                <div className="relative flex-1 min-w-[220px] max-w-md">
+                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, prénom, type..."
+                    value={searchAll}
+                    onChange={(e) => setSearchAll(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-gray-300 rounded-full"></span><span className="text-gray-600">En attente</span></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-yellow-400 rounded-full"></span><span className="text-gray-600">Bloqué</span></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-green-500 rounded-full"></span><span className="text-gray-600">Validé</span></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span><span className="text-gray-600">Refusé</span></span>
+                </div>
+              </div>
 
+              <div className="p-4 sm:p-6">
             {allLeaves.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 Aucune demande
@@ -843,39 +817,66 @@ export default function RHPage() {
               </div>
               );
             })()}
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'users' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">
-                Gestion des utilisateurs
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleRecalculateBalances}
-                  disabled={recalcLoading}
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition disabled:opacity-50"
-                  title="Recalculer les soldes de tous les utilisateurs"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  {recalcLoading ? 'Recalcul...' : 'Recalculer soldes'}
-                </button>
-                <button
-                  onClick={() => setShowCreateUserModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Créer un utilisateur
-                </button>
+          <div className="space-y-6">
+            {/* HERO violet */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-fuchsia-300/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Équipe
+                      </span>
+                    </div>
+                    <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Gestion des utilisateurs</h1>
+                    <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                      Créez, modifiez, ajustez les soldes et gérez l&apos;accès des agents de la mairie.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleRecalculateBalances}
+                      disabled={recalcLoading}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white border border-white/30 rounded-xl text-sm font-semibold transition disabled:opacity-50"
+                      title="Recalculer les soldes de tous les utilisateurs"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {recalcLoading ? 'Recalcul...' : 'Recalculer soldes'}
+                    </button>
+                    <button
+                      onClick={() => setShowCreateUserModal(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-violet-700 rounded-xl text-sm font-semibold shadow-lg shadow-black/10 hover:shadow-xl hover:-translate-y-0.5 transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Créer un utilisateur
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                  <RecupHeroStat label="Agents au total" value={users?.length || 0} icon="users" />
+                  <RecupHeroStat label="CDI" value={users?.filter(u => (u.type_contrat || 'CDI') === 'CDI').length || 0} icon="calendar" />
+                  <RecupHeroStat label="CDD" value={users?.filter(u => u.type_contrat === 'CDD').length || 0} icon="calendar" />
+                  <RecupHeroStat label="Responsables" value={users?.filter(u => Number(u.niveau_validation) > 0).length || 0} icon="trending-up" />
+                </div>
               </div>
             </div>
 
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-4 sm:p-6">
             {users && users.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 Aucun utilisateur trouvé
@@ -990,15 +991,39 @@ export default function RHPage() {
                 </table>
               </div>
             )}
+            </div>
           </div>
         )}
 
         {activeTab === 'cet-requests' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Demandes CET
-            </h2>
+          <div className="space-y-6">
+            {/* HERO ambre */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-yellow-500 to-orange-400 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-yellow-200/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Compte épargne temps
+                  </span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Demandes CET</h1>
+                <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                  Validez les demandes de versement et de retrait du compte épargne temps des agents.
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                  <RecupHeroStat label="À traiter" value={cetRequests.filter(r => r.statut === 'en_attente').length} icon="bell" highlight={cetRequests.filter(r => r.statut === 'en_attente').length > 0} />
+                  <RecupHeroStat label="Versements" value={cetRequests.filter(r => r.type === 'credit').length} icon="trending-up" />
+                  <RecupHeroStat label="Retraits" value={cetRequests.filter(r => r.type !== 'credit').length} icon="calendar" />
+                  <RecupHeroStat label="Total demandes" value={cetRequests.length} icon="users" />
+                </div>
+              </div>
+            </div>
 
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-4 sm:p-6">
             {cetRequests.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 Aucune demande CET
@@ -1078,43 +1103,45 @@ export default function RHPage() {
                 </table>
               </div>
             )}
+            </div>
           </div>
         )}
 
         {activeTab === 'cet-balances' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Soldes CET de tous les agents
-            </h2>
+          <div className="space-y-6">
+            {/* HERO ambre - Soldes */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-500 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-orange-300/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    Patrimoine CET
+                  </span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Soldes CET</h1>
+                <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                  Vue d&apos;ensemble des soldes CET de chaque agent avec ajustement direct.
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+                  <RecupHeroStat label="Agents avec CET" value={cetBalances.filter(b => b.solde_cet > 0).length} icon="users" />
+                  <RecupHeroStat label="Total jours en CET" value={cetBalances.reduce((s, b) => s + (b.solde_cet || 0), 0)} icon="trending-up" />
+                  <RecupHeroStat label="En attente" value={cetBalances.reduce((s, b) => s + (b.demandes_en_attente || 0), 0)} icon="bell" highlight={cetBalances.reduce((s, b) => s + (b.demandes_en_attente || 0), 0) > 0} />
+                  <RecupHeroStat label="Plafond / agent" value="60j" icon="calendar" />
+                </div>
+              </div>
+            </div>
 
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-4 sm:p-6">
             {cetBalances.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 Aucun agent trouvé
               </p>
             ) : (
               <>
-                {/* Résumé */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                    <p className="text-sm text-indigo-600 font-medium">Agents avec CET</p>
-                    <p className="text-2xl font-bold text-indigo-800">
-                      {cetBalances.filter(b => b.solde_cet > 0).length}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm text-green-600 font-medium">Total jours en CET</p>
-                    <p className="text-2xl font-bold text-green-800">
-                      {cetBalances.reduce((sum, b) => sum + (b.solde_cet || 0), 0)}
-                    </p>
-                  </div>
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <p className="text-sm text-orange-600 font-medium">Demandes en attente</p>
-                    <p className="text-2xl font-bold text-orange-800">
-                      {cetBalances.reduce((sum, b) => sum + (b.demandes_en_attente || 0), 0)}
-                    </p>
-                  </div>
-                </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -1196,6 +1223,7 @@ export default function RHPage() {
                 </div>
               </>
             )}
+            </div>
           </div>
         )}
 
@@ -1229,115 +1257,141 @@ export default function RHPage() {
         )}
 
         {activeTab === 'create-leave' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              Créer un congé (validation directe)
-            </h2>
-
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                Ce formulaire permet de créer un congé directement validé, sans passer par le circuit de validation
-                et sans la contrainte des 7 jours à l'avance.
-              </p>
+          <div className="space-y-6">
+            {/* HERO emeraude */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-green-500 text-white shadow-xl">
+              <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-teal-200/20 rounded-full blur-3xl"></div>
+              <div className="relative p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Validation directe
+                  </span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Créer un congé</h1>
+                <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+                  Posez un congé directement validé pour un agent, sans circuit ni contrainte de délai.
+                </p>
+              </div>
             </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!rhLeaveForm.user_id || !rhLeaveForm.date_debut || !rhLeaveForm.date_fin) {
-                toast.error('Veuillez remplir tous les champs obligatoires');
-                return;
-              }
-              if (new Date(rhLeaveForm.date_debut) > new Date(rhLeaveForm.date_fin)) {
-                toast.error('La date de début doit être avant la date de fin');
-                return;
-              }
-              setRhLeaveLoading(true);
-              try {
-                const response = await fetch('/api/leaves/rh-create', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(rhLeaveForm),
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                  throw new Error(data.message);
-                }
-                toast.success(`Congé créé et validé avec succès (${data.businessDays} jour(s) ouvrés)`);
-                setRhLeaveForm({ user_id: '', date_debut: '', date_fin: '', motif: '' });
-              } catch (error) {
-                toast.error(error.message);
-              } finally {
-                setRhLeaveLoading(false);
-              }
-            }} className="space-y-4 max-w-xl">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Employé *
-                </label>
-                <select
-                  value={rhLeaveForm.user_id}
-                  onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, user_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Sélectionner un employé</option>
-                  {allUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.prenom} {user.nom} ({user.type_utilisateur}) - {user.jours_restants || 0} jours restants
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date de début *
-                  </label>
-                  <input
-                    type="date"
-                    value={rhLeaveForm.date_debut}
-                    onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_debut: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-4 sm:p-6">
+              <div className="max-w-2xl mx-auto">
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 mb-6 flex items-start gap-3">
+                  <div className="p-2 bg-emerald-600 text-white rounded-lg flex-shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-semibold text-emerald-900">Création directement validée</p>
+                    <p className="text-emerald-700 text-xs mt-0.5">
+                      Aucun circuit de validation, aucune contrainte de 7 jours à l&apos;avance.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date de fin *
-                  </label>
-                  <input
-                    type="date"
-                    value={rhLeaveForm.date_fin}
-                    onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_fin: e.target.value })}
-                    min={rhLeaveForm.date_debut}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motif (optionnel)
-                </label>
-                <textarea
-                  value={rhLeaveForm.motif}
-                  onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, motif: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Motif du congé..."
-                />
-              </div>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!rhLeaveForm.user_id || !rhLeaveForm.date_debut || !rhLeaveForm.date_fin) {
+                    toast.error('Veuillez remplir tous les champs obligatoires');
+                    return;
+                  }
+                  if (new Date(rhLeaveForm.date_debut) > new Date(rhLeaveForm.date_fin)) {
+                    toast.error('La date de début doit être avant la date de fin');
+                    return;
+                  }
+                  setRhLeaveLoading(true);
+                  try {
+                    const response = await fetch('/api/leaves/rh-create', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(rhLeaveForm),
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                      throw new Error(data.message);
+                    }
+                    toast.success(`Congé créé et validé avec succès (${data.businessDays} jour(s) ouvrés)`);
+                    setRhLeaveForm({ user_id: '', date_debut: '', date_fin: '', motif: '' });
+                  } catch (error) {
+                    toast.error(error.message);
+                  } finally {
+                    setRhLeaveLoading(false);
+                  }
+                }} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Employé *</label>
+                    <select
+                      value={rhLeaveForm.user_id}
+                      onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, user_id: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                      required
+                    >
+                      <option value="">Sélectionner un employé</option>
+                      {allUsers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.prenom} {user.nom} ({user.type_utilisateur}) - {user.jours_restants || 0} jours restants
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <button
-                type="submit"
-                disabled={rhLeaveLoading}
-                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold"
-              >
-                {rhLeaveLoading ? 'Création en cours...' : 'Créer et valider le congé'}
-              </button>
-            </form>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début *</label>
+                      <input
+                        type="date"
+                        value={rhLeaveForm.date_debut}
+                        onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_debut: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de fin *</label>
+                      <input
+                        type="date"
+                        value={rhLeaveForm.date_fin}
+                        onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_fin: e.target.value })}
+                        min={rhLeaveForm.date_debut}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Motif (optionnel)</label>
+                    <textarea
+                      value={rhLeaveForm.motif}
+                      onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, motif: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      placeholder="Motif du congé..."
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={rhLeaveLoading}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-3 rounded-xl font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    {rhLeaveLoading ? 'Création en cours...' : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Créer et valider le congé
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2379,6 +2433,37 @@ function RecupStatusBadge({ statut }) {
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}></span>
       {c.label}
     </span>
+  );
+}
+
+function MainTab({ active, onClick, children, count, color = 'blue' }) {
+  const colorMap = {
+    blue: { activeBg: 'bg-blue-50', activeText: 'text-blue-700', activeRing: 'ring-blue-100', activeBadge: 'bg-blue-100 text-blue-700' },
+    indigo: { activeBg: 'bg-indigo-50', activeText: 'text-indigo-700', activeRing: 'ring-indigo-100', activeBadge: 'bg-indigo-100 text-indigo-700' },
+    violet: { activeBg: 'bg-violet-50', activeText: 'text-violet-700', activeRing: 'ring-violet-100', activeBadge: 'bg-violet-100 text-violet-700' },
+    amber: { activeBg: 'bg-amber-50', activeText: 'text-amber-700', activeRing: 'ring-amber-100', activeBadge: 'bg-amber-100 text-amber-700' },
+    orange: { activeBg: 'bg-orange-50', activeText: 'text-orange-700', activeRing: 'ring-orange-100', activeBadge: 'bg-orange-100 text-orange-700' },
+    emerald: { activeBg: 'bg-emerald-50', activeText: 'text-emerald-700', activeRing: 'ring-emerald-100', activeBadge: 'bg-emerald-100 text-emerald-700' },
+  };
+  const c = colorMap[color] || colorMap.blue;
+  return (
+    <button
+      onClick={onClick}
+      className={`relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition ${
+        active
+          ? `${c.activeBg} ${c.activeText} shadow-sm ring-1 ${c.activeRing}`
+          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+      }`}
+    >
+      {children}
+      {count !== undefined && count > 0 && (
+        <span className={`ml-1 px-1.5 py-0.5 text-[11px] rounded-full font-bold ${
+          active ? c.activeBadge : 'bg-red-500 text-white'
+        }`}>
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 

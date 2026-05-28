@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireRH } from '@/lib/auth';
-import { notifyRecuperationDecision } from '@/lib/pushNotifications';
+import { verifyToken } from '@/lib/auth';
+import { validateRecuperationAtLevel, forceValidateRecuperationByRH } from '@/lib/hierarchy';
+import { notifyRecuperationDecision, sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
 
 // GET - Récupérer une demande spécifique (avec document)
 export async function GET(request, { params }) {
@@ -41,19 +42,21 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT - Valider/Refuser une demande (DGS/RH uniquement)
+// PUT - Valider/Refuser une demande via circuit hiérarchique
 export async function PUT(request, { params }) {
   try {
-    const { authorized, user } = await requireRH();
-    if (!authorized) {
-      return NextResponse.json(
-        { success: false, message: 'Accès refusé' },
-        { status: 403 }
-      );
+    const token = request.cookies.get('auth_token')?.value;
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'Non authentifié' }, { status: 401 });
     }
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: 'Token invalide' }, { status: 401 });
+    }
+    const validatorId = decoded.userId;
 
     const { id } = await params;
-    const { action, commentaire } = await request.json();
+    const { action, commentaire, force_rh } = await request.json();
 
     if (!['valider', 'refuser'].includes(action)) {
       return NextResponse.json(
@@ -62,66 +65,74 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Récupérer la demande
-    const demandeResult = await db.execute({
-      sql: 'SELECT * FROM demandes_recuperation WHERE id = ? AND statut = ?',
-      args: [id, 'en_attente']
-    });
+    const decision = action === 'valider' ? 'validee' : 'refusee';
 
+    // Récupérer la demande pour notifications
+    const demandeResult = await db.execute({
+      sql: `SELECT d.*, u.nom, u.prenom
+            FROM demandes_recuperation d
+            JOIN users u ON d.user_id = u.id
+            WHERE d.id = ?`,
+      args: [id]
+    });
     if (demandeResult.rows.length === 0) {
       return NextResponse.json(
-        { success: false, message: 'Demande non trouvée ou déjà traitée' },
+        { success: false, message: 'Demande non trouvée' },
         { status: 404 }
       );
     }
-
     const demande = demandeResult.rows[0];
-    const newStatut = action === 'valider' ? 'validee' : 'refusee';
 
-    // Mettre à jour le statut
-    await db.execute({
-      sql: `
-        UPDATE demandes_recuperation
-        SET statut = ?, date_validation = CURRENT_TIMESTAMP, validateur_id = ?, commentaire = ?
-        WHERE id = ?
-      `,
-      args: [newStatut, user.userId, commentaire || null, id]
-    });
-
-    // Si validée et type = récupération, ajouter les heures au solde
-    if (action === 'valider' && demande.type_compensation === 'recuperation') {
-      // Recalculer le solde total depuis toutes les demandes validées
-      const totalResult = await db.execute({
-        sql: `
-          SELECT COALESCE(SUM(nombre_heures), 0) as total
-          FROM demandes_recuperation
-          WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'
-        `,
-        args: [demande.user_id]
-      });
-
-      const totalHeures = totalResult.rows[0]?.total || 0;
-
-      await db.execute({
-        sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
-        args: [demande.user_id]
-      });
-
-      await db.execute({
-        sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
-        args: [totalHeures, demande.user_id]
-      });
+    if (demande.statut !== 'en_attente') {
+      return NextResponse.json(
+        { success: false, message: 'Cette demande a déjà été traitée' },
+        { status: 400 }
+      );
     }
 
-    // Notifier l'agent
     try {
-      await notifyRecuperationDecision(demande.user_id, action, demande.type_compensation);
-    } catch (e) { /* ignore push errors */ }
+      const result = force_rh
+        ? await forceValidateRecuperationByRH(id, validatorId, decision, commentaire || '', 'demandes_recuperation')
+        : await validateRecuperationAtLevel(id, validatorId, decision, commentaire || '', 'demandes_recuperation');
 
-    return NextResponse.json({
-      success: true,
-      message: `Demande ${action === 'valider' ? 'validée' : 'refusée'} avec succès`
-    });
+      // Notifications
+      if (result.isFinal) {
+        try {
+          await notifyRecuperationDecision(demande.user_id, action, demande.type_compensation);
+        } catch (e) { /* ignore push errors */ }
+      } else {
+        try {
+          await sendPushToUser(demande.user_id, {
+            title: 'Avancement de votre demande',
+            body: result.message,
+            url: '/recuperation',
+            tag: `recup-progress-${id}`
+          });
+        } catch (e) { /* ignore */ }
+        if (result.nextLevel === 'rh') {
+          try {
+            await sendPushToRH({
+              title: 'Demande d\'heures sup en attente RH',
+              body: `La demande de ${demande.prenom} ${demande.nom} nécessite votre validation`,
+              url: '/validation',
+              tag: `recup-${id}`
+            });
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: result.message,
+        isFinal: result.isFinal,
+        nextLevel: result.nextLevel
+      });
+    } catch (validationError) {
+      return NextResponse.json(
+        { success: false, message: validationError.message },
+        { status: 403 }
+      );
+    }
   } catch (error) {
     console.error('Error processing recuperation request:', error);
     return NextResponse.json(

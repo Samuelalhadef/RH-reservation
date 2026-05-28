@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 7; // Incrémenter pour forcer re-migration
+let _migrationVersion = 8; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -50,6 +50,20 @@ async function runMigrations() {
     { table: 'demandes_conges', column: 'statut_niveau_2', type: 'TEXT DEFAULT NULL' },
     { table: 'demandes_conges', column: 'validateur_niveau_2_id', type: 'INTEGER' },
     { table: 'demandes_conges', column: 'date_validation_niveau_2', type: 'DATETIME' },
+    // Validation hiérarchique pour demandes_recuperation (déclaration d'heures sup)
+    { table: 'demandes_recuperation', column: 'statut_niveau_1', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_recuperation', column: 'validateur_niveau_1_id', type: 'INTEGER' },
+    { table: 'demandes_recuperation', column: 'date_validation_niveau_1', type: 'DATETIME' },
+    { table: 'demandes_recuperation', column: 'statut_niveau_2', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_recuperation', column: 'validateur_niveau_2_id', type: 'INTEGER' },
+    { table: 'demandes_recuperation', column: 'date_validation_niveau_2', type: 'DATETIME' },
+    // Validation hiérarchique pour demandes_utilisation_recup
+    { table: 'demandes_utilisation_recup', column: 'statut_niveau_1', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_utilisation_recup', column: 'validateur_niveau_1_id', type: 'INTEGER' },
+    { table: 'demandes_utilisation_recup', column: 'date_validation_niveau_1', type: 'DATETIME' },
+    { table: 'demandes_utilisation_recup', column: 'statut_niveau_2', type: 'TEXT DEFAULT NULL' },
+    { table: 'demandes_utilisation_recup', column: 'validateur_niveau_2_id', type: 'INTEGER' },
+    { table: 'demandes_utilisation_recup', column: 'date_validation_niveau_2', type: 'DATETIME' },
   ];
   for (const migration of migrations) {
     try {

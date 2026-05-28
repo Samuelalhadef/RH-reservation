@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { notifyRecuperationRequest } from '@/lib/pushNotifications';
+import { sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
+import { getValidationCircuit } from '@/lib/hierarchy';
 
 // GET - Récupérer mes demandes de récupération + solde
 export async function GET(request) {
@@ -106,9 +107,25 @@ export async function POST(request) {
       args: [user.userId, date_travail, heures, raison, type_compensation, signature, document_data || null]
     });
 
-    // Notifier la DGS/RH
+    // Notifier le premier validateur du circuit (responsable direct, sinon RH/DGS)
     try {
-      await notifyRecuperationRequest(userName);
+      const circuit = await getValidationCircuit(user.userId);
+      const firstStep = circuit.niveaux[0];
+      if (firstStep && firstStep.type !== 'rh' && firstStep.validateur_id) {
+        await sendPushToUser(firstStep.validateur_id, {
+          title: 'Nouvelle demande d\'heures supplémentaires',
+          body: `${userName} a fait une demande d'heures supplémentaires`,
+          url: '/validation',
+          tag: 'recup-request'
+        });
+      } else {
+        await sendPushToRH({
+          title: 'Nouvelle demande d\'heures supplémentaires',
+          body: `${userName} a fait une demande d'heures supplémentaires`,
+          url: '/validation',
+          tag: 'recup-request'
+        });
+      }
     } catch (e) { /* ignore push errors */ }
 
     return NextResponse.json({

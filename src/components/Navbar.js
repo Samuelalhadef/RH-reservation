@@ -44,12 +44,12 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-100 shadow-sm">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center py-3 sm:py-4">
           {/* Logo + titre */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-gray-200">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm ring-1 ring-gray-100">
               <Image
                 src="/images/logo.png"
                 alt="Logo"
@@ -61,27 +61,24 @@ const Navbar = () => {
               />
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-bold text-gray-800">Mon Portail Agent</h1>
+              <h1 className="text-base sm:text-lg font-bold bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">Mon Portail Agent</h1>
               <p className="text-xs text-gray-500 hidden sm:block">Chartrettes</p>
             </div>
           </div>
 
           {/* Menu desktop */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1 bg-gray-50/80 rounded-xl p-1 ring-1 ring-gray-100">
             {navItems.map((item) => (
               <button
                 key={item.path}
                 onClick={() => router.push(item.path)}
-                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                   pathname === item.path
-                    ? 'text-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
                 }`}
               >
                 {item.label}
-                {pathname === item.path && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
-                )}
               </button>
             ))}
           </div>

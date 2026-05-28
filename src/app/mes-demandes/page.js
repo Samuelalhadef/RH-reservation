@@ -201,174 +201,63 @@ export default function MesDemandesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center">Chargement...</p>
-        </div>
+        <div className="container mx-auto px-4 py-16 text-center text-gray-400 text-sm">Chargement...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50">
       <Navbar />
 
-      <div className="container mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Mes demandes de congés</h1>
-          <p className="text-gray-600">Consultez l'historique complet de vos demandes</p>
-        </div>
-
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total</p>
-                <p className="text-3xl font-bold text-gray-800">{stats.total}</p>
-              </div>
-              <div className="bg-gray-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* HERO bleu */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-sky-500 to-cyan-500 text-white shadow-xl">
+          <div className="absolute -top-16 -right-12 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-12 w-80 h-80 bg-sky-300/20 rounded-full blur-3xl"></div>
+          <div className="relative p-6 sm:p-8">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-medium uppercase tracking-wider">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-              </div>
+                Historique
+              </span>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">En attente</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.enAttente}</p>
-              </div>
-              <div className="bg-yellow-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Validées</p>
-                <p className="text-3xl font-bold text-green-600">{stats.validee}</p>
-              </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Refusées</p>
-                <p className="text-3xl font-bold text-red-600">{stats.refusee}</p>
-              </div>
-              <div className="bg-red-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Mes demandes de congés</h1>
+            <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
+              Suivez l&apos;avancée et l&apos;historique complet de vos demandes.
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+              <MesDemHeroStat label="Total" value={stats.total} icon="folder" />
+              <MesDemHeroStat label="En attente" value={stats.enAttente} icon="clock" highlight={stats.enAttente > 0} />
+              <MesDemHeroStat label="Validées" value={stats.validee} icon="check" />
+              <MesDemHeroStat label="Refusées" value={stats.refusee} icon="cross" />
             </div>
           </div>
         </div>
 
-        {/* Légende du circuit de validation */}
-        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 mb-6">
-          <h3 className="text-sm font-semibold text-blue-800 mb-3">Circuit de validation hiérarchique</h3>
-          <div className="flex flex-wrap items-center gap-4 text-sm mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-gray-700">Validé</span>
+        {/* Card principale avec filtres + légende */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex flex-wrap items-center gap-2">
+              <FiltrePill active={filterStatus === 'all'} onClick={() => setFilterStatus('all')}>Toutes <span className="opacity-60 ml-1">({stats.total})</span></FiltrePill>
+              <FiltrePill active={filterStatus === 'en_attente'} onClick={() => setFilterStatus('en_attente')} dot="amber">En attente <span className="opacity-60 ml-1">({stats.enAttente})</span></FiltrePill>
+              <FiltrePill active={filterStatus === 'validee'} onClick={() => setFilterStatus('validee')} dot="emerald">Validées <span className="opacity-60 ml-1">({stats.validee})</span></FiltrePill>
+              <FiltrePill active={filterStatus === 'refusee'} onClick={() => setFilterStatus('refusee')} dot="rose">Refusées <span className="opacity-60 ml-1">({stats.refusee})</span></FiltrePill>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-yellow-500 animate-pulse flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-gray-700">En attente (bloqué ici)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <span className="text-gray-700">Refusé</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-gray-700">Pas encore atteint</span>
+            <div className="hidden lg:flex flex-wrap items-center gap-3 ml-auto text-xs">
+              <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-green-500 rounded-full"></span><span className="text-gray-500">Validé</span></span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></span><span className="text-gray-500">Bloqué</span></span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span><span className="text-gray-500">Refusé</span></span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-gray-300 rounded-full"></span><span className="text-gray-500">À venir</span></span>
             </div>
           </div>
-          <div className="text-xs text-blue-700 bg-blue-100 rounded p-2">
-            <strong>Parcours :</strong> Demande → Responsable direct (N+1) → Direction (N+2 si applicable) → Service RH (validation finale)
-          </div>
-        </div>
-
-        {/* Filtres */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                filterStatus === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Toutes ({stats.total})
-            </button>
-            <button
-              onClick={() => setFilterStatus('en_attente')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                filterStatus === 'en_attente'
-                  ? 'bg-yellow-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              En attente ({stats.enAttente})
-            </button>
-            <button
-              onClick={() => setFilterStatus('validee')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                filterStatus === 'validee'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Validées ({stats.validee})
-            </button>
-            <button
-              onClick={() => setFilterStatus('refusee')}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                filterStatus === 'refusee'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Refusées ({stats.refusee})
-            </button>
-          </div>
-        </div>
-
+          <div className="bg-white">
         {/* Liste des demandes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white">
           {filteredLeaves.length === 0 ? (
             <div className="p-8 text-center">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -525,7 +414,44 @@ export default function MesDemandesPage() {
             </>
           )}
         </div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function MesDemHeroStat({ label, value, icon, highlight }) {
+  const icons = {
+    folder: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+    clock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    check: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    cross: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  };
+  return (
+    <div className={`relative bg-white/15 backdrop-blur-sm rounded-xl p-3 border ${highlight ? 'border-white/40 ring-2 ring-white/30' : 'border-white/20'}`}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <svg className="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">{icons[icon]}</svg>
+        <p className="text-[10px] uppercase tracking-wider text-white/70 font-medium">{label}</p>
+      </div>
+      <p className="text-2xl font-bold tracking-tight">{value}</p>
+    </div>
+  );
+}
+
+function FiltrePill({ active, onClick, children, dot }) {
+  const dotColors = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', rose: 'bg-rose-500' };
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition ${
+        active
+          ? 'bg-blue-600 text-white shadow-sm'
+          : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50'
+      }`}
+    >
+      {dot && <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white/80' : dotColors[dot]}`}></span>}
+      {children}
+    </button>
   );
 }
