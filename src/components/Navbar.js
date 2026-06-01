@@ -44,6 +44,7 @@ const Navbar = () => {
   }
 
   return (
+    <>
     <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-100 shadow-sm">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center py-3 sm:py-4">
@@ -140,8 +141,9 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+    </nav>
 
-      {/* Overlay + Drawer mobile */}
+    {/* Overlay + Drawer mobile - hors du <nav> pour éviter le containing block créé par backdrop-blur */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50" onClick={() => setMobileMenuOpen(false)}>
           <div className="absolute inset-0 bg-black bg-opacity-40" />
@@ -230,7 +232,7 @@ const Navbar = () => {
           </button>
         </div>
       </div>
-    </nav>
+    </>
   );
 };
 
