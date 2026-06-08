@@ -7,10 +7,7 @@ import { calculateLeaveBalance } from '@/lib/contractUtils';
 
 export async function POST(request) {
   try {
-    console.log('=== POST /api/users - Creating new user ===');
-
     const { authorized } = await requireRH();
-    console.log('Auth check:', { authorized });
 
     if (!authorized) {
       return NextResponse.json(
@@ -20,7 +17,6 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    console.log('Request body:', body);
 
     let { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = body;
 
@@ -45,7 +41,6 @@ export async function POST(request) {
     }
 
     if (email) {
-      console.log('Checking existing user with email:', email);
       const existingUser = await db.execute({
         sql: 'SELECT id FROM users WHERE email = ?',
         args: [email]

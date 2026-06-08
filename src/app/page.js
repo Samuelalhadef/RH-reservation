@@ -215,6 +215,11 @@ export default function LoginPage() {
         <p className="text-center text-white/60 text-xs mt-6">
           © {new Date().getFullYear()} Mairie de Chartrettes — Tous droits réservés
         </p>
+        <div className="flex items-center justify-center gap-4 mt-2 text-white/50 text-xs">
+          <a href="/confidentialite" className="hover:text-white/80 transition">Confidentialité</a>
+          <span>·</span>
+          <a href="/mentions-legales" className="hover:text-white/80 transition">Mentions légales</a>
+        </div>
       </div>
     </div>
   );

@@ -77,7 +77,10 @@
       "Bash(git checkout *)",
       "Bash(tasklist)",
       "Bash(tasklist *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\mairi\\\\Documents\\\\GitHub\\\\RH-reservations\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(Format-Table)"
     ],
     "deny": [],
     "ask": []

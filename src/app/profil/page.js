@@ -327,6 +327,7 @@ export default function ProfilPage() {
 
         {/* Contenu des onglets */}
         {activeTab === 'profil' && (
+          <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Informations personnelles */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -396,6 +397,35 @@ export default function ProfilPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+            {/* Mes données personnelles (RGPD) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Mes données personnelles</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-800">Exporter mes données (RGPD)</p>
+                  <p className="text-sm text-gray-500">
+                    Téléchargez l'ensemble de vos données personnelles au format JSON
+                    (droit d'accès et de portabilité).
+                  </p>
+                </div>
+                <a
+                  href="/api/users/export"
+                  className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition font-medium text-center whitespace-nowrap"
+                >
+                  Exporter mes données
+                </a>
+              </div>
+              <p className="text-xs text-gray-500 mt-4">
+                Consultez notre{' '}
+                <a href="/confidentialite" className="text-violet-600 hover:text-violet-800 font-medium">
+                  politique de confidentialité
+                </a>{' '}
+                pour connaître vos droits, ou contactez le service RH pour toute demande de
+                rectification ou d'effacement.
+              </p>
             </div>
           </div>
         )}
