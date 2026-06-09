@@ -68,13 +68,22 @@ export default function ConfidentialitePage() {
 
           <section>
             <h2 className="text-xl font-semibold text-gray-900">5. Destinataires et sous-traitants</h2>
-            <p>Vos données sont accessibles, selon les habilitations, à votre hiérarchie et au service RH. Elles sont hébergées et traitées par les sous-traitants suivants :</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Turso</strong> (base de données) — hébergement [Union européenne, AWS eu-west-1] ;</li>
-              <li><strong>Vercel</strong> (hébergement de l'application) — [localisation à confirmer] ;</li>
-              <li><strong>Resend</strong> (envoi des e-mails de notification) ;</li>
-              <li>Service de <strong>notifications push</strong> du navigateur (si vous y consentez).</li>
-            </ul>
+            <p>
+              Vos données sont accessibles, selon les habilitations, à votre hiérarchie et au
+              service RH. Elles sont hébergées sur un <strong>serveur dédié situé dans les locaux
+              de la Mairie de Chartrettes</strong> ; elles ne quittent donc pas les installations
+              de la collectivité et restent sur le territoire français.
+            </p>
+            <p>
+              L'administration technique de ce serveur est confiée à la société{' '}
+              <strong>Mousquetaires</strong> (10 avenue de la Forêt, 77590 Bois-le-Roi), agissant
+              en qualité de sous-traitant au sens de l'article 28 du RGPD.
+            </p>
+            <p>
+              Le cas échéant, l'envoi des e-mails de notification est assuré par le prestataire{' '}
+              <strong>Resend</strong>, et les notifications push (si vous y consentez) transitent
+              par le service de notification de votre navigateur. {/* À confirmer/retirer selon l'architecture finale on-premise */}
+            </p>
             <p>
               Aucune donnée n'est cédée à des tiers à des fins commerciales. Aucun outil de mesure
               d'audience tiers n'est utilisé.

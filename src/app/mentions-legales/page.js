@@ -33,8 +33,10 @@ export default function MentionsLegalesPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900">Hébergement</h2>
             <p>
-              Application hébergée par <strong>[Vercel Inc.]</strong> et base de données par{' '}
-              <strong>[Turso]</strong>. [Coordonnées des hébergeurs à compléter.]
+              L'application et les données sont hébergées sur un <strong>serveur dédié installé
+              dans les locaux de la Mairie de Chartrettes</strong>. L'installation et l'administration
+              technique de ce serveur sont assurées par la société{' '}
+              <strong>Mousquetaires</strong>, 10 avenue de la Forêt, 77590 Bois-le-Roi.
             </p>
           </section>
 

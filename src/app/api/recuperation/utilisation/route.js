@@ -118,14 +118,14 @@ export async function POST(request) {
           url: '/validation',
           tag: 'recup-util-request'
         });
-      } else {
-        await sendPushToRH({
-          title: 'Nouvelle demande d\'utilisation de récupération',
-          body: `${userName} souhaite utiliser des heures de récupération`,
-          url: '/validation',
-          tag: 'recup-util-request'
-        });
       }
+      // Toujours notifier la RH/admin par push, même si l'agent a un responsable
+      await sendPushToRH({
+        title: 'Nouvelle demande d\'utilisation de récupération',
+        body: `${userName} souhaite utiliser des heures de récupération`,
+        url: '/validation',
+        tag: 'recup-util-request'
+      });
     } catch (e) { /* ignore */ }
 
     return NextResponse.json({ success: true, message: 'Demande d\'utilisation envoyée' });

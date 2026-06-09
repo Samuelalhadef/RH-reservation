@@ -118,14 +118,14 @@ export async function POST(request) {
           url: '/validation',
           tag: 'recup-request'
         });
-      } else {
-        await sendPushToRH({
-          title: 'Nouvelle demande d\'heures supplémentaires',
-          body: `${userName} a fait une demande d'heures supplémentaires`,
-          url: '/validation',
-          tag: 'recup-request'
-        });
       }
+      // Toujours notifier la RH/admin par push, même si l'agent a un responsable
+      await sendPushToRH({
+        title: 'Nouvelle demande d\'heures supplémentaires',
+        body: `${userName} a fait une demande d'heures supplémentaires`,
+        url: '/validation',
+        tag: 'recup-request'
+      });
     } catch (e) { /* ignore push errors */ }
 
     return NextResponse.json({

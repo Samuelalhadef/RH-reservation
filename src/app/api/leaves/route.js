@@ -283,6 +283,15 @@ export async function POST(request) {
             await notifyLeaveRequest(`${userData.prenom} ${userData.nom}`, hasResponsable, Number(result.lastInsertRowid));
           } catch (e) { /* ignore push errors */ }
         }
+        // Toujours notifier la RH/admin par push, même si l'agent a un responsable
+        try {
+          await sendPushToRH({
+            title: 'Nouvelle demande de congé',
+            body: `${userData.prenom} ${userData.nom} a fait une demande de congé`,
+            url: '/validation',
+            tag: `leave-${Number(result.lastInsertRowid)}`
+          });
+        } catch (e) { /* ignore push errors */ }
       } else {
         // Pas de responsable direct, envoyer à la RH
         const rhResult = await db.execute({
