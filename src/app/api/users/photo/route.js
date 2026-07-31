@@ -22,9 +22,17 @@ export async function POST(request) {
     }
 
     // Vérifier que c'est bien une image base64
-    if (!photo.startsWith('data:image/')) {
+    if (typeof photo !== 'string' || !photo.startsWith('data:image/')) {
       return NextResponse.json(
         { success: false, message: 'Format d\'image invalide' },
+        { status: 400 }
+      );
+    }
+
+    // Limite de taille (~3 Mo en base64) pour éviter la saturation de la base.
+    if (photo.length > 3 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, message: 'Image trop volumineuse (3 Mo maximum)' },
         { status: 400 }
       );
     }

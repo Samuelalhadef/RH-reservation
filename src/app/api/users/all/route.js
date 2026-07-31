@@ -37,7 +37,7 @@ export async function GET() {
     console.error('Error fetching users with balances:', error);
     console.error('Error details:', error.message);
     return NextResponse.json(
-      { success: false, message: `Erreur lors de la récupération des utilisateurs: ${error.message}`, users: [] },
+      { success: false, message: `Erreur lors de la récupération des utilisateurs`, users: [] },
       { status: 500 }
     );
   }

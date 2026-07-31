@@ -97,7 +97,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error placing recuperation (RH):', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

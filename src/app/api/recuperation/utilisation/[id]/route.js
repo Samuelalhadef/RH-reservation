@@ -91,6 +91,6 @@ export async function PUT(request, { params }) {
     }
   } catch (error) {
     console.error('Error processing utilisation recup:', error);
-    return NextResponse.json({ success: false, message: `Erreur: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ success: false, message: `Erreur` }, { status: 500 });
   }
 }

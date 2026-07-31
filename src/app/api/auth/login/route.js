@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { db } from '@/lib/db';
 import { generateToken } from '@/lib/auth';
+import { rateLimit, resetRateLimit } from '@/lib/rateLimit';
 import { cookies } from 'next/headers';
 
 export async function POST(request) {
@@ -12,6 +13,20 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, message: 'Identifiant et mot de passe requis' },
         { status: 400 }
+      );
+    }
+
+    // Protection brute-force : limite les tentatives par IP et par identifiant.
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+    const rlIp = rateLimit(`login:ip:${ip}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+    const rlUser = rateLimit(`login:user:${userId}`, { limit: 5, windowMs: 15 * 60 * 1000 });
+    if (!rlIp.allowed || !rlUser.allowed) {
+      const retryAfter = Math.max(rlIp.retryAfter, rlUser.retryAfter);
+      return NextResponse.json(
+        { success: false, message: 'Trop de tentatives de connexion. Réessayez plus tard.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
       );
     }
 
@@ -36,6 +51,9 @@ export async function POST(request) {
         { status: 401 }
       );
     }
+
+    // Connexion réussie : on efface les compteurs de tentatives.
+    resetRateLimit(`login:user:${userId}`);
 
     const token = generateToken(user.id, user.type_utilisateur);
 

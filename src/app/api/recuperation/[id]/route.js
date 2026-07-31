@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, getUserFromRequest, isRHType } from '@/lib/auth';
 import { validateRecuperationAtLevel, forceValidateRecuperationByRH } from '@/lib/hierarchy';
 import { notifyRecuperationDecision, sendPushToUser, sendPushToRH } from '@/lib/pushNotifications';
 
 // GET - Récupérer une demande spécifique (avec document)
 export async function GET(request, { params }) {
   try {
+    const { authenticated, user } = getUserFromRequest(request);
+    if (!authenticated) {
+      return NextResponse.json({ success: false, message: 'Non authentifié' }, { status: 401 });
+    }
+
     const { id } = await params;
 
     const result = await db.execute({
@@ -29,9 +34,19 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Contrôle d'accès : seul le propriétaire de la demande ou un profil RH
+    // peut consulter le détail (qui contient signature + document justificatif).
+    const demande = result.rows[0];
+    if (demande.user_id !== user.userId && !isRHType(user.type)) {
+      return NextResponse.json(
+        { success: false, message: 'Accès refusé' },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      demande: result.rows[0]
+      demande
     });
   } catch (error) {
     console.error('Error fetching recuperation request:', error);
@@ -136,7 +151,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Error processing recuperation request:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

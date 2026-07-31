@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, isRHType } from '@/lib/auth';
 
 // GET - Détail d'une demande
 export async function GET(request, { params }) {
@@ -33,9 +33,19 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Contrôle d'accès : congés maternité/paternité/adoption contiennent des
+    // documents sensibles (justificatifs médicaux). Seul le propriétaire ou la RH.
+    const demande = result.rows[0];
+    if (demande.user_id !== user.userId && !isRHType(user.type)) {
+      return NextResponse.json(
+        { success: false, message: 'Accès refusé' },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      demande: result.rows[0]
+      demande
     });
   } catch (error) {
     console.error('Error fetching parentalite request:', error);

@@ -123,7 +123,7 @@ export async function POST(request, { params }) {
   } catch (error) {
     console.error('Error adjusting balance:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

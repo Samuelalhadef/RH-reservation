@@ -38,6 +38,38 @@ export async function PUT(request, { params }) {
 
     const demande = demandeResult.rows[0];
     const newStatut = action === 'valider' ? 'validee' : 'refusee';
+    const currentYear = new Date().getFullYear();
+
+    // Avant de valider, re-vérifier que le solde est toujours suffisant :
+    // entre la demande et l'approbation, l'agent a pu consommer ces jours.
+    // Sans ce contrôle, le solde (congés ou CET) pourrait devenir négatif.
+    if (action === 'valider') {
+      if (demande.type === 'credit') {
+        const soldeRes = await db.execute({
+          sql: 'SELECT jours_restants FROM soldes_conges WHERE user_id = ? AND annee = ?',
+          args: [demande.user_id, currentYear]
+        });
+        const dispo = soldeRes.rows[0]?.jours_restants ?? 0;
+        if (dispo < demande.jours) {
+          return NextResponse.json(
+            { success: false, message: `Solde congés insuffisant (${dispo} jour(s) disponible(s)). Validation impossible.` },
+            { status: 400 }
+          );
+        }
+      } else {
+        const cetRes = await db.execute({
+          sql: 'SELECT solde FROM cet WHERE user_id = ?',
+          args: [demande.user_id]
+        });
+        const dispoCet = cetRes.rows[0]?.solde ?? 0;
+        if (dispoCet < demande.jours) {
+          return NextResponse.json(
+            { success: false, message: `Solde CET insuffisant (${dispoCet} jour(s) disponible(s)). Validation impossible.` },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     // Mettre à jour le statut de la demande
     await db.execute({
@@ -51,8 +83,6 @@ export async function PUT(request, { params }) {
 
     // Si validée, effectuer le transfert réel
     if (action === 'valider') {
-      const currentYear = new Date().getFullYear();
-
       if (demande.type === 'credit') {
         // Congés -> CET : déduire du solde congés, ajouter au CET
         await db.execute({
@@ -107,7 +137,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Error processing CET request:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

@@ -22,9 +22,17 @@ export async function POST(request) {
       );
     }
 
-    if (newPassword.length < 6) {
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
       return NextResponse.json(
-        { success: false, message: 'Le nouveau mot de passe doit contenir au moins 6 caractères' },
+        { success: false, message: 'Le nouveau mot de passe doit contenir au moins 8 caractères' },
+        { status: 400 }
+      );
+    }
+
+    // Empêche de réutiliser le mot de passe temporaire/actuel.
+    if (newPassword === currentPassword) {
+      return NextResponse.json(
+        { success: false, message: 'Le nouveau mot de passe doit être différent de l\'actuel' },
         { status: 400 }
       );
     }

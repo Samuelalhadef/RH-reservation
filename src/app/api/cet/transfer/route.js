@@ -195,7 +195,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating CET request:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors de la demande: ' + error.message },
+      { success: false, message: 'Erreur lors de la demande' },
       { status: 500 }
     );
   }

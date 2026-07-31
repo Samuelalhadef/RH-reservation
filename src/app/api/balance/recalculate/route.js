@@ -74,7 +74,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error recalculating balances:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors du recalcul: ' + error.message },
+      { success: false, message: 'Erreur lors du recalcul' },
       { status: 500 }
     );
   }

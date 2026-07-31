@@ -66,9 +66,23 @@ export async function POST(request) {
 
     const debut = new Date(date_debut);
     const fin = new Date(date_fin);
+    if (isNaN(debut.getTime()) || isNaN(fin.getTime())) {
+      return NextResponse.json(
+        { success: false, message: 'Dates invalides' },
+        { status: 400 }
+      );
+    }
     if (fin < debut) {
       return NextResponse.json(
         { success: false, message: 'La date de fin doit être après la date de début' },
+        { status: 400 }
+      );
+    }
+
+    // Limite de taille du justificatif (~5 Mo en base64) contre la saturation de la base.
+    if (document_data && (typeof document_data !== 'string' || document_data.length > 5 * 1024 * 1024)) {
+      return NextResponse.json(
+        { success: false, message: 'Document trop volumineux (5 Mo maximum)' },
         { status: 400 }
       );
     }
@@ -113,7 +127,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating parentalite request:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

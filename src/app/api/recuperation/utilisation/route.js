@@ -131,6 +131,6 @@ export async function POST(request) {
     return NextResponse.json({ success: true, message: 'Demande d\'utilisation envoyée' });
   } catch (error) {
     console.error('Error creating utilisation recup:', error);
-    return NextResponse.json({ success: false, message: `Erreur: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ success: false, message: `Erreur` }, { status: 500 });
   }
 }

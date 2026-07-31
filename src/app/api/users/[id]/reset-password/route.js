@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { db } from '@/lib/db';
-import { requireRH } from '@/lib/auth';
+import { requireRH, generateTempPassword } from '@/lib/auth';
 import { sendTemporaryPasswordEmail } from '@/lib/email';
 
 export async function POST(request, { params }) {
@@ -30,7 +30,7 @@ export async function POST(request, { params }) {
 
     const user = result.rows[0];
 
-    const tempPassword = 'Chartrettes';
+    const tempPassword = generateTempPassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     await db.execute({

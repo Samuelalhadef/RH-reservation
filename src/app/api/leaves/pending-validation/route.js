@@ -193,7 +193,7 @@ export async function GET(request) {
   } catch (error) {
     console.error('Error fetching pending validations:', error);
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: 'Erreur serveur' },
       { status: 500 }
     );
   }

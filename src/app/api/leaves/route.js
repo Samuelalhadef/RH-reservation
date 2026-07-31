@@ -96,6 +96,13 @@ export async function POST(request) {
       );
     }
 
+    if (isNaN(new Date(date_debut).getTime()) || isNaN(new Date(date_fin).getTime())) {
+      return NextResponse.json(
+        { success: false, message: 'Dates invalides' },
+        { status: 400 }
+      );
+    }
+
     if (new Date(date_debut) > new Date(date_fin)) {
       return NextResponse.json(
         { success: false, message: 'La date de début doit être avant la date de fin' },
@@ -343,7 +350,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating leave request:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors de la création de la demande: ' + error.message },
+      { success: false, message: 'Erreur lors de la création de la demande' },
       { status: 500 }
     );
   }

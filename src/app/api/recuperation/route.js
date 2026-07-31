@@ -80,10 +80,30 @@ export async function POST(request) {
       );
     }
 
+    // Limites de taille (signature manuscrite + justificatif, base64) anti-DoS.
+    if (typeof signature !== 'string' || signature.length > 2 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, message: 'Signature invalide ou trop volumineuse' },
+        { status: 400 }
+      );
+    }
+    if (document_data && (typeof document_data !== 'string' || document_data.length > 5 * 1024 * 1024)) {
+      return NextResponse.json(
+        { success: false, message: 'Document trop volumineux (5 Mo maximum)' },
+        { status: 400 }
+      );
+    }
+
     // Vérifier que la date de travail est dans le passé ou aujourd'hui
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dateTravail = new Date(date_travail);
+    if (isNaN(dateTravail.getTime())) {
+      return NextResponse.json(
+        { success: false, message: 'Date de travail invalide' },
+        { status: 400 }
+      );
+    }
     if (dateTravail > today) {
       return NextResponse.json(
         { success: false, message: 'La date de travail ne peut pas être dans le futur' },
@@ -136,7 +156,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating recuperation request:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

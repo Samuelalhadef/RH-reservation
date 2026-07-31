@@ -142,6 +142,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Error fetching pending recuperation validations:', error);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Erreur serveur' }, { status: 500 });
   }
 }

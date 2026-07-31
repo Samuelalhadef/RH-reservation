@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { db } from '@/lib/db';
-import { requireRH } from '@/lib/auth';
+import { requireRH, generateTempPassword } from '@/lib/auth';
 
 import { calculateLeaveBalance } from '@/lib/contractUtils';
+
+// Rôles autorisés — empêche l'enregistrement d'un type_utilisateur arbitraire
+const TYPES_UTILISATEUR_VALIDES = [
+  'RH', 'Direction', 'DG', 'Directeur Vie Locale', 'Directeur Centre',
+  'Responsable Anim.', 'Responsable Serv. Tech.', 'Responsable',
+  'Cantinière', 'Animateur', 'Animateur Culturel', 'ATSEM/Animation',
+  'Entretien', 'Service Technique', 'Police Municipale', 'Administratif',
+  'Communication', 'Alternant',
+];
 
 export async function POST(request) {
   try {
@@ -23,6 +32,13 @@ export async function POST(request) {
     if (!nom || !prenom || !type_utilisateur) {
       return NextResponse.json(
         { success: false, message: 'Nom, prénom et type sont requis' },
+        { status: 400 }
+      );
+    }
+
+    if (!TYPES_UTILISATEUR_VALIDES.includes(type_utilisateur)) {
+      return NextResponse.json(
+        { success: false, message: 'Type d\'utilisateur invalide' },
         { status: 400 }
       );
     }
@@ -54,8 +70,7 @@ export async function POST(request) {
       }
     }
 
-    console.log('Generating password and hashing...');
-    const tempPassword = 'Chartrettes';
+    const tempPassword = generateTempPassword();
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     // Auto-assignation du responsable si non fourni
@@ -167,10 +182,8 @@ export async function POST(request) {
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating user:', error);
-    console.error('Error details:', error.message);
-    console.error('Error stack:', error.stack);
     return NextResponse.json(
-      { success: false, message: `Erreur lors de la création de l'utilisateur: ${error.message}` },
+      { success: false, message: 'Erreur lors de la création de l\'utilisateur' },
       { status: 500 }
     );
   }

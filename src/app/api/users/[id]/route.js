@@ -153,9 +153,8 @@ export async function PUT(request, { params }) {
     });
   } catch (error) {
     console.error('Error updating user:', error);
-    console.error('Error details:', error.message);
     return NextResponse.json(
-      { success: false, message: `Erreur lors de la mise à jour de l'utilisateur: ${error.message}` },
+      { success: false, message: 'Erreur lors de la mise à jour de l\'utilisateur' },
       { status: 500 }
     );
   }
@@ -202,9 +201,8 @@ export async function DELETE(request, { params }) {
     });
   } catch (error) {
     console.error('Error deleting user:', error);
-    console.error('Error details:', error.message);
     return NextResponse.json(
-      { success: false, message: `Erreur lors de la suppression de l'utilisateur: ${error.message}` },
+      { success: false, message: 'Erreur lors de la suppression de l\'utilisateur' },
       { status: 500 }
     );
   }

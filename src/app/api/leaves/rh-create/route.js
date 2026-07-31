@@ -185,7 +185,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error creating RH leave:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors de la création du congé: ' + error.message },
+      { success: false, message: 'Erreur lors de la création du congé' },
       { status: 500 }
     );
   }

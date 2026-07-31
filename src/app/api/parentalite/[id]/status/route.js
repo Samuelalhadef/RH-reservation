@@ -82,7 +82,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Error updating parentalite status:', error);
     return NextResponse.json(
-      { success: false, message: `Erreur: ${error.message}` },
+      { success: false, message: `Erreur` },
       { status: 500 }
     );
   }

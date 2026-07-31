@@ -114,7 +114,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Error cancelling leave:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur lors de l\'annulation: ' + error.message },
+      { success: false, message: 'Erreur lors de l\'annulation' },
       { status: 500 }
     );
   }

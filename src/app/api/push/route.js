@@ -46,7 +46,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error subscribing to push:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur: ' + error.message },
+      { success: false, message: 'Erreur' },
       { status: 500 }
     );
   }
@@ -82,7 +82,7 @@ export async function DELETE(request) {
   } catch (error) {
     console.error('Error unsubscribing from push:', error);
     return NextResponse.json(
-      { success: false, message: 'Erreur: ' + error.message },
+      { success: false, message: 'Erreur' },
       { status: 500 }
     );
   }

@@ -1,7 +1,17 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Ne jamais démarrer avec un secret par défaut : un secret connu permettrait
+// à n'importe qui de forger des tokens valides et d'usurper un compte RH.
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error(
+    'JWT_SECRET manquant ou trop court (>= 32 caractères requis). ' +
+    'Définissez une valeur aléatoire forte dans les variables d\'environnement.'
+  );
+}
 
 /**
  * Génère un token JWT
@@ -65,4 +75,45 @@ export async function requireRH() {
     return { authorized: false, user: null };
   }
   return { authorized: true, user };
+}
+
+/**
+ * Indique si un type d'utilisateur a les droits RH/Direction/DG.
+ */
+export function isRHType(type) {
+  return type === 'RH' || type === 'Direction' || type === 'DG';
+}
+
+/**
+ * Authentifie une requête à partir du cookie qu'elle porte (pour les routes
+ * qui n'utilisent pas le helper basé sur next/headers cookies()).
+ * @returns {{authenticated: boolean, user: object|null}}
+ */
+/**
+ * Génère un mot de passe temporaire aléatoire (fort, lisible).
+ * Remplace l'ancien mot de passe fixe « Chartrettes » identique pour tous,
+ * qui permettait de se connecter à tout compte fraîchement créé/réinitialisé.
+ */
+export function generateTempPassword() {
+  // Évite les caractères ambigus (0/O, 1/l/I) pour une saisie manuelle fiable.
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(12);
+  let pwd = '';
+  for (let i = 0; i < 12; i++) {
+    pwd += charset[bytes[i] % charset.length];
+  }
+  // Garantit au moins un chiffre et une majuscule.
+  return 'M' + pwd + '7';
+}
+
+export function getUserFromRequest(request) {
+  const token = request.cookies.get('auth_token')?.value;
+  if (!token) {
+    return { authenticated: false, user: null };
+  }
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return { authenticated: false, user: null };
+  }
+  return { authenticated: true, user: decoded };
 }
