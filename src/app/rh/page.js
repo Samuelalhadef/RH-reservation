@@ -37,10 +37,15 @@ export default function RHPage() {
   const [editingUser, setEditingUser] = useState(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  // Assistant emploi du temps hebdomadaire (calcul de la quotité à partir des heures/jour)
+  const [showHoursCalendar, setShowHoursCalendar] = useState(false);
+  const [weeklyHours, setWeeklyHours] = useState({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
   const [rhLeaveForm, setRhLeaveForm] = useState({
     user_id: '',
     date_debut: '',
     date_fin: '',
+    type_debut: 'journee_complete',
+    type_fin: 'journee_complete',
     motif: ''
   });
   const [rhLeaveLoading, setRhLeaveLoading] = useState(false);
@@ -208,6 +213,8 @@ export default function RHPage() {
       toast.success(`Utilisateur créé avec succès ! Mot de passe temporaire: ${data.tempPassword}`, { duration: 8000 });
       setShowCreateUserModal(false);
       setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
+      setShowHoursCalendar(false);
+      setWeeklyHours({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -1349,7 +1356,7 @@ export default function RHPage() {
                       throw new Error(data.message);
                     }
                     toast.success(`Congé créé et validé avec succès (${data.businessDays} jour(s) ouvrés)`);
-                    setRhLeaveForm({ user_id: '', date_debut: '', date_fin: '', motif: '' });
+                    setRhLeaveForm({ user_id: '', date_debut: '', date_fin: '', type_debut: 'journee_complete', type_fin: 'journee_complete', motif: '' });
                   } catch (error) {
                     toast.error(error.message);
                   } finally {
@@ -1376,24 +1383,46 @@ export default function RHPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début *</label>
-                      <input
-                        type="date"
-                        value={rhLeaveForm.date_debut}
-                        onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_debut: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        required
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={rhLeaveForm.date_debut}
+                          onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_debut: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        <select
+                          value={rhLeaveForm.type_debut}
+                          onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, type_debut: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                        >
+                          <option value="journee_complete">Journée complète</option>
+                          <option value="matin">Matin uniquement</option>
+                          <option value="apres_midi">Après-midi uniquement</option>
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de fin *</label>
-                      <input
-                        type="date"
-                        value={rhLeaveForm.date_fin}
-                        onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_fin: e.target.value })}
-                        min={rhLeaveForm.date_debut}
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        required
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={rhLeaveForm.date_fin}
+                          onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, date_fin: e.target.value })}
+                          min={rhLeaveForm.date_debut}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          required
+                        />
+                        <select
+                          value={rhLeaveForm.type_fin}
+                          onChange={(e) => setRhLeaveForm({ ...rhLeaveForm, type_fin: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                        >
+                          <option value="journee_complete">Journée complète</option>
+                          <option value="matin">Matin uniquement</option>
+                          <option value="apres_midi">Après-midi uniquement</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1705,6 +1734,9 @@ export default function RHPage() {
                   onChange={(e) => setNewUser({ ...newUser, quotite_travail: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  {![100, 90, 80, 70, 60, 50].includes(newUser.quotite_travail) && (
+                    <option value={newUser.quotite_travail}>{newUser.quotite_travail}% (personnalisé)</option>
+                  )}
                   <option value={100}>100% - Temps plein</option>
                   <option value={90}>90%</option>
                   <option value={80}>80% - 4/5e</option>
@@ -1715,6 +1747,83 @@ export default function RHPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Les jours de congés seront proratisés selon la quotité ({Math.round(25 * newUser.quotite_travail / 100 * 100) / 100} jours/an)
                 </p>
+
+                {/* Assistant : emploi du temps hebdomadaire */}
+                <button
+                  type="button"
+                  onClick={() => setShowHoursCalendar(v => !v)}
+                  className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {showHoursCalendar ? "Masquer l'emploi du temps" : "Remplir l'emploi du temps hebdomadaire"}
+                </button>
+
+                {showHoursCalendar && (() => {
+                  const jours = [
+                    { key: 'lundi', label: 'Lundi' },
+                    { key: 'mardi', label: 'Mardi' },
+                    { key: 'mercredi', label: 'Mercredi' },
+                    { key: 'jeudi', label: 'Jeudi' },
+                    { key: 'vendredi', label: 'Vendredi' },
+                  ];
+                  const total = jours.reduce((s, j) => s + (parseFloat(weeklyHours[j.key]) || 0), 0);
+                  const totalRounded = Math.round(total * 100) / 100;
+                  const quotiteCalc = Math.round(total / 35 * 100);
+                  const quotiteApplied = Math.max(1, Math.min(100, quotiteCalc));
+                  const congesHeures = Math.round(total * 5 * 100) / 100;
+                  return (
+                    <div className="mt-3 p-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Heures travaillées par jour</p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {jours.map(j => (
+                          <div key={j.key}>
+                            <label className="block text-[11px] text-gray-500 mb-1 text-center">{j.label}</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="24"
+                              step="0.5"
+                              value={weeklyHours[j.key]}
+                              onChange={(e) => setWeeklyHours({ ...weeklyHours, [j.key]: e.target.value })}
+                              placeholder="0"
+                              className="w-full px-2 py-1.5 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+                          <p className="text-[11px] text-gray-500">Heures / semaine</p>
+                          <p className="text-sm font-bold text-gray-800">{totalRounded} h</p>
+                        </div>
+                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+                          <p className="text-[11px] text-gray-500">Quotité</p>
+                          <p className="text-sm font-bold text-gray-800">{quotiteCalc} %</p>
+                        </div>
+                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+                          <p className="text-[11px] text-gray-500">Congés (5 sem.)</p>
+                          <p className="text-sm font-bold text-gray-800">{congesHeures} h</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (total <= 0) { toast.error('Saisissez au moins une heure'); return; }
+                          setNewUser({ ...newUser, quotite_travail: quotiteApplied });
+                          toast.success(`Quotité fixée à ${quotiteApplied}% (${totalRounded} h/sem)`);
+                        }}
+                        className="w-full mt-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                      >
+                        Appliquer la quotité ({quotiteCalc}%)
+                      </button>
+                      <p className="text-[11px] text-gray-500 mt-2">
+                        Référence temps plein : 35 h/semaine. Congés annuels = 5 × heures hebdomadaires.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="mb-4">
@@ -1827,6 +1936,8 @@ export default function RHPage() {
                   onClick={() => {
                     setShowCreateUserModal(false);
                     setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
+                    setShowHoursCalendar(false);
+                    setWeeklyHours({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
@@ -2551,7 +2662,7 @@ function RecupSubTab({ active, onClick, children, count, icon }) {
 }
 
 function RecupFilterPill({ active, onClick, children, dot }) {
-  const dotColors = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', rose: 'bg-rose-500' };
+  const dotColors = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', rose: 'bg-rose-500', blue: 'bg-blue-500' };
   return (
     <button
       onClick={onClick}
@@ -2577,6 +2688,9 @@ function RecuperationRHView({
   rhRecupForm, setRhRecupForm, rhRecupLoading, setRhRecupLoading,
   setRecupBalances, fetchData
 }) {
+  // Filtre par type de compensation (uniquement onglet "Heures déclarées")
+  const [recupTypeFilter, setRecupTypeFilter] = useState('tous');
+
   // Stats globales
   const pendingAcq = recupRequests.filter(r => r.statut === 'en_attente').length;
   const pendingUtil = recupUtilRequests.filter(r => r.statut === 'en_attente').length;
@@ -2601,6 +2715,8 @@ function RecuperationRHView({
   };
   const matchesStatus = (req) =>
     recupStatusFilter === 'toutes' ? true : req.statut === recupStatusFilter;
+  const matchesType = (req) =>
+    recupTypeFilter === 'tous' ? true : req.type_compensation === recupTypeFilter;
 
   // Pending unifié (les deux types)
   const pendingItems = useMemo(() => {
@@ -2643,8 +2759,8 @@ function RecuperationRHView({
   };
 
   const declarationsGroupes = useMemo(
-    () => groupByMonth(recupRequests, 'date_travail'),
-    [recupRequests, recupSearch, recupStatusFilter]
+    () => groupByMonth(recupRequests.filter(matchesType), 'date_travail'),
+    [recupRequests, recupSearch, recupStatusFilter, recupTypeFilter]
   );
   const utilisationsGroupes = useMemo(
     () => groupByMonth(recupUtilRequests, 'date_debut'),
@@ -2791,6 +2907,21 @@ function RecuperationRHView({
                 </RecupFilterPill>
                 <RecupFilterPill active={recupStatusFilter === 'refusee'} onClick={() => setRecupStatusFilter('refusee')} dot="rose">
                   Refusées
+                </RecupFilterPill>
+              </div>
+            )}
+
+            {recupSubTab === 'declarations' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-px h-5 bg-gray-200 hidden sm:block"></span>
+                <RecupFilterPill active={recupTypeFilter === 'tous'} onClick={() => setRecupTypeFilter('tous')}>
+                  Tous types
+                </RecupFilterPill>
+                <RecupFilterPill active={recupTypeFilter === 'remuneration'} onClick={() => setRecupTypeFilter('remuneration')} dot="emerald">
+                  Rémunérées
+                </RecupFilterPill>
+                <RecupFilterPill active={recupTypeFilter === 'recuperation'} onClick={() => setRecupTypeFilter('recuperation')} dot="blue">
+                  Récupérées
                 </RecupFilterPill>
               </div>
             )}

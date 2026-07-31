@@ -15,7 +15,7 @@ export async function POST(request) {
       );
     }
 
-    const { user_id, date_debut, date_fin, motif } = await request.json();
+    const { user_id, date_debut, date_fin, type_debut, type_fin, motif } = await request.json();
 
     if (!user_id || !date_debut || !date_fin) {
       return NextResponse.json(
@@ -41,6 +41,35 @@ export async function POST(request) {
 
     // Calculer les jours ouvrés
     let businessDays = calculateBusinessDays(date_debut, date_fin, holidays);
+
+    if (businessDays === 0) {
+      return NextResponse.json(
+        { success: false, message: 'La période sélectionnée ne contient aucun jour ouvré' },
+        { status: 400 }
+      );
+    }
+
+    // Ajustement pour les demi-journées
+    const isSameDay = date_debut === date_fin;
+    const typeDebutValue = type_debut || 'journee_complete';
+    const typeFinValue = type_fin || 'journee_complete';
+
+    if (isSameDay) {
+      if (typeDebutValue === 'matin' && typeFinValue === 'apres_midi') {
+        businessDays = 1;
+      } else if (typeDebutValue === 'matin' || typeDebutValue === 'apres_midi') {
+        businessDays = 0.5;
+      }
+    } else {
+      if (typeDebutValue === 'apres_midi') {
+        businessDays -= 0.5;
+      }
+      if (typeFinValue === 'matin') {
+        businessDays -= 0.5;
+      }
+    }
+
+    businessDays = Math.max(0, businessDays);
 
     if (businessDays === 0) {
       return NextResponse.json(
@@ -101,13 +130,13 @@ export async function POST(request) {
     await db.execute({
       sql: `
         INSERT INTO demandes_conges (
-          user_id, date_debut, date_fin, nombre_jours_ouvres, motif,
+          user_id, date_debut, date_fin, nombre_jours_ouvres, type_debut, type_fin, motif,
           statut, date_demande, date_validation, validateur_id,
           statut_niveau_1, statut_niveau_2
         )
-        VALUES (?, ?, ?, ?, ?, 'validee', ?, ?, ?, 'validee', 'validee')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'validee', ?, ?, ?, 'validee', 'validee')
       `,
-      args: [user_id, date_debut, date_fin, businessDays, motif || null, now, now, rhUserId]
+      args: [user_id, date_debut, date_fin, businessDays, typeDebutValue, typeFinValue, motif || null, now, now, rhUserId]
     });
 
     // Recalculer jours_pris à partir de TOUS les congés validés de l'année
