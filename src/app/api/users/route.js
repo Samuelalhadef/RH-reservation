@@ -27,7 +27,7 @@ export async function POST(request) {
 
     const body = await request.json();
 
-    let { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = body;
+    let { nom, prenom, email, type_utilisateur, service, poste, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, horaires_travail, responsable_id } = body;
 
     if (!nom || !prenom || !type_utilisateur) {
       return NextResponse.json(
@@ -55,6 +55,11 @@ export async function POST(request) {
     if (type_contrat === 'Mi-temps') {
       quotite_travail = 50;
     }
+
+    // Horaires de travail : stockés en JSON (matin/après-midi par jour)
+    const horairesJson = horaires_travail
+      ? (typeof horaires_travail === 'string' ? horaires_travail : JSON.stringify(horaires_travail))
+      : null;
 
     if (email) {
       const existingUser = await db.execute({
@@ -108,10 +113,10 @@ export async function POST(request) {
     console.log('Creating user in database...');
     const result = await db.execute({
       sql: `
-        INSERT INTO users (nom, prenom, email, mot_de_passe, type_utilisateur, service, poste, mot_de_passe_temporaire, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (nom, prenom, email, mot_de_passe, type_utilisateur, service, poste, mot_de_passe_temporaire, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, horaires_travail, responsable_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
       `,
-      args: [nom, prenom, email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@mairie-chartrettes.fr`, hashedPassword, type_utilisateur, service || null, poste || null, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null, date_entree_mairie || null, quotite_travail || 100, responsable_id || null]
+      args: [nom, prenom, email || `${prenom.toLowerCase()}.${nom.toLowerCase()}@mairie-chartrettes.fr`, hashedPassword, type_utilisateur, service || null, poste || null, type_contrat || 'CDI', date_debut_contrat || null, date_fin_contrat || null, date_entree_mairie || null, quotite_travail || 100, horairesJson, responsable_id || null]
     });
 
     const userId = Number(result.lastInsertRowid);

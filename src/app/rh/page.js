@@ -11,6 +11,159 @@ const AdvancedStatsRH = dynamic(() => import('@/components/AdvancedStatsRH'), {
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
 
+// --- Horaires de travail (emploi du temps hebdomadaire) ---
+const JOURS_SEMAINE = [
+  { key: 'lundi', label: 'Lundi' },
+  { key: 'mardi', label: 'Mardi' },
+  { key: 'mercredi', label: 'Mercredi' },
+  { key: 'jeudi', label: 'Jeudi' },
+  { key: 'vendredi', label: 'Vendredi' },
+];
+
+const emptySchedule = () =>
+  JOURS_SEMAINE.reduce((acc, j) => {
+    acc[j.key] = { m_debut: '', m_fin: '', a_debut: '', a_fin: '' };
+    return acc;
+  }, {});
+
+// Parse une valeur stockée (chaîne JSON ou objet) vers un objet horaires complet
+const parseSchedule = (value) => {
+  const base = emptySchedule();
+  if (!value) return base;
+  try {
+    const obj = typeof value === 'string' ? JSON.parse(value) : value;
+    if (obj && typeof obj === 'object') {
+      for (const j of JOURS_SEMAINE) {
+        if (obj[j.key]) base[j.key] = { ...base[j.key], ...obj[j.key] };
+      }
+    }
+  } catch (e) {
+    // valeur illisible → horaires vides
+  }
+  return base;
+};
+
+// Vrai si au moins un créneau est renseigné
+const scheduleHasData = (schedule) =>
+  JOURS_SEMAINE.some((j) => {
+    const d = schedule[j.key] || {};
+    return d.m_debut || d.m_fin || d.a_debut || d.a_fin;
+  });
+
+// Heures entre deux "HH:MM" (0 si invalide/négatif)
+const diffHeures = (debut, fin) => {
+  if (!debut || !fin) return 0;
+  const [h1, m1] = debut.split(':').map(Number);
+  const [h2, m2] = fin.split(':').map(Number);
+  if ([h1, m1, h2, m2].some((n) => Number.isNaN(n))) return 0;
+  const mins = h2 * 60 + m2 - (h1 * 60 + m1);
+  return mins > 0 ? mins / 60 : 0;
+};
+
+const heuresJour = (d) => (d ? diffHeures(d.m_debut, d.m_fin) + diffHeures(d.a_debut, d.a_fin) : 0);
+
+const heuresSemaine = (schedule) =>
+  JOURS_SEMAINE.reduce((s, j) => s + heuresJour(schedule[j.key]), 0);
+
+function HorairesTravailEditor({ schedule, setSchedule, onApplyQuotite }) {
+  const total = heuresSemaine(schedule);
+  const totalRounded = Math.round(total * 100) / 100;
+  const quotiteCalc = Math.round((total / 35) * 100);
+  const quotiteApplied = Math.max(1, Math.min(100, quotiteCalc));
+  const congesHeures = Math.round(total * 5 * 100) / 100;
+
+  const setChamp = (key, champ, value) =>
+    setSchedule({ ...schedule, [key]: { ...schedule[key], [champ]: value } });
+
+  return (
+    <div className="mt-3 p-3 rounded-lg border border-blue-100 bg-blue-50/50">
+      <p className="text-xs font-medium text-gray-700 mb-2">
+        Horaires par jour (matin / après-midi)
+      </p>
+      <div className="space-y-2">
+        {JOURS_SEMAINE.map((j) => {
+          const d = schedule[j.key] || {};
+          const h = heuresJour(d);
+          return (
+            <div
+              key={j.key}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-white rounded-md px-2 py-1.5 ring-1 ring-gray-100"
+            >
+              <span className="w-16 shrink-0 text-xs font-medium text-gray-700">{j.label}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-amber-600 font-medium">Matin</span>
+                <input
+                  type="time"
+                  value={d.m_debut || ''}
+                  onChange={(e) => setChamp(j.key, 'm_debut', e.target.value)}
+                  className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <span className="text-gray-400 text-xs">→</span>
+                <input
+                  type="time"
+                  value={d.m_fin || ''}
+                  onChange={(e) => setChamp(j.key, 'm_fin', e.target.value)}
+                  className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-indigo-600 font-medium">Après-midi</span>
+                <input
+                  type="time"
+                  value={d.a_debut || ''}
+                  onChange={(e) => setChamp(j.key, 'a_debut', e.target.value)}
+                  className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <span className="text-gray-400 text-xs">→</span>
+                <input
+                  type="time"
+                  value={d.a_fin || ''}
+                  onChange={(e) => setChamp(j.key, 'a_fin', e.target.value)}
+                  className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <span className="ml-auto text-xs font-semibold text-gray-600 w-14 text-right">
+                {h > 0 ? `${Math.round(h * 100) / 100} h` : '—'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+          <p className="text-[11px] text-gray-500">Heures / semaine</p>
+          <p className="text-sm font-bold text-gray-800">{totalRounded} h</p>
+        </div>
+        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+          <p className="text-[11px] text-gray-500">Quotité</p>
+          <p className="text-sm font-bold text-gray-800">{quotiteCalc} %</p>
+        </div>
+        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
+          <p className="text-[11px] text-gray-500">Congés (5 sem.)</p>
+          <p className="text-sm font-bold text-gray-800">{congesHeures} h</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (total <= 0) {
+            toast.error('Saisissez au moins un horaire');
+            return;
+          }
+          onApplyQuotite(quotiteApplied, totalRounded);
+        }}
+        className="w-full mt-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+      >
+        Appliquer la quotité ({quotiteCalc}%)
+      </button>
+      <p className="text-[11px] text-gray-500 mt-2">
+        Référence temps plein : 35 h/semaine. Congés annuels = 5 × heures hebdomadaires. Les
+        horaires sont enregistrés sur la fiche de l&apos;employé.
+      </p>
+    </div>
+  );
+}
+
 export default function RHPage() {
   const { isRH, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -37,9 +190,11 @@ export default function RHPage() {
   const [editingUser, setEditingUser] = useState(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
-  // Assistant emploi du temps hebdomadaire (calcul de la quotité à partir des heures/jour)
+  // Assistant emploi du temps hebdomadaire (horaires réels matin/après-midi → quotité + congés)
   const [showHoursCalendar, setShowHoursCalendar] = useState(false);
-  const [weeklyHours, setWeeklyHours] = useState({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
+  const [weeklySchedule, setWeeklySchedule] = useState(emptySchedule());
+  const [showEditHoursCalendar, setShowEditHoursCalendar] = useState(false);
+  const [editSchedule, setEditSchedule] = useState(emptySchedule());
   const [rhLeaveForm, setRhLeaveForm] = useState({
     user_id: '',
     date_debut: '',
@@ -198,10 +353,11 @@ export default function RHPage() {
     }
 
     try {
+      const horaires_travail = scheduleHasData(weeklySchedule) ? JSON.stringify(weeklySchedule) : null;
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser),
+        body: JSON.stringify({ ...newUser, horaires_travail }),
       });
 
       const data = await response.json();
@@ -214,7 +370,7 @@ export default function RHPage() {
       setShowCreateUserModal(false);
       setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
       setShowHoursCalendar(false);
-      setWeeklyHours({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
+      setWeeklySchedule(emptySchedule());
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -235,10 +391,11 @@ export default function RHPage() {
     }
 
     try {
+      const horaires_travail = scheduleHasData(editSchedule) ? JSON.stringify(editSchedule) : null;
       const response = await fetch(`/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingUser),
+        body: JSON.stringify({ ...editingUser, horaires_travail }),
       });
 
       const data = await response.json();
@@ -250,6 +407,8 @@ export default function RHPage() {
       toast.success('Utilisateur modifié avec succès');
       setShowEditUserModal(false);
       setEditingUser(null);
+      setShowEditHoursCalendar(false);
+      setEditSchedule(emptySchedule());
       fetchData();
     } catch (error) {
       toast.error(error.message);
@@ -982,6 +1141,8 @@ export default function RHPage() {
                             <button
                               onClick={() => {
                                 setEditingUser(user);
+                                setEditSchedule(parseSchedule(user.horaires_travail));
+                                setShowEditHoursCalendar(false);
                                 setShowEditUserModal(true);
                               }}
                               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
@@ -1760,70 +1921,16 @@ export default function RHPage() {
                   {showHoursCalendar ? "Masquer l'emploi du temps" : "Remplir l'emploi du temps hebdomadaire"}
                 </button>
 
-                {showHoursCalendar && (() => {
-                  const jours = [
-                    { key: 'lundi', label: 'Lundi' },
-                    { key: 'mardi', label: 'Mardi' },
-                    { key: 'mercredi', label: 'Mercredi' },
-                    { key: 'jeudi', label: 'Jeudi' },
-                    { key: 'vendredi', label: 'Vendredi' },
-                  ];
-                  const total = jours.reduce((s, j) => s + (parseFloat(weeklyHours[j.key]) || 0), 0);
-                  const totalRounded = Math.round(total * 100) / 100;
-                  const quotiteCalc = Math.round(total / 35 * 100);
-                  const quotiteApplied = Math.max(1, Math.min(100, quotiteCalc));
-                  const congesHeures = Math.round(total * 5 * 100) / 100;
-                  return (
-                    <div className="mt-3 p-3 rounded-lg border border-blue-100 bg-blue-50/50">
-                      <p className="text-xs font-medium text-gray-700 mb-2">Heures travaillées par jour</p>
-                      <div className="grid grid-cols-5 gap-2">
-                        {jours.map(j => (
-                          <div key={j.key}>
-                            <label className="block text-[11px] text-gray-500 mb-1 text-center">{j.label}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="24"
-                              step="0.5"
-                              value={weeklyHours[j.key]}
-                              onChange={(e) => setWeeklyHours({ ...weeklyHours, [j.key]: e.target.value })}
-                              placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm text-center border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
-                          <p className="text-[11px] text-gray-500">Heures / semaine</p>
-                          <p className="text-sm font-bold text-gray-800">{totalRounded} h</p>
-                        </div>
-                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
-                          <p className="text-[11px] text-gray-500">Quotité</p>
-                          <p className="text-sm font-bold text-gray-800">{quotiteCalc} %</p>
-                        </div>
-                        <div className="p-2 rounded-md bg-white ring-1 ring-gray-100">
-                          <p className="text-[11px] text-gray-500">Congés (5 sem.)</p>
-                          <p className="text-sm font-bold text-gray-800">{congesHeures} h</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (total <= 0) { toast.error('Saisissez au moins une heure'); return; }
-                          setNewUser({ ...newUser, quotite_travail: quotiteApplied });
-                          toast.success(`Quotité fixée à ${quotiteApplied}% (${totalRounded} h/sem)`);
-                        }}
-                        className="w-full mt-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-                      >
-                        Appliquer la quotité ({quotiteCalc}%)
-                      </button>
-                      <p className="text-[11px] text-gray-500 mt-2">
-                        Référence temps plein : 35 h/semaine. Congés annuels = 5 × heures hebdomadaires.
-                      </p>
-                    </div>
-                  );
-                })()}
+                {showHoursCalendar && (
+                  <HorairesTravailEditor
+                    schedule={weeklySchedule}
+                    setSchedule={setWeeklySchedule}
+                    onApplyQuotite={(q, h) => {
+                      setNewUser({ ...newUser, quotite_travail: q });
+                      toast.success(`Quotité fixée à ${q}% (${h} h/sem)`);
+                    }}
+                  />
+                )}
               </div>
 
               <div className="mb-4">
@@ -1937,7 +2044,7 @@ export default function RHPage() {
                     setShowCreateUserModal(false);
                     setNewUser({ nom: '', prenom: '', email: '', type_utilisateur: 'Employé', service: '', poste: '', type_contrat: 'CDI', date_debut_contrat: '', date_fin_contrat: '', date_entree_mairie: '', quotite_travail: 100, responsable_id: '' });
                     setShowHoursCalendar(false);
-                    setWeeklyHours({ lundi: '', mardi: '', mercredi: '', jeudi: '', vendredi: '' });
+                    setWeeklySchedule(emptySchedule());
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >
@@ -2136,6 +2243,29 @@ export default function RHPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Les jours de congés seront proratisés selon la quotité ({Math.round(25 * (editingUser.quotite_travail || 100) / 100 * 100) / 100} jours/an)
                 </p>
+
+                {/* Assistant : emploi du temps hebdomadaire */}
+                <button
+                  type="button"
+                  onClick={() => setShowEditHoursCalendar(v => !v)}
+                  className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {showEditHoursCalendar ? "Masquer les horaires" : (scheduleHasData(editSchedule) ? "Modifier les horaires hebdomadaires" : "Renseigner les horaires hebdomadaires")}
+                </button>
+
+                {showEditHoursCalendar && (
+                  <HorairesTravailEditor
+                    schedule={editSchedule}
+                    setSchedule={setEditSchedule}
+                    onApplyQuotite={(q, h) => {
+                      setEditingUser({ ...editingUser, quotite_travail: q });
+                      toast.success(`Quotité fixée à ${q}% (${h} h/sem)`);
+                    }}
+                  />
+                )}
               </div>
 
               <div className="mb-4">
@@ -2255,6 +2385,8 @@ export default function RHPage() {
                   onClick={() => {
                     setShowEditUserModal(false);
                     setEditingUser(null);
+                    setShowEditHoursCalendar(false);
+                    setEditSchedule(emptySchedule());
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
                 >

@@ -42,6 +42,7 @@ async function runMigrations() {
     { table: 'soldes_conges', column: 'jours_fractionnement', type: 'REAL DEFAULT 0' },
     { table: 'soldes_conges', column: 'jours_compensateurs', type: 'REAL DEFAULT 0' },
     { table: 'users', column: 'quotite_travail', type: 'REAL DEFAULT 100' },
+    { table: 'users', column: 'horaires_travail', type: 'TEXT' },
     { table: 'users', column: 'responsable_id', type: 'INTEGER' },
     { table: 'users', column: 'niveau_validation', type: 'INTEGER DEFAULT 0' },
     { table: 'demandes_conges', column: 'statut_niveau_1', type: 'TEXT DEFAULT NULL' },
@@ -343,6 +344,7 @@ export const initDatabase = async () => {
         service TEXT,
         poste TEXT,
         quotite_travail REAL DEFAULT 100,
+        horaires_travail TEXT,
         responsable_id INTEGER,
         niveau_validation INTEGER DEFAULT 0
       )

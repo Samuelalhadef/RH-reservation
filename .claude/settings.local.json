@@ -91,7 +91,8 @@
       "Bash(head -n 66 /tmp/rhcreate.patch)",
       "Bash(git apply *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git --no-pager diff --stat -- src/lib/db.js \"src/app/api/users/route.js\" \"src/app/api/users/[id]/route.js\" \"src/app/api/users/all/route.js\" src/app/rh/page.js)"
     ],
     "deny": [],
     "ask": []

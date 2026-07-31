@@ -14,7 +14,7 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    let { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, responsable_id } = await request.json();
+    let { nom, prenom, email, type_utilisateur, service, poste, actif, type_contrat, date_debut_contrat, date_fin_contrat, date_entree_mairie, quotite_travail, horaires_travail, responsable_id } = await request.json();
 
     if (!nom || !prenom || !email || !type_utilisateur) {
       return NextResponse.json(
@@ -35,6 +35,11 @@ export async function PUT(request, { params }) {
     if (type_contrat === 'Mi-temps') {
       quotite_travail = 50;
     }
+
+    // Horaires de travail : stockés en JSON (matin/après-midi par jour)
+    const horairesJson = horaires_travail
+      ? (typeof horaires_travail === 'string' ? horaires_travail : JSON.stringify(horaires_travail))
+      : null;
 
     const existing = await db.execute({
       sql: 'SELECT id FROM users WHERE id = ?',
@@ -59,7 +64,7 @@ export async function PUT(request, { params }) {
       sql: `
         UPDATE users
         SET nom = ?, prenom = ?, email = ?, type_utilisateur = ?, service = ?, poste = ?, actif = ?,
-            type_contrat = ?, date_debut_contrat = ?, date_fin_contrat = ?, date_entree_mairie = ?, quotite_travail = ?, responsable_id = ?
+            type_contrat = ?, date_debut_contrat = ?, date_fin_contrat = ?, date_entree_mairie = ?, quotite_travail = ?, horaires_travail = ?, responsable_id = ?
         WHERE id = ?
       `,
       args: [
@@ -75,6 +80,7 @@ export async function PUT(request, { params }) {
         date_fin_contrat || null,
         date_entree_mairie || null,
         quotite_travail || 100,
+        horairesJson,
         responsable_id || null,
         id
       ]
