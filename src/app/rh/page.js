@@ -9,61 +9,15 @@ const AdvancedStatsRH = dynamic(() => import('@/components/AdvancedStatsRH'), {
   loading: () => <div className="p-8 text-center text-gray-500">Chargement des statistiques...</div>
 });
 import { formatDateFR, formatStatus, getStatusColor } from '@/lib/clientDateUtils';
+import {
+  JOURS_SEMAINE,
+  emptySchedule,
+  parseSchedule,
+  scheduleHasData,
+  heuresJour,
+  heuresSemaine,
+} from '@/lib/horaires';
 import toast from 'react-hot-toast';
-
-// --- Horaires de travail (emploi du temps hebdomadaire) ---
-const JOURS_SEMAINE = [
-  { key: 'lundi', label: 'Lundi' },
-  { key: 'mardi', label: 'Mardi' },
-  { key: 'mercredi', label: 'Mercredi' },
-  { key: 'jeudi', label: 'Jeudi' },
-  { key: 'vendredi', label: 'Vendredi' },
-];
-
-const emptySchedule = () =>
-  JOURS_SEMAINE.reduce((acc, j) => {
-    acc[j.key] = { m_debut: '', m_fin: '', a_debut: '', a_fin: '' };
-    return acc;
-  }, {});
-
-// Parse une valeur stockée (chaîne JSON ou objet) vers un objet horaires complet
-const parseSchedule = (value) => {
-  const base = emptySchedule();
-  if (!value) return base;
-  try {
-    const obj = typeof value === 'string' ? JSON.parse(value) : value;
-    if (obj && typeof obj === 'object') {
-      for (const j of JOURS_SEMAINE) {
-        if (obj[j.key]) base[j.key] = { ...base[j.key], ...obj[j.key] };
-      }
-    }
-  } catch (e) {
-    // valeur illisible → horaires vides
-  }
-  return base;
-};
-
-// Vrai si au moins un créneau est renseigné
-const scheduleHasData = (schedule) =>
-  JOURS_SEMAINE.some((j) => {
-    const d = schedule[j.key] || {};
-    return d.m_debut || d.m_fin || d.a_debut || d.a_fin;
-  });
-
-// Heures entre deux "HH:MM" (0 si invalide/négatif)
-const diffHeures = (debut, fin) => {
-  if (!debut || !fin) return 0;
-  const [h1, m1] = debut.split(':').map(Number);
-  const [h2, m2] = fin.split(':').map(Number);
-  if ([h1, m1, h2, m2].some((n) => Number.isNaN(n))) return 0;
-  const mins = h2 * 60 + m2 - (h1 * 60 + m1);
-  return mins > 0 ? mins / 60 : 0;
-};
-
-const heuresJour = (d) => (d ? diffHeures(d.m_debut, d.m_fin) + diffHeures(d.a_debut, d.a_fin) : 0);
-
-const heuresSemaine = (schedule) =>
-  JOURS_SEMAINE.reduce((s, j) => s + heuresJour(schedule[j.key]), 0);
 
 function HorairesTravailEditor({ schedule, setSchedule, onApplyQuotite }) {
   const total = heuresSemaine(schedule);

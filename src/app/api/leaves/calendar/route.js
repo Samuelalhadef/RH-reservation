@@ -42,9 +42,32 @@ export async function GET(request) {
 
     const result = await db.execute({ sql, args });
 
+    // Récupérations posées (validées ou en attente) — pour affichage dans le calendrier
+    let recupSql = `
+      SELECT id, date_debut, date_fin, nombre_heures, statut, raison
+      FROM demandes_utilisation_recup
+      WHERE statut IN ('validee', 'en_attente')
+      AND user_id = ?
+    `;
+    const recupArgs = [userId];
+
+    if (year) {
+      recupSql += ' AND strftime("%Y", date_debut) = ?';
+      recupArgs.push(year.toString());
+    }
+    if (month) {
+      recupSql += ' AND strftime("%m", date_debut) = ?';
+      recupArgs.push(month.toString().padStart(2, '0'));
+    }
+
+    recupSql += ' ORDER BY date_debut';
+
+    const recupResult = await db.execute({ sql: recupSql, args: recupArgs });
+
     return NextResponse.json({
       success: true,
-      events: result.rows
+      events: result.rows,
+      recups: recupResult.rows
     });
   } catch (error) {
     console.error('Error fetching calendar:', error);

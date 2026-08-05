@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDateFR } from '@/lib/clientDateUtils';
+import { parseSchedule, scheduleHasData, diffHeures } from '@/lib/horaires';
 import toast from 'react-hot-toast';
 
 const LeaveCalendar = ({ onLeaveCreated }) => {
   const { isAlternant } = useAuth();
   const [leaves, setLeaves] = useState([]);
+  const [recups, setRecups] = useState([]);
+  const [schedule, setSchedule] = useState(null);
   const [holidays, setHolidays] = useState([]);
   const [schoolHolidays, setSchoolHolidays] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -39,6 +42,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         fetch('/api/leaves/calendar').then(r => r.json()),
         fetch('/api/holidays/all').then(r => r.json()),
         fetch('/api/school-holidays').then(r => r.json()),
+        fetch('/api/users/profile').then(r => r.json()),
       ];
 
       if (isAlternant()) {
@@ -48,11 +52,13 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
       const results = await Promise.all(promises);
 
       setLeaves(results[0].events || []);
+      setRecups(results[0].recups || []);
       setHolidays(results[1].holidays || []);
       setSchoolHolidays(results[2].periods || []);
+      setSchedule(parseSchedule(results[3]?.user?.horaires_travail));
 
-      if (isAlternant() && results[3]) {
-        const daysSet = new Set((results[3].jours || []).map(j => j.date));
+      if (isAlternant() && results[4]) {
+        const daysSet = new Set((results[4].jours || []).map(j => j.date));
         setCoursDays(daysSet);
       }
     } catch (error) {
@@ -128,6 +134,19 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     return schoolHolidays.some(p => dateStr >= p.debut && dateStr <= p.fin);
   };
 
+  // Clé jour de semaine (dimanche=0 → samedi=6) pour l'emploi du temps hebdomadaire
+  const WEEKDAY_KEYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+  // Vrai si l'agent ne travaille pas cette demi-journée selon son planning hebdo.
+  // Ne s'applique que si un planning est réellement configuré (sinon rien n'est grisé).
+  const isNonWorkingHalfDay = (date, period) => {
+    if (!schedule || !scheduleHasData(schedule)) return false;
+    const d = schedule[WEEKDAY_KEYS[date.getDay()]];
+    if (!d) return false; // week-end : géré ailleurs
+    if (period === 'matin') return diffHeures(d.m_debut, d.m_fin) <= 0;
+    return diffHeures(d.a_debut, d.a_fin) <= 0;
+  };
+
   // Détermine le statut d'une demi-journée par rapport aux congés existants
   const getHalfDayLeaveStatus = (date, period) => {
     const dateStr = formatDateToYYYYMMDD(date);
@@ -191,6 +210,44 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     return null;
   };
 
+  // Détermine quelles demi-journées d'une date sont couvertes par une récup
+  // Retourne { matin: bool, apres_midi: bool } ou null si la date n'est pas concernée
+  const getRecupPeriods = (recup, dateStr) => {
+    const startStr = recup.date_debut.split('T')[0];
+    const endStr = recup.date_fin.split('T')[0];
+
+    if (dateStr < startStr || dateStr > endStr) return null;
+
+    // Récup sur plusieurs jours : journée entière couverte
+    if (startStr !== endStr) return { matin: true, apres_midi: true };
+
+    // Récup sur un seul jour : on déduit matin/après-midi de l'horaire dans la raison
+    const timeMatch = (recup.raison || '').match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (!timeMatch) return { matin: true, apres_midi: true }; // horaire inconnu → journée entière
+
+    const startMin = parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10);
+    const endMin = parseInt(timeMatch[3], 10) * 60 + parseInt(timeMatch[4], 10);
+    const NOON = 13 * 60; // frontière déjeuner à 13:00
+
+    const matin = startMin < NOON;
+    const apresMidi = endMin > NOON;
+
+    if (!matin && !apresMidi) return { matin: true, apres_midi: false };
+    return { matin, apres_midi: apresMidi };
+  };
+
+  // Statut de récup d'une demi-journée (ou null)
+  const getHalfDayRecupStatus = (date, period) => {
+    const dateStr = formatDateToYYYYMMDD(date);
+
+    for (const recup of recups) {
+      const periods = getRecupPeriods(recup, dateStr);
+      if (periods && periods[period]) return { statut: recup.statut, recup };
+    }
+
+    return null;
+  };
+
   const isHalfDaySelectable = (date, period) => {
     if (isPastDate(date)) return false;
     if (isLessThan7DaysAhead(date)) return false;
@@ -203,8 +260,14 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     // Alternants ne peuvent pas poser de congé sur leurs jours de cours
     if (isAlternant() && coursDays.has(dateStr)) return false;
 
+    // Impossible de poser un congé sur une demi-journée non travaillée
+    if (isNonWorkingHalfDay(date, period)) return false;
+
     const leaveStatus = getHalfDayLeaveStatus(date, period);
     if (leaveStatus && leaveStatus.statut === 'validee') return false;
+
+    const recupStatus = getHalfDayRecupStatus(date, period);
+    if (recupStatus && recupStatus.statut === 'validee') return false;
 
     return true;
   };
@@ -407,6 +470,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const isTooSoon = isLessThan7DaysAhead(date);
     const isHoliday = holidays.some(h => h.date === dateStr);
     const leaveStatus = getHalfDayLeaveStatus(date, period);
+    const recupStatus = getHalfDayRecupStatus(date, period);
     const inRange = isInSelectedRange(date, period);
     const isStart = isStartSlot(date, period);
     const isEnd = isEndSlot(date, period);
@@ -415,10 +479,13 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (isWeekend(date)) return 'bg-gray-100';
     if (isHoliday) return 'bg-gray-300 ring-1 ring-inset ring-gray-400';
     if (isCours) return 'bg-violet-200';
+    if (isNonWorkingHalfDay(date, period)) return 'bg-gray-100';
 
     if (isPast || isTooSoon) {
       if (leaveStatus && leaveStatus.statut === 'validee') return 'bg-green-200 opacity-60';
       if (leaveStatus && leaveStatus.statut === 'en_attente') return 'bg-orange-200 opacity-60';
+      if (recupStatus && recupStatus.statut === 'validee') return 'bg-cyan-200 opacity-60';
+      if (recupStatus && recupStatus.statut === 'en_attente') return 'bg-cyan-100 opacity-60';
       return 'bg-gray-100';
     }
 
@@ -428,6 +495,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (leaveStatus) {
       if (leaveStatus.statut === 'validee') return 'bg-green-100';
       if (leaveStatus.statut === 'en_attente') return 'bg-orange-100';
+    }
+
+    if (recupStatus) {
+      if (recupStatus.statut === 'validee') return 'bg-cyan-200';
+      if (recupStatus.statut === 'en_attente') return 'bg-cyan-100';
     }
 
     return '';
@@ -446,12 +518,16 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (isWeekend(date)) return 'text-gray-400';
     if (isHoliday) return 'text-gray-600 font-bold';
     if (isCours) return 'text-violet-800 font-semibold';
+    if (isNonWorkingHalfDay(date, 'matin') && isNonWorkingHalfDay(date, 'apres_midi')) return 'text-gray-400';
 
     if (isPast || isTooSoon) {
       const lsAM = getHalfDayLeaveStatus(date, 'matin');
       const lsPM = getHalfDayLeaveStatus(date, 'apres_midi');
       if ((lsAM && lsAM.statut === 'validee') || (lsPM && lsPM.statut === 'validee')) return 'text-green-600 font-semibold';
       if ((lsAM && lsAM.statut === 'en_attente') || (lsPM && lsPM.statut === 'en_attente')) return 'text-orange-600 font-semibold';
+      const rsAM = getHalfDayRecupStatus(date, 'matin');
+      const rsPM = getHalfDayRecupStatus(date, 'apres_midi');
+      if (rsAM || rsPM) return 'text-cyan-700 font-semibold';
       return 'text-gray-400';
     }
 
@@ -470,6 +546,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     const lsPM = getHalfDayLeaveStatus(date, 'apres_midi');
     if (lsAM && lsAM.statut === 'validee' && lsPM && lsPM.statut === 'validee') return 'text-green-800 font-semibold';
     if (lsAM && lsAM.statut === 'en_attente' && lsPM && lsPM.statut === 'en_attente') return 'text-orange-800 font-semibold';
+
+    const rsAM = getHalfDayRecupStatus(date, 'matin');
+    const rsPM = getHalfDayRecupStatus(date, 'apres_midi');
+    if (rsAM || rsPM) return 'text-cyan-800 font-semibold';
 
     return 'text-gray-700';
   };
@@ -560,6 +640,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-orange-100 border-2 border-orange-300 rounded"></div>
             <span className="text-gray-600">En attente</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-cyan-200 border-2 border-cyan-400 rounded"></div>
+            <span className="text-gray-600">Récupération</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-gray-300 border-2 border-gray-400 rounded"></div>

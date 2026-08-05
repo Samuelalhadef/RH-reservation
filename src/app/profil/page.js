@@ -5,7 +5,77 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import ChangePasswordModal from '@/components/ChangePasswordModal';
+import { JOURS_SEMAINE, parseSchedule, scheduleHasData, heuresJour, heuresSemaine } from '@/lib/horaires';
 import toast from 'react-hot-toast';
+
+// "08:30" -> "8h30" ; "" -> null
+const fmtHeure = (h) => {
+  if (!h) return null;
+  const [hh, mm] = h.split(':');
+  return `${parseInt(hh, 10)}h${mm}`;
+};
+
+// Affichage lecture seule de l'emploi du temps : jours/créneaux non travaillés grisés
+function HorairesApercu({ horaires }) {
+  const schedule = parseSchedule(horaires);
+  const totalSemaine = Math.round(heuresSemaine(schedule) * 100) / 100;
+
+  const Creneau = ({ debut, fin, label, couleur }) => {
+    const d = fmtHeure(debut);
+    const f = fmtHeure(fin);
+    if (!d || !f) {
+      return (
+        <div className="flex-1 rounded-lg px-3 py-2 bg-gray-100 text-gray-400 text-center">
+          <span className="text-[10px] uppercase tracking-wide block">{label}</span>
+          <span className="text-sm font-medium">Repos</span>
+        </div>
+      );
+    }
+    return (
+      <div className={`flex-1 rounded-lg px-3 py-2 text-center ${couleur}`}>
+        <span className="text-[10px] uppercase tracking-wide block opacity-70">{label}</span>
+        <span className="text-sm font-semibold">{d} – {f}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      {JOURS_SEMAINE.map((j) => {
+        const d = schedule[j.key] || {};
+        const h = heuresJour(d);
+        const jourTravaille = h > 0;
+        return (
+          <div
+            key={j.key}
+            className={`flex flex-wrap items-center gap-2 rounded-xl p-2.5 border ${
+              jourTravaille ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100 opacity-60'
+            }`}
+          >
+            <span className={`w-20 shrink-0 text-sm font-semibold ${jourTravaille ? 'text-gray-800' : 'text-gray-400'}`}>
+              {j.label}
+            </span>
+            {jourTravaille ? (
+              <>
+                <Creneau debut={d.m_debut} fin={d.m_fin} label="Matin" couleur="bg-amber-50 text-amber-700" />
+                <Creneau debut={d.a_debut} fin={d.a_fin} label="Après-midi" couleur="bg-indigo-50 text-indigo-700" />
+                <span className="w-16 text-right text-sm font-bold text-gray-700">
+                  {Math.round(h * 100) / 100} h
+                </span>
+              </>
+            ) : (
+              <span className="flex-1 text-sm font-medium text-gray-400">Non travaillé</span>
+            )}
+          </div>
+        );
+      })}
+      <div className="flex justify-between items-center pt-2 px-1">
+        <span className="text-sm text-gray-500">Total hebdomadaire</span>
+        <span className="text-lg font-bold text-violet-600">{totalSemaine} h</span>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilPage() {
   const { user, isAuthenticated } = useAuth();
@@ -399,6 +469,25 @@ export default function ProfilPage() {
               </div>
             </div>
           </div>
+
+            {/* Mon emploi du temps */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Mon emploi du temps</h3>
+                {profile?.quotite_travail != null && (
+                  <span className="text-xs font-medium text-violet-700 bg-violet-50 rounded-full px-2.5 py-1">
+                    Quotité {profile.quotite_travail}%
+                  </span>
+                )}
+              </div>
+              {scheduleHasData(parseSchedule(profile?.horaires_travail)) ? (
+                <HorairesApercu horaires={profile.horaires_travail} />
+              ) : (
+                <p className="text-sm text-gray-400">
+                  Vos horaires ne sont pas encore renseignés. Contactez le service RH.
+                </p>
+              )}
+            </div>
 
             {/* Mes données personnelles (RGPD) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
