@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { invalidate } from '@/lib/dataCache';
 
 const AuthContext = createContext(null);
 
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }) => {
       // Refresh en arrière-plan (non bloquant) : vérifie session + photo + rôle
       fetch('/api/users/profile').then(res => {
         if (res.status === 401) {
+          invalidate();
           setUser(null);
           localStorage.removeItem('user');
           toast.error('Session expirée, veuillez vous reconnecter');
@@ -61,6 +63,9 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Erreur de connexion');
       }
 
+      // Vide le cache client : aucune donnée d'une session précédente ne doit
+      // rester visible pour le nouvel utilisateur.
+      invalidate();
       setUser(data.user);
       localStorage.setItem('user', JSON.stringify(data.user));
       toast.success(`Bienvenue ${data.user.prenom} ${data.user.nom}!`);
@@ -74,6 +79,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      invalidate();
       setUser(null);
       localStorage.removeItem('user');
       toast.success('Déconnexion réussie');

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { prefetch } from '@/lib/dataCache';
 
 const NotificationButton = dynamic(() => import('./NotificationButton'), {
   ssr: false,
@@ -43,6 +44,30 @@ const Navbar = () => {
     navItems.push({ label: 'Interface RH', path: '/rh' });
   }
 
+  // La navigation se fait par router.push (et non par <Link>), donc Next ne
+  // précharge rien automatiquement : on déclenche le préchargement du code des
+  // pages du menu dès l'affichage de la barre.
+  const navPaths = navItems.map((i) => i.path).join(',');
+  useEffect(() => {
+    for (const path of navPaths.split(',')) {
+      if (path) router.prefetch(path);
+    }
+  }, [navPaths, router]);
+
+  // Données à précharger au survol d'un onglet : la page s'ouvre déjà remplie.
+  const ROUTE_DATA = {
+    '/dashboard': ['/api/users/profile', '/api/leaves/my-leaves'],
+    '/mes-demandes': ['/api/leaves/my-leaves'],
+    '/recuperation': ['/api/users/profile', '/api/recuperation', '/api/recuperation/utilisation', '/api/parentalite'],
+    '/validation': ['/api/leaves/pending-validation', '/api/recuperation/pending-validation'],
+    '/rh': ['/api/leaves', '/api/users/all', '/api/cet/requests', '/api/recuperation/all', '/api/parentalite/all'],
+  };
+
+  const handleNavHover = (path) => {
+    router.prefetch(path);
+    prefetch(ROUTE_DATA[path] || [], { ttl: 60_000 });
+  };
+
   return (
     <>
     <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-100 shadow-sm">
@@ -73,6 +98,8 @@ const Navbar = () => {
               <button
                 key={item.path}
                 onClick={() => router.push(item.path)}
+                onMouseEnter={() => handleNavHover(item.path)}
+                onFocus={() => handleNavHover(item.path)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                   pathname === item.path
                     ? 'bg-white text-blue-700 shadow-sm ring-1 ring-blue-100'
@@ -186,6 +213,8 @@ const Navbar = () => {
                 router.push(item.path);
                 setMobileMenuOpen(false);
               }}
+              onTouchStart={() => handleNavHover(item.path)}
+              onMouseEnter={() => handleNavHover(item.path)}
               className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition ${
                 pathname === item.path
                   ? 'bg-blue-50 text-blue-600'

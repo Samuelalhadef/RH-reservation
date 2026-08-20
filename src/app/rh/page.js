@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
@@ -18,6 +18,7 @@ import {
   heuresSemaine,
 } from '@/lib/horaires';
 import toast from 'react-hot-toast';
+import { fetchJson, hasCached, invalidate, prefetch } from '@/lib/dataCache';
 
 function HorairesTravailEditor({ schedule, setSchedule, onApplyQuotite }) {
   const total = heuresSemaine(schedule);
@@ -119,13 +120,16 @@ function HorairesTravailEditor({ schedule, setSchedule, onApplyQuotite }) {
 }
 
 export default function RHPage() {
-  const { isRH, isAuthenticated } = useAuth();
+  const { isRH, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [allLeaves, setAllLeaves] = useState([]);
   const [searchAll, setSearchAll] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Rafraîchissement en arrière-plan : les données déjà chargées restent visibles.
+  const [refreshing, setRefreshing] = useState(false);
+  const prefetchedRef = useRef(false);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [newUser, setNewUser] = useState({
     nom: '',
@@ -195,82 +199,156 @@ export default function RHPage() {
   const [forceValidateComment, setForceValidateComment] = useState('');
   const [forceValidateLoading, setForceValidateLoading] = useState(false);
 
+  // Endpoints nécessaires à chaque onglet. Sert au chargement, au rafraîchissement
+  // et au préchargement en arrière-plan.
+  const TAB_ENDPOINTS = useMemo(() => ({
+    all: ['/api/leaves'],
+    stats: [],
+    users: ['/api/users/all'],
+    'create-leave': ['/api/users/all'],
+    'cet-requests': ['/api/cet/requests'],
+    'cet-balances': ['/api/cet/all-balances'],
+    'recup-requests': [
+      '/api/recuperation/all',
+      '/api/recuperation/all-balances',
+      '/api/users/all',
+    ],
+    parentalite: ['/api/parentalite/all'],
+  }), []);
+
+  // Compteurs des pastilles d'onglets : chargés une seule fois, pas à chaque changement d'onglet.
+  const BADGE_ENDPOINTS = useMemo(
+    () => ['/api/cet/requests', '/api/recuperation/all', '/api/parentalite/all'],
+    []
+  );
+
+  // Range une réponse API dans le bon état. Une même URL peut alimenter
+  // plusieurs onglets (ex. /api/users/all), d'où l'aiguillage par URL.
+  const applyData = useCallback((url, data) => {
+    switch (url) {
+      case '/api/leaves':
+        setAllLeaves(data.leaves || []);
+        break;
+      case '/api/users/all':
+        setUsers(data.users || []);
+        setAllUsers(data.users || []);
+        break;
+      case '/api/cet/requests':
+        setCetRequests(data.demandes || []);
+        break;
+      case '/api/cet/all-balances':
+        setCetBalances(data.balances || []);
+        break;
+      case '/api/recuperation/all':
+        setRecupRequests(data.demandes || []);
+        setRecupUtilRequests(data.demandes_utilisation || []);
+        break;
+      case '/api/recuperation/all-balances':
+        setRecupBalances(data.balances || []);
+        break;
+      case '/api/parentalite/all':
+        setParentaliteRequests(data.demandes || []);
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  const loadUrls = useCallback(
+    async (urls, { force = false } = {}) => {
+      const results = await Promise.allSettled(
+        urls.map((url) => fetchJson(url, { force }).then((data) => applyData(url, data)))
+      );
+      return results.every((r) => r.status === 'fulfilled');
+    },
+    [applyData]
+  );
+
+  /**
+   * Charge un onglet. Si les données sont déjà en cache, elles restent affichées
+   * pendant la revalidation : l'écran ne se vide plus à chaque clic.
+   */
+  const loadTab = useCallback(
+    async (tab, { force = false } = {}) => {
+      const urls = TAB_ENDPOINTS[tab] || [];
+      const alreadyVisible = urls.every((url) => hasCached(url));
+
+      if (alreadyVisible) {
+        setLoading(false);
+        if (urls.length) setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      // Données déjà affichées : on revalide systématiquement en arrière-plan
+      // (motif « stale-while-revalidate ») pour ne jamais montrer un écran vide
+      // ni des chiffres périmés.
+      const ok = await loadUrls(urls, { force: force || alreadyVisible });
+      if (!ok) {
+        console.error(`Erreur lors du chargement des données de l'onglet ${tab}`);
+        toast.error('Erreur lors du chargement des données');
+      }
+
+      setLoading(false);
+      setRefreshing(false);
+      return ok;
+    },
+    [TAB_ENDPOINTS, loadUrls]
+  );
+
+  /** Rafraîchit les pastilles d'onglets sans bloquer l'affichage. */
+  const refreshBadges = useCallback(
+    (options) => loadUrls(BADGE_ENDPOINTS, options).catch(() => false),
+    [BADGE_ENDPOINTS, loadUrls]
+  );
+
+  /**
+   * Après une modification : on vide le cache et on recharge l'onglet courant
+   * ainsi que les pastilles avec des données fraîches.
+   */
+  const fetchData = useCallback(async () => {
+    invalidate();
+    await Promise.all([
+      loadTab(activeTab, { force: true }),
+      refreshBadges({ force: true }),
+    ]);
+  }, [activeTab, loadTab, refreshBadges]);
+
+  const isRHUser = isRH();
+
   useEffect(() => {
+    // Tant que le contexte d'authentification lit la session, on n'affiche ni
+    // redirection ni écran vide : cela provoquait un aller-retour vers l'accueil.
+    if (authLoading) return;
+
     if (!isAuthenticated) {
       router.push('/');
-    } else if (!isRH()) {
-      router.push('/dashboard');
-    } else {
-      fetchData();
+      return;
     }
-  }, [activeTab, isAuthenticated, isRH, router]);
-
-  const fetchData = async () => {
-    // Toujours charger le nombre de demandes CET, récup et parentalité pour les badges
-    try {
-      const [cetRes, recupRes, parentaliteRes] = await Promise.all([
-        fetch('/api/cet/requests').then(r => r.json()),
-        fetch('/api/recuperation/all').then(r => r.json()),
-        fetch('/api/parentalite/all').then(r => r.json())
-      ]);
-      setCetRequests(cetRes.demandes || []);
-      setRecupRequests(recupRes.demandes || []);
-      setParentaliteRequests(parentaliteRes.demandes || []);
-    } catch (e) { /* ignore */ }
-
-    if (activeTab === 'stats') {
-      setLoading(false);
+    if (!isRHUser) {
+      router.push('/dashboard');
       return;
     }
 
-    setLoading(true);
-    try {
-      if (activeTab === 'all') {
-        const response = await fetch('/api/leaves');
-        const data = await response.json();
-        setAllLeaves(data.leaves || []);
-      } else if (activeTab === 'users') {
-        const response = await fetch('/api/users/all');
-        const data = await response.json();
-        console.log('Users data:', data);
-        setUsers(data.users || []);
-      } else if (activeTab === 'create-leave') {
-        const response = await fetch('/api/users/all');
-        const data = await response.json();
-        setAllUsers(data.users || []);
-      } else if (activeTab === 'cet-requests') {
-        const response = await fetch('/api/cet/requests');
-        const data = await response.json();
-        setCetRequests(data.demandes || []);
-      } else if (activeTab === 'recup-requests') {
-        const [allRes, balRes, usersRes] = await Promise.all([
-          fetch('/api/recuperation/all').then(r => r.json()),
-          fetch('/api/recuperation/all-balances').then(r => r.json()),
-          fetch('/api/users/all').then(r => r.json())
-        ]);
-        setRecupRequests(allRes.demandes || []);
-        setRecupUtilRequests(allRes.demandes_utilisation || []);
-        setRecupBalances(balRes.balances || []);
-        setAllUsers(usersRes.users || []);
-      } else if (activeTab === 'cet-balances') {
-        const response = await fetch('/api/cet/all-balances');
-        const data = await response.json();
-        setCetBalances(data.balances || []);
-      } else if (activeTab === 'parentalite') {
-        const response = await fetch('/api/parentalite/all');
-        const data = await response.json();
-        setParentaliteRequests(data.demandes || []);
+    let cancelled = false;
+    (async () => {
+      await loadTab(activeTab);
+      if (cancelled) return;
+      refreshBadges();
+      // Précharge les autres onglets : le clic suivant est instantané.
+      if (!prefetchedRef.current) {
+        prefetchedRef.current = true;
+        prefetch(
+          [...new Set(Object.values(TAB_ENDPOINTS).flat())],
+          { ttl: 60_000 }
+        );
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Erreur lors du chargement des données');
-      if (activeTab === 'all') setAllLeaves([]);
-      if (activeTab === 'users') setUsers([]);
-      if (activeTab === 'create-leave') setAllUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, authLoading, isAuthenticated, isRHUser, router, loadTab, refreshBadges, TAB_ENDPOINTS]);
 
   const handleResetPassword = async (userId) => {
     if (!window.confirm('Réinitialiser le mot de passe de cet utilisateur ?')) {
@@ -618,12 +696,17 @@ export default function RHPage() {
     }
   };
 
+  // Écran d'attente réservé au tout premier chargement (aucune donnée en cache).
+  // Les changements d'onglet réutilisent le cache et n'effacent plus l'écran.
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center">Chargement...</p>
+        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4">
+          <div className="h-16 bg-white rounded-2xl shadow-sm border border-gray-100 animate-pulse" />
+          <div className="h-32 bg-white rounded-2xl shadow-sm border border-gray-100 animate-pulse" />
+          <div className="h-64 bg-white rounded-2xl shadow-sm border border-gray-100 animate-pulse" />
+          <p className="text-center text-sm text-gray-400">Chargement des données…</p>
         </div>
       </div>
     );
@@ -632,6 +715,14 @@ export default function RHPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+
+      {/* Revalidation en arrière-plan : les données affichées restent utilisables */}
+      {refreshing && (
+        <div className="fixed top-16 right-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 shadow-md border border-gray-100 text-xs text-gray-500">
+          <span className="w-3 h-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+          Mise à jour…
+        </div>
+      )}
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Barre d'onglets principale - style pilule */}
@@ -3521,9 +3612,8 @@ function PlaceRecupForm({ recupBalances, rhRecupForm, setRhRecupForm, rhRecupLoa
       if (!response.ok) throw new Error(data.message);
       toast.success('Récupération placée et validée');
       setRhRecupForm({ user_id: '', date_debut: '', date_fin: '', nombre_heures: '', raison: '' });
-      const balRes = await fetch('/api/recuperation/all-balances').then(r => r.json());
-      setRecupBalances(balRes.balances || []);
-      if (fetchData) fetchData();
+      // fetchData() invalide le cache et recharge soldes + demandes de récupération.
+      if (fetchData) await fetchData();
     } catch (error) {
       toast.error(error.message);
     } finally {

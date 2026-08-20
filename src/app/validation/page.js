@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import { formatDateFR } from '@/lib/clientDateUtils';
 import toast from 'react-hot-toast';
+import { fetchJson, hasCached } from '@/lib/dataCache';
+
+const PENDING_URLS = ['/api/leaves/pending-validation', '/api/recuperation/pending-validation'];
 
 export default function ValidationPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [pendingDeclarations, setPendingDeclarations] = useState([]);
@@ -20,20 +23,26 @@ export default function ValidationPage() {
   const [validatorInfo, setValidatorInfo] = useState(null);
 
   useEffect(() => {
+    // On attend la lecture de la session avant de rediriger, sinon la page
+    // repart vers l'accueil avant même d'avoir pu charger quoi que ce soit.
+    if (authLoading) return;
     if (!isAuthenticated) {
       router.push('/');
-    } else {
-      fetchPending();
+      return;
     }
-  }, [isAuthenticated, router]);
+    fetchPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, router]);
 
-  const fetchPending = async () => {
-    setLoading(true);
+  const fetchPending = useCallback(async () => {
+    // Si les demandes sont déjà en cache, on les garde à l'écran pendant la
+    // revalidation au lieu d'afficher un spinner à chaque retour sur la page.
+    const cached = PENDING_URLS.every(hasCached);
+    if (!cached) setLoading(true);
     try {
-      const [leavesRes, recupRes] = await Promise.all([
-        fetch('/api/leaves/pending-validation').then(r => r.json()),
-        fetch('/api/recuperation/pending-validation').then(r => r.json())
-      ]);
+      const [leavesRes, recupRes] = await Promise.all(
+        PENDING_URLS.map((url) => fetchJson(url, { force: true }).catch(() => ({})))
+      );
       if (leavesRes.success) {
         setPendingLeaves(leavesRes.leaves || []);
         setValidatorInfo(leavesRes.validator_info);
@@ -49,7 +58,7 @@ export default function ValidationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleValidateLeave = async (leaveId, status) => {
     try {

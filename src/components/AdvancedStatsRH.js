@@ -17,6 +17,7 @@ import {
 import { Bar, Doughnut, PolarArea } from 'react-chartjs-2';
 import toast from 'react-hot-toast';
 import { exportToExcel, exportToPDF } from '@/lib/exportUtils';
+import { fetchJson, hasCached } from '@/lib/dataCache';
 
 // Enregistrer les composants Chart.js
 ChartJS.register(
@@ -52,35 +53,37 @@ export default function AdvancedStatsRH() {
   const [allUsers, setAllUsers] = useState([]);
 
   useEffect(() => {
-    fetchStats();
-    fetchAllUsers();
+    const statsUrl = `/api/leaves/dashboard-stats?year=${selectedYear}`;
+    // Données déjà connues : on les réaffiche tout de suite et on revalide ensuite.
+    const cached = hasCached(statsUrl);
+    if (!cached) setLoading(true);
+
+    let cancelled = false;
+
+    fetchJson(statsUrl, { force: cached })
+      .then((data) => {
+        if (!cancelled) setStats(data.stats);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Erreur lors du chargement des statistiques avancées');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    fetchJson('/api/users/all')
+      .then((data) => {
+        if (!cancelled && data.success) setAllUsers(data.users || []);
+      })
+      .catch(() => {});
+
+    // Précharge l'année précédente : le sélecteur d'année répond instantanément.
+    fetchJson(`/api/leaves/dashboard-stats?year=${selectedYear - 1}`, { ttl: 120_000 }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedYear]);
-
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/leaves/dashboard-stats?year=${selectedYear}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
-      setStats(data.stats);
-    } catch (error) {
-      toast.error('Erreur lors du chargement des statistiques avancées');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAllUsers = async () => {
-    try {
-      const response = await fetch('/api/users/all');
-      const data = await response.json();
-      if (data.success) {
-        setAllUsers(data.users || []);
-      }
-    } catch (error) {
-      // ignore fetch error
-    }
-  };
 
   const handleExportExcel = async () => {
     if (allUsers.length === 0) {

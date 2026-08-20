@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import toast from 'react-hot-toast';
+import { fetchJson, hasCached, invalidate, prefetch } from '@/lib/dataCache';
 
 const LeaveCalendar = dynamic(() => import('@/components/LeaveCalendar'), {
   ssr: false,
@@ -19,30 +20,33 @@ const ChangePasswordModal = dynamic(() => import('@/components/ChangePasswordMod
 });
 
 export default function DashboardPage() {
-  const { user, refreshProfile, isAuthenticated } = useAuth();
+  const { user, refreshProfile, isAuthenticated, loading: authLoading, isRH } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [myLeaves, setMyLeaves] = useState([]);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/');
-    } else {
-      fetchData();
-      if (user?.requirePasswordChange) {
-        setShowPasswordModal(true);
-        toast.error('Vous devez changer votre mot de passe');
-      }
-    }
-  }, [isAuthenticated, user, router]);
+  const DASHBOARD_URLS = ['/api/users/profile', '/api/leaves/my-leaves'];
 
-  const fetchData = async () => {
+  // Endpoints de l'espace RH, préchargés pour les profils RH/Direction/DG afin
+  // que l'ouverture de /rh soit immédiate.
+  const RH_PREFETCH_URLS = [
+    '/api/leaves',
+    '/api/users/all',
+    '/api/cet/requests',
+    '/api/cet/all-balances',
+    '/api/recuperation/all',
+    '/api/recuperation/all-balances',
+    '/api/parentalite/all',
+  ];
+
+  const fetchData = useCallback(async ({ force = false } = {}) => {
+    if (force) invalidate(DASHBOARD_URLS);
     try {
       const [profileRes, leavesRes] = await Promise.all([
-        fetch('/api/users/profile').then(r => r.json()),
-        fetch('/api/leaves/my-leaves').then(r => r.json()),
+        fetchJson('/api/users/profile', { force }),
+        fetchJson('/api/leaves/my-leaves', { force }),
       ]);
 
       setProfile(profileRes.user || null);
@@ -50,12 +54,36 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Erreur lors du chargement des données');
-      setProfile(null);
-      setMyLeaves([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const isRHUser = isRH();
+  const requirePasswordChange = !!user?.requirePasswordChange;
+
+  useEffect(() => {
+    // On attend la fin de la lecture de session avant toute redirection.
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      router.push('/');
+      return;
+    }
+
+    // Données déjà en cache : affichage immédiat, revalidation en arrière-plan.
+    const cached = DASHBOARD_URLS.every(hasCached);
+    if (cached) setLoading(false);
+    fetchData({ force: cached });
+
+    if (requirePasswordChange) {
+      setShowPasswordModal(true);
+      toast.error('Vous devez changer votre mot de passe');
+    }
+
+    if (isRHUser) prefetch(RH_PREFETCH_URLS, { ttl: 60_000 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, isRHUser, requirePasswordChange, router, fetchData]);
 
   if (loading) {
     return (
