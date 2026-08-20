@@ -4,6 +4,7 @@ import { requireRH } from '@/lib/auth';
 import { calculateBusinessDays } from '@/lib/dateUtils';
 import { getFrenchHolidaysRange } from '@/lib/holidays';
 import { recalculateFractionnement } from '@/lib/fractionnement';
+import { recalculateBalance } from '@/lib/soldes';
 
 export async function POST(request) {
   try {
@@ -139,39 +140,8 @@ export async function POST(request) {
       args: [user_id, date_debut, date_fin, businessDays, typeDebutValue, typeFinValue, motif || null, now, now, rhUserId]
     });
 
-    // Recalculer jours_pris à partir de TOUS les congés validés de l'année
-    const totalResult = await db.execute({
-      sql: `
-        SELECT COALESCE(SUM(nombre_jours_ouvres), 0) as total_pris
-        FROM demandes_conges
-        WHERE user_id = ? AND statut = 'validee'
-          AND strftime('%Y', date_debut) = ?
-      `,
-      args: [user_id, String(currentYear)]
-    });
-    const totalPris = totalResult.rows[0]?.total_pris || 0;
-
-    // Récupérer les infos du solde pour recalculer jours_restants
-    const soldeResult = await db.execute({
-      sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs FROM soldes_conges WHERE user_id = ? AND annee = ?',
-      args: [user_id, currentYear]
-    });
-
-    if (soldeResult.rows.length > 0) {
-      const s = soldeResult.rows[0];
-      const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + (s.jours_fractionnement || 0) + (s.jours_compensateurs || 0);
-      const restants = totalAcquis - totalPris;
-
-      await db.execute({
-        sql: `
-          UPDATE soldes_conges
-          SET jours_pris = ?,
-              jours_restants = ?
-          WHERE user_id = ? AND annee = ?
-        `,
-        args: [totalPris, restants, user_id, currentYear]
-      });
-    }
+    // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
+    await recalculateBalance(user_id, currentYear);
 
     // Recalculer les jours de fractionnement
     await recalculateFractionnement(user_id, currentYear);

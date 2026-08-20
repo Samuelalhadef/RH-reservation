@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { totalDroits } from './soldes.js';
 
 /**
  * Calcule le nombre de jours ouvrés hors période principale (mai-octobre)
@@ -72,13 +73,13 @@ export async function recalculateFractionnement(userId, year) {
 
   // Mettre à jour le solde
   const soldeResult = await db.execute({
-    sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs, jours_pris FROM soldes_conges WHERE user_id = ? AND annee = ?',
+    sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs, jours_cet, jours_pris FROM soldes_conges WHERE user_id = ? AND annee = ?',
     args: [userId, year]
   });
 
   if (soldeResult.rows.length > 0) {
     const s = soldeResult.rows[0];
-    const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + fractionnement + (s.jours_compensateurs || 0);
+    const totalAcquis = totalDroits({ ...s, jours_fractionnement: fractionnement });
     const restants = totalAcquis - (s.jours_pris || 0);
 
     await db.execute({

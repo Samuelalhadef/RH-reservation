@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { calculateLeaveBalance } from '@/lib/contractUtils';
+import { recalculateBalance } from '@/lib/soldes';
 
 export async function PUT(request, { params }) {
   try {
@@ -97,24 +98,19 @@ export async function PUT(request, { params }) {
       const currentYear = new Date().getFullYear();
       const newJoursAcquis = calculateLeaveBalance(type_contrat || 'CDI', date_debut_contrat, date_fin_contrat, currentYear, quotite_travail || 100);
 
-      // Récupérer les jours déjà pris
       const balanceResult = await db.execute({
         sql: 'SELECT jours_pris FROM soldes_conges WHERE user_id = ? AND annee = ?',
         args: [id, currentYear]
       });
 
       if (balanceResult.rows.length > 0) {
-        const joursPris = balanceResult.rows[0].jours_pris || 0;
-        const joursRestants = newJoursAcquis - joursPris;
-
         await db.execute({
-          sql: `
-            UPDATE soldes_conges
-            SET jours_acquis = ?, jours_restants = ?
-            WHERE user_id = ? AND annee = ?
-          `,
-          args: [newJoursAcquis, joursRestants, id, currentYear]
+          sql: 'UPDATE soldes_conges SET jours_acquis = ? WHERE user_id = ? AND annee = ?',
+          args: [newJoursAcquis, id, currentYear]
         });
+
+        // Recalculer jours_restants avec tous les droits (reports, fractionnement, compensateurs, CET)
+        await recalculateBalance(id, currentYear);
 
         console.log(`Updated balance for user ${id}: ${newJoursAcquis} days acquired`);
       }

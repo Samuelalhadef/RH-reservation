@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Guide Administrateur — Portail RH Chartrettes</title>
+<style>
+  :root{
+    --bleu:#2563eb; --indigo:#4f46e5; --gris:#374151; --gris-clair:#6b7280;
+    --bg:#f8fafc; --trait:#e5e7eb;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;line-height:1.55;margin:0;font-size:12.5px;}
+  h1,h2,h3{color:#111827;line-height:1.25;}
+  h2{font-size:22px;border-bottom:3px solid var(--bleu);padding-bottom:6px;margin-top:0;}
+  h3{font-size:16px;color:var(--indigo);margin-top:20px;}
+  h4{font-size:13.5px;margin:16px 0 4px;color:#111827;}
+  /* Un titre ne reste jamais seul en bas de page */
+  h2,h3,h4{break-after:avoid;break-inside:avoid;}
+  p,li,td,th{orphans:2;widows:2;}
+  table,.legend{break-inside:avoid;}
+  p{margin:7px 0;}
+  a{color:var(--bleu);text-decoration:none;}
+  code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-size:11.5px;}
+  ul,ol{margin:7px 0 7px 0;padding-left:22px;}
+  li{margin:3px 0;}
+  /* Les chapitres s'enchaînent au fil des pages : pas de page à moitié vide.
+     Seule la couverture occupe une page entière. */
+  .page{padding:0;}
+  .page + .page > h2{margin-top:26px;}
+  .break{break-before:page;}
+  figure{margin:12px 0;break-inside:avoid;text-align:center;}
+  figure img{max-width:100%;max-height:77mm;width:auto;border:1px solid var(--trait);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.08);}
+  figure.tall img{max-height:114mm;}
+  figcaption{font-size:11px;color:var(--gris-clair);margin-top:5px;font-style:italic;}
+  .tip,.warn,.info{border-radius:8px;padding:11px 14px;margin:12px 0;font-size:12px;break-inside:avoid;}
+  .tip{background:#ecfdf5;border-left:4px solid #10b981;}
+  .warn{background:#fff7ed;border-left:4px solid #f97316;}
+  .info{background:#eff6ff;border-left:4px solid var(--bleu);}
+  /* Seul le titre de l'encadré passe en bloc — les <b> en cours de phrase restent en ligne */
+  .tip>b:first-child,.warn>b:first-child,.info>b:first-child{display:block;margin-bottom:2px;}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:11.5px;}
+  th,td{border:1px solid var(--trait);padding:6px 9px;text-align:left;vertical-align:top;}
+  th{background:#f1f5f9;font-weight:600;}
+  .toc a{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dotted #d1d5db;color:#1f2937;}
+  .toc .num{color:var(--bleu);font-weight:600;margin-right:8px;}
+  .badge{display:inline-block;background:var(--indigo);color:#fff;border-radius:6px;padding:1px 8px;font-size:10.5px;font-weight:600;}
+  /* Couverture */
+  .cover{page:cover;height:296mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+         background:linear-gradient(135deg,#4f46e5,#2563eb 55%,#06b6d4);color:#fff;border-radius:0;}
+  .cover .kicker{text-transform:uppercase;letter-spacing:3px;font-size:13px;opacity:.85;margin-bottom:14px;}
+  .cover h1{color:#fff;font-size:44px;margin:0 0 10px;}
+  .cover .sub{font-size:17px;opacity:.9;max-width:520px;}
+  .cover .foot{position:relative;margin-top:60px;font-size:12px;opacity:.8;}
+  .cover .pill{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);
+               border-radius:999px;padding:6px 16px;margin-top:26px;font-size:13px;}
+  .steps{counter-reset:step;list-style:none;padding-left:0;}
+  .steps li{counter-increment:step;position:relative;padding-left:34px;margin:8px 0;}
+  .steps li::before{content:counter(step);position:absolute;left:0;top:0;width:24px;height:24px;background:var(--bleu);
+    color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:11.5px;}
+  .sw{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);}
+  /* QR code d'accès au portail */
+  .cover .qr{margin-top:30px;background:#fff;padding:10px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18);}
+  .cover .qr img{display:block;width:30mm;height:30mm;}
+  .cover .qr-url{margin-top:10px;font-size:12px;opacity:.9;letter-spacing:.2px;}
+  .qr-box{display:flex;align-items:center;gap:18px;border:1px solid var(--trait);border-radius:10px;
+          padding:14px 16px;margin:14px 0;background:var(--bg);page-break-inside:avoid;}
+  .qr-box img{width:32mm;height:32mm;flex:0 0 auto;border:1px solid var(--trait);border-radius:6px;background:#fff;}
+  .qr-box .qr-txt{font-size:12px;}
+  .qr-box .qr-txt b{display:block;margin-bottom:3px;color:#111827;}
+  .qr-box .qr-link{display:inline-block;margin-top:6px;font-weight:600;color:var(--bleu);word-break:break-all;}
+  /* Marges appliquées à toutes les pages, y compris les pages de continuation */
+  @page{size:A4;margin:16mm 15mm 14mm;}
+  @page cover{margin:0;}
+</style>
+</head>
+<body>
+
+<!-- ============ COUVERTURE ============ -->
+<div class="cover">
+  <div class="kicker">Mairie de Chartrettes</div>
+  <h1>Guide de l'administrateur</h1>
+  <div class="sub">Portail de gestion des congés, récupérations et absences — Interface RH</div>
+  <div class="pill">Rôle RH / Direction / DG</div>
+  <div class="qr"><img src="guide-qr.svg" alt="QR code d'accès au portail RH"></div>
+  <div class="qr-url">Scannez pour accéder au portail<br>rh-reservation-u9jb.vercel.app</div>
+  <div class="foot">Document interne · Version 1.0</div>
+</div>
+
+<!-- ============ SOMMAIRE ============ -->
+<div class="page break">
+  <h2>Sommaire</h2>
+  <div class="toc">
+    <a href="#c1"><span><span class="num">1</span> Introduction & rôles</span></a>
+    <a href="#c2"><span><span class="num">2</span> Se connecter au portail</span></a>
+    <a href="#c3"><span><span class="num">3</span> Vue d'ensemble de l'interface</span></a>
+    <a href="#c4"><span><span class="num">4</span> Interface RH — Toutes les demandes</span></a>
+    <a href="#c5"><span><span class="num">5</span> Gérer les utilisateurs (agents)</span></a>
+    <a href="#c6"><span><span class="num">6</span> Créer un congé pour un agent</span></a>
+    <a href="#c7"><span><span class="num">7</span> Récupération & heures supplémentaires</span></a>
+    <a href="#c8"><span><span class="num">8</span> Compte Épargne Temps (CET)</span></a>
+    <a href="#c9"><span><span class="num">9</span> Congés de parentalité</span></a>
+    <a href="#c10"><span><span class="num">10</span> File de validation</span></a>
+    <a href="#c11"><span><span class="num">11</span> Statistiques</span></a>
+    <a href="#c12"><span><span class="num">12</span> Calendrier de l'équipe</span></a>
+    <a href="#c13"><span><span class="num">13</span> Ce que voit un agent</span></a>
+    <a href="#c14"><span><span class="num">14</span> Questions fréquentes & dépannage</span></a>
+    <a href="#c15"><span><span class="num">15</span> Annexes (sécurité, RGPD, référence)</span></a>
+  </div>
+  <div class="info" style="margin-top:22px;">
+    <b>À propos de ce guide</b>
+    Les captures d'écran de ce document ont été réalisées sur un environnement de démonstration
+    contenant des données fictives (Marie Dupont, Jean Martin, Sophie Durand). Aucune donnée réelle
+    d'agent n'y figure.
+  </div>
+</div>
+
+<!-- ============ 1. INTRO ============ -->
+<div class="page" id="c1">
+  <h2>1. Introduction & rôles</h2>
+  <p>Le portail RH permet de gérer, en un seul endroit, l'ensemble des absences des agents de la mairie :
+  congés annuels, récupération d'heures supplémentaires, Compte Épargne Temps (CET) et congés de
+  parentalité. Chaque demande suit un <b>circuit de validation</b> et met à jour automatiquement les soldes.</p>
+
+  <h3>Les différents rôles</h3>
+  <table>
+    <tr><th>Rôle</th><th>Ce qu'il peut faire</th></tr>
+    <tr><td><b>Agent</b> (Employé, Alternant…)</td><td>Poser ses congés, déclarer/utiliser des heures de récupération, consulter ses soldes et le calendrier de l'équipe.</td></tr>
+    <tr><td><b>Responsable</b> (niveau de validation &gt; 0)</td><td>Tout ce que fait un agent, plus la validation des demandes de son équipe (dans la file de validation).</td></tr>
+    <tr><td><b>Administrateur</b> — <span class="badge">RH · Direction · DG</span></td><td>Accès complet : gestion des comptes, validation de toutes les demandes, ajustement des soldes, statistiques, jours fériés…</td></tr>
+  </table>
+  <div class="info"><b>Qui est « administrateur » ?</b>
+  Toute personne dont le type de compte est <code>RH</code>, <code>Direction</code> ou <code>DG</code>.
+  Ces comptes voient le menu <b>« Interface RH »</b> ; les agents ordinaires ne le voient pas.</div>
+
+  <h3>Le circuit de validation d'une demande</h3>
+  <ol>
+    <li>L'agent dépose sa demande depuis son tableau de bord.</li>
+    <li>Son responsable direct (N1) puis, le cas échéant, le responsable hiérarchique (N2) valident.</li>
+    <li>La RH donne la validation finale — ou peut <b>valider directement</b> pour court-circuiter le circuit.</li>
+    <li>Une fois validée, la demande décompte automatiquement le solde de l'agent.</li>
+  </ol>
+</div>
+
+<!-- ============ 2. CONNEXION ============ -->
+<div class="page" id="c2">
+  <h2>2. Se connecter au portail</h2>
+  <p>La connexion se fait en deux temps : on choisit son nom dans la liste des agents, puis on saisit son mot de passe.</p>
+
+  <div class="qr-box">
+    <img src="guide-qr.svg" alt="QR code d'accès au portail RH">
+    <div class="qr-txt">
+      <b>Adresse du portail</b>
+      Scannez ce QR code avec l'appareil photo de votre smartphone, ou saisissez l'adresse
+      directement dans votre navigateur (ordinateur, tablette ou mobile).
+      <a class="qr-link" href="https://rh-reservation-u9jb.vercel.app/">https://rh-reservation-u9jb.vercel.app/</a>
+    </div>
+  </div>
+  <div class="tip"><b>Installer le portail comme une application</b>
+  Le portail est une application web installable : depuis votre mobile, après avoir scanné le QR code,
+  utilisez « Ajouter à l'écran d'accueil » pour y accéder ensuite en un seul geste.</div>
+
+  <ol class="steps">
+    <li>Ouvrez le portail dans votre navigateur.</li>
+    <li>Recherchez votre nom via le champ de recherche, puis cliquez sur votre fiche.</li>
+    <li>Saisissez votre mot de passe et cliquez sur <b>« Se connecter »</b>.</li>
+  </ol>
+  <figure><img src="guide-screenshots/01-login-selection.png"><figcaption>Étape 1 — sélection de l'agent dans la liste.</figcaption></figure>
+  <figure><img src="guide-screenshots/02-login-password.png"><figcaption>Étape 2 — saisie du mot de passe.</figcaption></figure>
+  <div class="warn"><b>Première connexion / mot de passe temporaire</b>
+  À la création d'un compte, un mot de passe temporaire est généré. À la première connexion, l'agent est
+  invité à le remplacer par un mot de passe personnel. En cas d'oubli, la RH peut réinitialiser le mot de
+  passe (voir chapitre 5).</div>
+</div>
+
+<!-- ============ 3. INTERFACE ============ -->
+<div class="page" id="c3">
+  <h2>3. Vue d'ensemble de l'interface</h2>
+  <p>Une fois connecté en tant qu'administrateur, vous arrivez sur votre <b>tableau de bord personnel</b>.
+  La barre de navigation en haut donne accès à toutes les sections.</p>
+  <figure class="tall"><img src="guide-screenshots/03-admin-dashboard.png"><figcaption>Tableau de bord — soldes personnels et calendrier de pose des congés.</figcaption></figure>
+  <h3>La barre de navigation</h3>
+  <table>
+    <tr><th>Menu</th><th>Contenu</th></tr>
+    <tr><td>Tableau de bord</td><td>Vos soldes et votre calendrier personnel de congés.</td></tr>
+    <tr><td>Mes demandes</td><td>L'historique et le suivi de vos propres demandes.</td></tr>
+    <tr><td>Validation</td><td>La file des demandes à valider (responsables & RH).</td></tr>
+    <tr><td>Récupération</td><td>Déclaration et utilisation des heures supplémentaires.</td></tr>
+    <tr><td>Calendrier équipe</td><td>Vue d'ensemble des absences de tous les agents.</td></tr>
+    <tr><td><b>Interface RH</b></td><td>Le centre d'administration (réservé RH/Direction/DG).</td></tr>
+  </table>
+</div>
+
+<!-- ============ 4. TOUTES LES DEMANDES ============ -->
+<div class="page" id="c4">
+  <h2>4. Interface RH — Toutes les demandes</h2>
+  <p>L'<b>Interface RH</b> est organisée en onglets. Le premier, <b>« Toutes les demandes »</b>, présente
+  l'ensemble des demandes de congés de la collectivité avec leur circuit de validation et leur statut.</p>
+  <figure><img src="guide-screenshots/04-rh-toutes-demandes.png"><figcaption>Onglet « Toutes les demandes » — suivi global.</figcaption></figure>
+  <h3>Actions possibles sur une demande</h3>
+  <ul>
+    <li><b>Valider directement</b> : approuve la demande immédiatement, sans attendre le circuit N1/N2.</li>
+    <li><b>Refuser directement</b> : rejette la demande (un motif peut être précisé).</li>
+    <li><b>Annuler</b> : annule une demande déjà validée (par exemple en cas d'erreur), avec motif.</li>
+  </ul>
+  <div class="tip"><b>Astuce</b> Le champ de recherche permet de filtrer par nom, prénom ou type d'agent.
+  Les pastilles de couleur indiquent le statut : <b>orange</b> = en attente, <b>vert</b> = validé, <b>rouge</b> = refusé.</div>
+  <div class="info"><b>Recalcul des soldes</b> Après un ajustement manuel ou une correction, un bouton permet de
+  recalculer l'ensemble des soldes à partir des congés réellement validés. Les soldes sont toujours
+  recalculés à partir des demandes validées, jamais incrémentés à la main.</div>
+</div>
+
+<!-- ============ 5. UTILISATEURS ============ -->
+<div class="page" id="c5">
+  <h2>5. Gérer les utilisateurs (agents)</h2>
+  <p>L'onglet <b>« Utilisateurs »</b> centralise la gestion des comptes : création, modification,
+  réinitialisation de mot de passe, ajustement des soldes et suppression.</p>
+  <figure><img src="guide-screenshots/06-rh-utilisateurs.png"><figcaption>Onglet « Utilisateurs » — liste des agents et statistiques.</figcaption></figure>
+
+  <h3>Créer un nouvel agent</h3>
+  <p>Cliquez sur <b>« Créer un utilisateur »</b> pour ouvrir le formulaire.</p>
+  <figure><img src="guide-screenshots/07-rh-creer-utilisateur.png"><figcaption>Formulaire de création d'un agent.</figcaption></figure>
+  <ul>
+    <li><b>Identité</b> : nom, prénom, e-mail, type d'agent, service et poste.</li>
+    <li><b>Contrat</b> : CDI, CDD (avec dates) ou Mi-temps ; date d'entrée à la mairie (pour l'ancienneté).</li>
+    <li><b>Quotité de travail</b> : de 50 à 100 %.</li>
+    <li><b>Horaires hebdomadaires</b> (optionnel) : horaires matin/après-midi pour chaque jour de la semaine.</li>
+  </ul>
+  <div class="tip"><b>Horaires hebdomadaires & jours non travaillés</b>
+  Si vous renseignez les horaires d'un agent à temps partiel, les demi-journées qu'il ne travaille pas
+  apparaîtront <b>grisées</b> dans son calendrier — il ne pourra pas y poser de congé (voir chapitre 13).
+  Un mot de passe temporaire est généré automatiquement à la création : communiquez-le à l'agent.</div>
+
+  <h3>Autres actions sur un agent</h3>
+  <table>
+    <tr><th>Action</th><th>Effet</th></tr>
+    <tr><td><b>Modifier</b></td><td>Met à jour l'identité, le contrat, la quotité et les horaires.</td></tr>
+    <tr><td><b>Réinitialiser le mot de passe</b></td><td>Génère un nouveau mot de passe temporaire à transmettre à l'agent.</td></tr>
+    <tr><td><b>Ajuster le solde</b></td><td>Ajoute ou retire des jours (congés ou jours compensateurs), avec un motif obligatoire.</td></tr>
+    <tr><td><b>Supprimer</b></td><td>Supprime définitivement le compte et ses demandes. <b>Action irréversible.</b></td></tr>
+  </table>
+  <div class="warn"><b>Suppression d'un agent</b> La suppression efface aussi toutes ses demandes de congés.
+  Préférez la modification si l'agent quitte temporairement ses fonctions.</div>
+</div>
+
+<!-- ============ 6. CREER UN CONGE ============ -->
+<div class="page" id="c6">
+  <h2>6. Créer un congé pour un agent</h2>
+  <p>L'onglet <b>« Créer un congé »</b> permet à la RH de poser directement un congé pour n'importe quel
+  agent — utile pour régulariser une absence ou saisir un congé à la place de l'agent.</p>
+  <figure><img src="guide-screenshots/12-rh-creer-conge.png"><figcaption>Création directe d'un congé par la RH.</figcaption></figure>
+  <ol class="steps">
+    <li>Sélectionnez l'agent (son solde s'affiche).</li>
+    <li>Choisissez la date de début et de fin, avec le type (journée complète, matin, après-midi).</li>
+    <li>Ajoutez éventuellement un motif, puis validez.</li>
+  </ol>
+  <div class="info"><b>Particularité</b> Un congé créé par la RH est <b>validé immédiatement</b> et n'est pas soumis
+  au délai de prévenance de 7 jours ni au circuit N1/N2.</div>
+</div>
+
+<!-- ============ 7. RECUPERATION ============ -->
+<div class="page" id="c7">
+  <h2>7. Récupération & heures supplémentaires</h2>
+  <p>L'onglet <b>« Récupération »</b> regroupe les déclarations d'heures supplémentaires et leur utilisation.</p>
+  <figure><img src="guide-screenshots/10-rh-recuperation.png"><figcaption>Onglet « Récupération » — déclarations et utilisations.</figcaption></figure>
+  <h3>Le principe</h3>
+  <ol>
+    <li>L'agent <b>déclare</b> des heures supplémentaires effectuées, en choisissant la compensation :
+        <b>rémunération</b> (être payé) ou <b>récupération</b> (temps de repos).</li>
+    <li>La RH valide la déclaration ; les heures « récupération » alimentent le <b>solde d'heures</b> de l'agent.</li>
+    <li>L'agent <b>utilise</b> ensuite ces heures pour poser une récupération (matin/après-midi).</li>
+  </ol>
+  <h3>Vos actions</h3>
+  <ul>
+    <li>Valider ou refuser une <b>déclaration</b> d'heures supplémentaires.</li>
+    <li>Valider ou refuser une <b>utilisation</b> de récupération.</li>
+    <li><b>Poser une récupération directement</b> pour un agent (sans passer par sa demande).</li>
+  </ul>
+  <div class="tip"><b>Affichage dans le calendrier</b> Les récupérations posées apparaissent en <b>cyan</b> dans le
+  calendrier de l'agent, sur le matin ou l'après-midi selon l'horaire (voir chapitre 13).</div>
+</div>
+
+<!-- ============ 8. CET ============ -->
+<div class="page" id="c8">
+  <h2>8. Compte Épargne Temps (CET)</h2>
+  <p>Le CET permet à un agent d'épargner des jours de congés non pris. Deux onglets le concernent.</p>
+  <h3>Demandes CET</h3>
+  <p>Les agents demandent un <b>versement</b> (déposer des jours) ou un <b>retrait</b> (récupérer des jours).
+  La RH valide ou refuse chaque demande.</p>
+  <figure><img src="guide-screenshots/08-rh-demandes-cet.png"><figcaption>Onglet « Demandes CET ».</figcaption></figure>
+  <h3>Soldes CET</h3>
+  <p>Vue d'ensemble des soldes CET de tous les agents, avec versements et retraits de l'année. Le bouton
+  <b>« Ajuster »</b> permet de corriger un solde (avec motif).</p>
+  <figure><img src="guide-screenshots/09-rh-soldes-cet.png"><figcaption>Onglet « Soldes CET ».</figcaption></figure>
+  <div class="info"><b>Règles du CET</b> Plafond de <b>60 jours</b> par agent. L'ouverture d'un CET requiert
+  1 an d'ancienneté ; le transfert annuel est limité (jusqu'à 5 jours/an selon les règles en vigueur).</div>
+</div>
+
+<!-- ============ 9. PARENTALITE ============ -->
+<div class="page" id="c9">
+  <h2>9. Congés de parentalité</h2>
+  <p>L'onglet <b>« Parentalité »</b> traite les congés de <b>maternité</b>, <b>paternité</b> et <b>adoption</b>.</p>
+  <figure><img src="guide-screenshots/11-rh-parentalite.png"><figcaption>Onglet « Parentalité ».</figcaption></figure>
+  <ul>
+    <li>Consultez les demandes déposées par les agents avec le justificatif éventuel.</li>
+    <li><b>Validez</b> ou <b>refusez</b> la demande (un commentaire peut être ajouté).</li>
+  </ul>
+</div>
+
+<!-- ============ 10. VALIDATION ============ -->
+<div class="page" id="c10">
+  <h2>10. File de validation</h2>
+  <p>La page <b>« Validation »</b> rassemble toutes les demandes en attente de votre décision (congés,
+  récupérations, parentalité). C'est le point d'entrée quotidien pour traiter les demandes.</p>
+  <figure><img src="guide-screenshots/13-validation.png"><figcaption>File de validation.</figcaption></figure>
+  <ul>
+    <li>Examinez chaque demande (agent, période, motif, solde restant).</li>
+    <li>Ajoutez un commentaire si nécessaire, puis <b>validez</b> ou <b>refusez</b>.</li>
+  </ul>
+  <div class="tip"><b>Notifications</b> Les agents et responsables concernés sont prévenus automatiquement
+  (notification push) à chaque étape du circuit.</div>
+</div>
+
+<!-- ============ 11. STATS ============ -->
+<div class="page" id="c11">
+  <h2>11. Statistiques</h2>
+  <p>L'onglet <b>« Statistiques »</b> offre une vue analytique : tendances, soldes et activité des absences
+  sur l'ensemble du personnel.</p>
+  <figure class="tall"><img src="guide-screenshots/05-rh-statistiques.png"><figcaption>Onglet « Statistiques ».</figcaption></figure>
+  <p>Utilisez ces indicateurs pour anticiper les pics d'absence et suivre la consommation des congés.</p>
+</div>
+
+<!-- ============ 12. CALENDRIER EQUIPE ============ -->
+<div class="page" id="c12">
+  <h2>12. Calendrier de l'équipe</h2>
+  <p>Le <b>calendrier de l'équipe</b> affiche, mois par mois, les absences de tous les agents. Chaque journée
+  est découpée en matin / après-midi pour visualiser les demi-journées.</p>
+  <figure class="tall"><img src="guide-screenshots/14-calendrier-equipe.png"><figcaption>Calendrier de l'équipe.</figcaption></figure>
+  <div class="tip"><b>Lecture</b> Un coup d'œil suffit pour repérer les périodes de forte absence et éviter les
+  chevauchements au sein d'un même service.</div>
+</div>
+
+<!-- ============ 13. COTE AGENT ============ -->
+<div class="page" id="c13">
+  <h2>13. Ce que voit un agent</h2>
+  <p>Comprendre l'écran de l'agent vous aide à l'accompagner. Depuis son tableau de bord, l'agent pose ses
+  congés en cliquant sur les demi-journées du calendrier.</p>
+
+  <h3>Légende des couleurs du calendrier</h3>
+  <p class="legend">
+    <span><i class="sw" style="background:#dcfce7;border-color:#86efac"></i> Validé</span>
+    <span><i class="sw" style="background:#ffedd5;border-color:#fdba74"></i> En attente</span>
+    <span><i class="sw" style="background:#a5f3fc;border-color:#22d3ee"></i> Récupération</span>
+    <span><i class="sw" style="background:#d1d5db;border-color:#9ca3af"></i> Jour férié</span>
+    <span><i class="sw" style="background:#f3f4f6;border-color:#e5e7eb"></i> Non disponible / non travaillé</span>
+  </p>
+
+  <h3>Agent à temps partiel — jours non travaillés grisés</h3>
+  <p>Lorsqu'un agent a des <b>horaires hebdomadaires</b> renseignés, les demi-journées qu'il ne travaille pas
+  sont automatiquement <b>grisées</b> et non sélectionnables. Ci-dessous, Sophie ne travaille pas le mercredi
+  (ni le vendredi après-midi) : ces créneaux apparaissent en gris.</p>
+  <figure class="tall"><img src="guide-screenshots/15-agent-dashboard-tempspartiel.png"><figcaption>Tableau de bord d'une agente à temps partiel — mercredis grisés.</figcaption></figure>
+
+  <h3>Récupérations affichées en cyan</h3>
+  <p>Les récupérations posées apparaissent en <b>cyan</b>, sur le matin ou l'après-midi selon l'horaire.</p>
+  <figure class="tall"><img src="guide-screenshots/16-agent-dashboard-recup.png"><figcaption>Calendrier d'un agent avec une récupération (en cyan).</figcaption></figure>
+
+  <h3>Mes demandes & Récupération (côté agent)</h3>
+  <figure><img src="guide-screenshots/17-agent-mes-demandes.png"><figcaption>Suivi de ses demandes.</figcaption></figure>
+  <figure><img src="guide-screenshots/18-agent-recuperation.png"><figcaption>Espace récupération de l'agent (solde, déclarations, utilisations).</figcaption></figure>
+</div>
+
+<!-- ============ 14. FAQ ============ -->
+<div class="page" id="c14">
+  <h2>14. Questions fréquentes & dépannage</h2>
+  <h4>Un agent a oublié son mot de passe</h4>
+  <p>Interface RH → Utilisateurs → <b>Réinitialiser le mot de passe</b>. Communiquez le nouveau mot de passe
+  temporaire à l'agent ; il le changera à sa prochaine connexion.</p>
+
+  <h4>Le solde d'un agent semble incorrect</h4>
+  <p>Vérifiez ses demandes validées, puis utilisez le bouton de <b>recalcul des soldes</b>. Les soldes sont
+  toujours recalculés depuis les congés réellement validés.</p>
+
+  <h4>Un agent ne peut pas poser de congé sur un jour</h4>
+  <p>Le jour est peut-être un week-end, un jour férié, un jour non travaillé (temps partiel), une récupération
+  déjà validée, ou situé à moins de 7 jours (délai de prévenance). Ces créneaux sont grisés.</p>
+
+  <h4>Une demande a été validée par erreur</h4>
+  <p>Dans « Toutes les demandes », utilisez <b>Annuler</b> sur la demande concernée (avec motif). Le solde est
+  automatiquement recrédité.</p>
+
+  <h4>Je ne vois pas le menu « Interface RH »</h4>
+  <p>Ce menu n'apparaît que pour les comptes de type RH, Direction ou DG. Vérifiez le type du compte.</p>
+</div>
+
+<!-- ============ 15. ANNEXES ============ -->
+<div class="page" id="c15">
+  <h2>15. Annexes</h2>
+  <h3>15.1 Bonnes pratiques de sécurité & RGPD</h3>
+  <ul>
+    <li>Le portail contient des <b>données personnelles</b> d'agents : ne partagez pas de captures d'écran
+    contenant de vraies données hors du cadre autorisé.</li>
+    <li>Utilisez des mots de passe forts et invitez les agents à changer leur mot de passe temporaire.</li>
+    <li>Déconnectez-vous après usage sur un poste partagé.</li>
+    <li>Limitez le nombre de comptes RH/Direction au strict nécessaire.</li>
+  </ul>
+
+  <h3>15.2 Règles métier de référence</h3>
+  <table>
+    <tr><th>Élément</th><th>Règle</th></tr>
+    <tr><td>Délai de prévenance</td><td>Un congé se pose au minimum 7 jours à l'avance (sauf pose directe par la RH).</td></tr>
+    <tr><td>Demi-journées</td><td>Chaque journée se découpe en matin / après-midi.</td></tr>
+    <tr><td>CET</td><td>Plafond 60 jours ; 1 an d'ancienneté pour ouvrir ; transfert annuel limité.</td></tr>
+    <tr><td>Récupération</td><td>Heures supplémentaires converties en temps de repos, posables par demi-journée.</td></tr>
+    <tr><td>Soldes</td><td>Toujours recalculés à partir des demandes validées.</td></tr>
+  </table>
+
+  <h3>15.3 Statuts d'une demande</h3>
+  <p class="legend">
+    <span><i class="sw" style="background:#f59e0b"></i> En attente</span>
+    <span><i class="sw" style="background:#10b981"></i> Validée</span>
+    <span><i class="sw" style="background:#ef4444"></i> Refusée</span>
+    <span><i class="sw" style="background:#9ca3af"></i> Annulée</span>
+  </p>
+
+  <div class="info" style="margin-top:26px;">
+    <b>Besoin d'aide ?</b> Ce guide couvre les principales opérations. Pour toute question technique ou
+    évolution du portail, rapprochez-vous de votre prestataire / référent informatique.
+  </div>
+</div>
+
+</body>
+</html>

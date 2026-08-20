@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { notifyCetDecision } from '@/lib/pushNotifications';
+import { recalculateBalance } from '@/lib/soldes';
 
 export async function PUT(request, { params }) {
   try {
@@ -68,6 +69,18 @@ export async function PUT(request, { params }) {
             { status: 400 }
           );
         }
+
+        // Le retrait crédite le solde congés de l'année : la ligne doit exister
+        const soldeRes = await db.execute({
+          sql: 'SELECT id FROM soldes_conges WHERE user_id = ? AND annee = ?',
+          args: [demande.user_id, currentYear]
+        });
+        if (soldeRes.rows.length === 0) {
+          return NextResponse.json(
+            { success: false, message: `Aucun solde de congés ${currentYear} pour cet agent. Créez son solde avant de valider le retrait.` },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -83,10 +96,13 @@ export async function PUT(request, { params }) {
 
     // Si validée, effectuer le transfert réel
     if (action === 'valider') {
+      // L'impact sur les congés est stocké dans soldes_conges.jours_cet (et non
+      // directement dans jours_restants) : jours_restants est recalculé à chaque
+      // validation/annulation de congé et écraserait sinon le mouvement CET.
       if (demande.type === 'credit') {
         // Congés -> CET : déduire du solde congés, ajouter au CET
         await db.execute({
-          sql: 'UPDATE soldes_conges SET jours_restants = jours_restants - ? WHERE user_id = ? AND annee = ?',
+          sql: 'UPDATE soldes_conges SET jours_cet = COALESCE(jours_cet, 0) - ? WHERE user_id = ? AND annee = ?',
           args: [demande.jours, demande.user_id, currentYear]
         });
 
@@ -113,7 +129,7 @@ export async function PUT(request, { params }) {
         });
 
         await db.execute({
-          sql: 'UPDATE soldes_conges SET jours_restants = jours_restants + ? WHERE user_id = ? AND annee = ?',
+          sql: 'UPDATE soldes_conges SET jours_cet = COALESCE(jours_cet, 0) + ? WHERE user_id = ? AND annee = ?',
           args: [demande.jours, demande.user_id, currentYear]
         });
 
@@ -122,6 +138,9 @@ export async function PUT(request, { params }) {
           args: [demande.user_id, demande.jours, demande.motif || 'Retrait CET vers solde congés']
         });
       }
+
+      // Répercuter le mouvement sur jours_restants
+      await recalculateBalance(demande.user_id, currentYear);
     }
 
     // Notifier l'agent par push

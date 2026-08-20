@@ -3,7 +3,7 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 9; // Incrémenter pour forcer re-migration
+let _migrationVersion = 10; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
 
 export function getDb() {
@@ -41,6 +41,7 @@ async function runMigrations() {
     { table: 'users', column: 'date_entree_mairie', type: 'DATE' },
     { table: 'soldes_conges', column: 'jours_fractionnement', type: 'REAL DEFAULT 0' },
     { table: 'soldes_conges', column: 'jours_compensateurs', type: 'REAL DEFAULT 0' },
+    { table: 'soldes_conges', column: 'jours_cet', type: 'REAL DEFAULT 0' },
     { table: 'users', column: 'quotite_travail', type: 'REAL DEFAULT 100' },
     { table: 'users', column: 'horaires_travail', type: 'TEXT' },
     { table: 'users', column: 'responsable_id', type: 'INTEGER' },
@@ -361,6 +362,7 @@ export const initDatabase = async () => {
         jours_restants REAL DEFAULT 25,
         jours_reportes REAL DEFAULT 0,
         jours_fractionnement REAL DEFAULT 0,
+        jours_cet REAL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(user_id, annee)
       )
@@ -370,6 +372,7 @@ export const initDatabase = async () => {
     const migrations = [
       { table: 'soldes_conges', column: 'jours_fractionnement', type: 'REAL DEFAULT 0' },
       { table: 'soldes_conges', column: 'jours_compensateurs', type: 'REAL DEFAULT 0' },
+      { table: 'soldes_conges', column: 'jours_cet', type: 'REAL DEFAULT 0' },
       { table: 'users', column: 'type_contrat', type: 'TEXT' },
       { table: 'users', column: 'date_debut_contrat', type: 'DATE' },
       { table: 'users', column: 'date_fin_contrat', type: 'DATE' },

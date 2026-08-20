@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { notifyLeaveCancelled } from '@/lib/pushNotifications';
 import { recalculateFractionnement } from '@/lib/fractionnement';
+import { recalculateBalance } from '@/lib/soldes';
 
 export async function PUT(request, { params }) {
   try {
@@ -60,37 +61,8 @@ export async function PUT(request, { params }) {
     if (wasValidated) {
       const currentYear = new Date().getFullYear();
 
-      const totalResult = await db.execute({
-        sql: `
-          SELECT COALESCE(SUM(nombre_jours_ouvres), 0) as total_pris
-          FROM demandes_conges
-          WHERE user_id = ? AND statut = 'validee'
-            AND strftime('%Y', date_debut) = ?
-        `,
-        args: [leave.user_id, String(currentYear)]
-      });
-      const totalPris = totalResult.rows[0]?.total_pris || 0;
-
-      const soldeResult = await db.execute({
-        sql: 'SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs FROM soldes_conges WHERE user_id = ? AND annee = ?',
-        args: [leave.user_id, currentYear]
-      });
-
-      if (soldeResult.rows.length > 0) {
-        const s = soldeResult.rows[0];
-        const totalAcquis = (s.jours_acquis || 0) + (s.jours_reportes || 0) + (s.jours_fractionnement || 0) + (s.jours_compensateurs || 0);
-        const restants = totalAcquis - totalPris;
-
-        await db.execute({
-          sql: `
-            UPDATE soldes_conges
-            SET jours_pris = ?,
-                jours_restants = ?
-            WHERE user_id = ? AND annee = ?
-          `,
-          args: [totalPris, restants, leave.user_id, currentYear]
-        });
-      }
+      // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
+      await recalculateBalance(leave.user_id, currentYear);
 
       // Recalculer le fractionnement après annulation
       await recalculateFractionnement(leave.user_id, currentYear);

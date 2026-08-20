@@ -21,6 +21,7 @@ const reset = async () => {
     await client.execute(`
       UPDATE soldes_conges SET
         jours_pris = 0,
+        jours_cet = 0,
         jours_restants = jours_acquis + jours_reportes + jours_fractionnement + jours_compensateurs
     `);
     console.log('✅ Tous les soldes de congés réinitialisés (jours_pris = 0)\n');
