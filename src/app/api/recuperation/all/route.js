@@ -16,7 +16,8 @@ export async function GET() {
     const result = await db.execute({
       sql: `
         SELECT d.id, d.user_id, d.date_travail, d.nombre_heures, d.raison,
-               d.type_compensation, d.statut, d.commentaire, d.signature,
+               d.type_compensation, d.statut, d.commentaire,
+               (d.signature IS NOT NULL AND d.signature != '') as has_signature,
                strftime('%d/%m/%Y', d.date_travail) as date_travail_fr,
                strftime('%d/%m/%Y', d.date_demande) as date_demande_fr,
                strftime('%d/%m/%Y', d.date_validation) as date_validation_fr,

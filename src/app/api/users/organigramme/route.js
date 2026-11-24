@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { photoUrlSql } from '@/lib/photo';
 
 export async function GET() {
   try {
@@ -15,7 +16,7 @@ export async function GET() {
     const result = await db.execute({
       sql: `
         SELECT u.id, u.nom, u.prenom, u.type_utilisateur, u.service, u.poste,
-               u.responsable_id, u.photo_profil, u.actif
+               u.responsable_id, ${photoUrlSql('u')}, u.actif
         FROM users u
         WHERE u.actif = 1
           AND LOWER(u.nom) NOT LIKE '%testtest%'

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
+import { photoUrlSql } from '@/lib/photo';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
 
     const result = await db.execute({
       sql: `
-        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.service, u.poste, u.photo_profil, u.date_entree_mairie,
+        SELECT u.id, u.nom, u.prenom, u.email, u.type_utilisateur, u.service, u.poste, ${photoUrlSql('u')}, u.date_entree_mairie,
                u.quotite_travail, u.horaires_travail,
                sc.jours_acquis, sc.jours_pris, sc.jours_restants, sc.jours_reportes, sc.jours_fractionnement, sc.jours_compensateurs,
                COALESCE(sr.heures_acquises, 0) as heures_recuperation

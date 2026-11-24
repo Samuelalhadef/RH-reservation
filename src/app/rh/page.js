@@ -3732,7 +3732,21 @@ function PlaceRecupForm({ recupBalances, rhRecupForm, setRhRecupForm, rhRecupLoa
   );
 }
 
-function RecupDocumentModal({ demande, onClose }) {
+function RecupDocumentModal({ demande: demandeListe, onClose }) {
+  // La liste RH ne transporte pas les signatures (images base64 lourdes) :
+  // on charge la signature de cette seule demande à l'ouverture.
+  const [signature, setSignature] = useState(demandeListe.signature ?? null);
+  useEffect(() => {
+    if (demandeListe.signature !== undefined || !demandeListe.has_signature) return;
+    let cancelled = false;
+    fetch(`/api/recuperation/${demandeListe.id}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled && data?.demande?.signature) setSignature(data.demande.signature); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [demandeListe]);
+  const demande = { ...demandeListe, signature };
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`

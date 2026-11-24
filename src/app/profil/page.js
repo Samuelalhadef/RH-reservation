@@ -78,7 +78,7 @@ function HorairesApercu({ horaires }) {
 }
 
 export default function ProfilPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, refreshProfile } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [cet, setCet] = useState(null);
@@ -226,6 +226,7 @@ export default function ProfilPage() {
         }
 
         setProfileImage(base64);
+        refreshProfile(); // met à jour l'avatar de la barre de navigation
         toast.success('Photo de profil mise à jour');
       } catch (error) {
         toast.error('Erreur lors de l\'upload de la photo');
