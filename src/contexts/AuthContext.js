@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { invalidate } from '@/lib/dataCache';
+import { fetchJson, invalidate } from '@/lib/dataCache';
 
 const AuthContext = createContext(null);
 
@@ -27,23 +27,23 @@ export const AuthProvider = ({ children }) => {
       setUser(parsed);
       setLoading(false);
       // Refresh en arrière-plan (non bloquant) : vérifie session + photo + rôle
-      fetch('/api/users/profile').then(res => {
-        if (res.status === 401) {
+      // Via le cache partagé : le tableau de bord demande le même profil au
+      // même moment, un seul appel réseau part.
+      fetchJson('/api/users/profile').then(data => {
+        if (data.user) {
+          const updatedUser = { ...parsed, ...data.user };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+      }).catch(error => {
+        if (error.status === 401) {
           invalidate();
           setUser(null);
           localStorage.removeItem('user');
           toast.error('Session expirée, veuillez vous reconnecter');
           router.push('/');
-        } else if (res.ok) {
-          return res.json().then(data => {
-            if (data.user) {
-              const updatedUser = { ...parsed, ...data.user };
-              setUser(updatedUser);
-              localStorage.setItem('user', JSON.stringify(updatedUser));
-            }
-          });
         }
-      }).catch(() => {});
+      });
     } else {
       setLoading(false);
     }
@@ -115,6 +115,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshProfile = async () => {
     try {
+      invalidate('/api/users/profile');
       const response = await fetch('/api/users/profile');
       const data = await response.json();
 

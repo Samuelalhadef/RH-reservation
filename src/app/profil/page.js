@@ -198,47 +198,39 @@ export default function ProfilPage() {
       return;
     }
 
-    // Vérifier la taille (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('L\'image ne doit pas dépasser 2 Mo');
+    // Les photos de téléphone font souvent plusieurs Mo : on accepte large,
+    // la photo est de toute façon réduite avant l'envoi.
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("L'image ne doit pas dépasser 20 Mo");
       return;
     }
 
     setUploadingImage(true);
+    try {
+      const photo = await reduirePhoto(file);
 
-    // Convertir en base64
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result;
+      const response = await fetch('/api/users/photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo }),
+      });
 
-        const response = await fetch('/api/users/photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photo: base64 }),
-        });
+      const data = await response.json();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          toast.error(data.message || 'Erreur lors de l\'upload');
-          return;
-        }
-
-        setProfileImage(base64);
-        refreshProfile(); // met à jour l'avatar de la barre de navigation
-        toast.success('Photo de profil mise à jour');
-      } catch (error) {
-        toast.error('Erreur lors de l\'upload de la photo');
-      } finally {
-        setUploadingImage(false);
+      if (!response.ok) {
+        toast.error(data.message || "Erreur lors de l'upload");
+        return;
       }
-    };
-    reader.onerror = () => {
-      toast.error('Erreur lors de la lecture du fichier');
+
+      setProfileImage(photo);
+      refreshProfile(); // met à jour l'avatar de la barre de navigation
+      toast.success('Photo de profil mise à jour');
+    } catch (error) {
+      toast.error('Impossible de lire cette image');
+    } finally {
       setUploadingImage(false);
-    };
-    reader.readAsDataURL(file);
+      e.target.value = ''; // permet de re-sélectionner le même fichier
+    }
   };
 
   if (loading) {
@@ -902,4 +894,40 @@ export default function ProfilPage() {
       )}
     </div>
   );
+}
+
+/**
+ * Réduit une photo avant l'envoi : recadrage carré centré, 400 × 400 px max,
+ * JPEG qualité 0,85 (≈ 30 à 60 ko au lieu de plusieurs Mo).
+ * L'avatar est toujours affiché en rond (object-cover), le carré suffit.
+ * @param {File} file
+ * @returns {Promise<string>} data URL JPEG
+ */
+async function reduirePhoto(file, taille = 400) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url; // le navigateur applique l'orientation EXIF des photos de téléphone
+    });
+    const cote = Math.min(img.naturalWidth, img.naturalHeight);
+    const sortie = Math.min(taille, cote);
+    const canvas = document.createElement('canvas');
+    canvas.width = sortie;
+    canvas.height = sortie;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; // fond blanc pour les PNG transparents (JPEG sans alpha)
+    ctx.fillRect(0, 0, sortie, sortie);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+      img,
+      (img.naturalWidth - cote) / 2, (img.naturalHeight - cote) / 2, cote, cote,
+      0, 0, sortie, sortie
+    );
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

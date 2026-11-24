@@ -29,10 +29,11 @@ export async function POST(request) {
       );
     }
 
-    // Limite de taille (~3 Mo en base64) pour éviter la saturation de la base.
-    if (photo.length > 3 * 1024 * 1024) {
+    // Limite de taille (~1 Mo en base64) pour éviter la saturation de la base.
+    // Le navigateur réduit la photo à 400 × 400 px avant l'envoi (≈ 50 ko).
+    if (photo.length > 1024 * 1024) {
       return NextResponse.json(
-        { success: false, message: 'Image trop volumineuse (3 Mo maximum)' },
+        { success: false, message: 'Image trop volumineuse (1 Mo maximum)' },
         { status: 400 }
       );
     }

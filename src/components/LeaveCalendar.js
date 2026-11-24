@@ -7,6 +7,7 @@ import { parseSchedule, scheduleHasData, diffHeures } from '@/lib/horaires';
 import toast from 'react-hot-toast';
 import { findSchoolHoliday } from '@/lib/schoolHolidays';
 import SchoolHolidayBanner from './SchoolHolidayBanner';
+import { fetchJson, invalidate } from '@/lib/dataCache';
 
 const LeaveCalendar = ({ onLeaveCreated }) => {
   const { isAlternant } = useAuth();
@@ -38,17 +39,20 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  // Passe par le cache partagé : le profil est déjà chargé par le tableau de
+  // bord, les jours fériés changent rarement. Après une création de congé, on
+  // force le rechargement des données qui viennent de changer.
+  const fetchData = async ({ force = false } = {}) => {
     try {
       const promises = [
-        fetch('/api/leaves/calendar').then(r => r.json()),
-        fetch('/api/holidays/all').then(r => r.json()),
-        fetch('/api/school-holidays').then(r => r.json()),
-        fetch('/api/users/profile').then(r => r.json()),
+        fetchJson('/api/leaves/calendar', { force }),
+        fetchJson('/api/holidays/all', { ttl: 10 * 60_000 }),
+        fetchJson('/api/school-holidays', { ttl: 10 * 60_000 }),
+        fetchJson('/api/users/profile'),
       ];
 
       if (isAlternant()) {
-        promises.push(fetch('/api/cours').then(r => r.json()));
+        promises.push(fetchJson('/api/cours', { force }));
       }
 
       const results = await Promise.all(promises);
@@ -331,6 +335,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        invalidate(['/api/cours']);
         setCoursDays(prev => {
           const next = new Set(prev);
           if (data.action === 'added') {
@@ -424,7 +429,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         setEndDate(null);
         setEndPeriod(null);
         setReason('');
-        fetchData();
+        fetchData({ force: true });
         toast.success(data.message || `Demande de congé envoyée avec succès! (${data.businessDays} jour(s) ouvrés)`);
         if (onLeaveCreated) onLeaveCreated();
       } else {
