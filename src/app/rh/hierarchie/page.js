@@ -153,6 +153,24 @@ export default function HierarchiePage() {
     return set;
   }, [people, rowOf]);
 
+  // Personnes qui valident réellement des demandes mais restent dans la rangée « Agents »
+  const unranked = useMemo(() => {
+    const set = new Set();
+    for (const id of validatesFor.keys()) {
+      const p = people[id];
+      if (p && !isRHType(p.type_utilisateur) && rowOf(p) === echelons.length + 1) set.add(id);
+    }
+    return set;
+  }, [validatesFor, people, rowOf, echelons.length]);
+
+  // Numéro d'étape de chaque échelon validant (étape 1 = le plus proche des agents)
+  const stepOfEchelon = useMemo(() => {
+    const m = new Map();
+    let n = 0;
+    for (let i = echelons.length - 1; i >= 0; i--) if (echelons[i].valide) m.set(echelons[i].id, ++n);
+    return m;
+  }, [echelons]);
+
   const stats = useMemo(() => {
     let longest = 0;
     for (const steps of circuits.values()) longest = Math.max(longest, steps.length);
@@ -160,9 +178,9 @@ export default function HierarchiePage() {
       echelons: echelons.length,
       validants: echelons.filter((e) => e.valide).length,
       longest,
-      alerts: inverted.size,
+      alerts: inverted.size + unranked.size,
     };
-  }, [circuits, echelons, inverted]);
+  }, [circuits, echelons, inverted, unranked]);
 
   // Mise en évidence autour de la personne sélectionnée
   const related = useMemo(() => {
@@ -214,8 +232,16 @@ export default function HierarchiePage() {
       return;
     }
     const patch = { responsable_id: targetId };
+    let targetRow = rowOf(target);
+    // Un agent de la base qui reçoit un subordonné devient valideur : il monte dans l'échelon validant le plus bas
+    if (!isRHType(target.type_utilisateur) && targetRow === echelons.length + 1) {
+      const lowest = [...echelons].reverse().find((e) => e.valide);
+      if (lowest) {
+        updatePerson(targetId, { echelon_id: lowest.id });
+        targetRow = echelonIndex.get(lowest.id) + 1;
+      }
+    }
     // Garder la pyramide cohérente : l'agent passe sous le niveau de son responsable
-    const targetRow = rowOf(target);
     if (!isRHType(target.type_utilisateur) && rowOf(p) <= targetRow) {
       patch.echelon_id = echelonIdForRow(targetRow + 1);
     }
@@ -267,41 +293,39 @@ export default function HierarchiePage() {
     setConfirmDelete(null);
   };
 
-  // Construit des échelons à partir des responsables déjà saisis
+  // Range la pyramide d'après le parcours réel : chaque valideur est placé selon le nombre de
+  // valideurs au-dessus de lui. Les échelons « hors parcours » et leurs membres sont conservés.
   const autoGenerate = () => {
-    const depthOf = (p) => {
-      let d = 0;
-      const seen = new Set([p.id]);
-      let cur = p.responsable_id;
-      while (cur != null && !seen.has(cur)) {
-        seen.add(cur);
-        const r = people[cur];
-        if (!r || isRHType(r.type_utilisateur)) break;
-        d++;
-        cur = r.responsable_id;
-      }
-      return d;
-    };
-    const managers = Object.values(people).filter((p) => !isRHType(p.type_utilisateur) && (childrenOf.get(p.id) || []).length > 0);
-    if (managers.length === 0) {
-      toast('Aucun responsable saisi pour l\'instant : ajoutez des échelons puis glissez les agents.', { icon: 'ℹ️' });
+    const validators = [...validatesFor.keys()].map((id) => people[id]).filter((p) => p && !isRHType(p.type_utilisateur));
+    if (validators.length === 0) {
+      toast('Aucun responsable saisi pour l\'instant : glissez les agents sur leur responsable.', { icon: 'ℹ️' });
       return;
     }
-    const depths = new Map(managers.map((m) => [m.id, depthOf(m)]));
+    const kept = echelons.filter((e) => !e.valide);
+    const keptIds = new Set(kept.map((e) => e.id));
+    const depths = new Map(validators.map((v) => [v.id, (circuits.get(v.id) || []).length]));
     const levels = [...new Set(depths.values())].sort((a, b) => a - b);
-    const names = DEFAULT_NAMES[levels.length] || levels.map((_, i) => `Échelon ${i + 1}`);
+    // Réutilise les échelons validants existants (et leurs noms) s'il y en a autant que de niveaux
+    const existing = echelons.filter((e) => e.valide);
+    const reuse = existing.length === levels.length;
+    const names = reuse ? existing.map((e) => e.nom) : DEFAULT_NAMES[levels.length] || [];
     const stamp = Date.now();
-    const newEchelons = levels.map((_, i) => ({ id: `new-${stamp}-${i}`, nom: names[i] || `Échelon ${i + 1}`, valide: true }));
-    setEchelons(newEchelons);
+    const generated = levels.map((_, i) => ({
+      id: reuse ? existing[i].id : `new-${stamp}-${i}`,
+      nom: names[i] || `Échelon ${i + 1}`,
+      valide: true,
+    }));
+    setEchelons([...kept, ...generated]);
     setPeople((prev) => {
       const next = {};
       for (const p of Object.values(prev)) {
+        if (p.echelon_id != null && keptIds.has(p.echelon_id)) { next[p.id] = p; continue; }
         const d = depths.get(p.id);
-        next[p.id] = { ...p, echelon_id: d === undefined ? null : newEchelons[levels.indexOf(d)].id };
+        next[p.id] = { ...p, echelon_id: d === undefined ? null : generated[levels.indexOf(d)].id };
       }
       return next;
     });
-    toast.success(`${levels.length} échelon(s) proposés d'après les responsables actuels — vérifiez puis enregistrez.`);
+    toast.success(`Pyramide rangée d'après le parcours : ${levels.length} échelon(s) validant(s) — vérifiez puis enregistrez.`);
   };
 
   const reset = () => {
@@ -381,6 +405,13 @@ export default function HierarchiePage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={autoGenerate}
+              title="Place chaque valideur dans l'échelon qui correspond à sa position réelle dans le parcours"
+              className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-medium hover:bg-gray-50"
+            >
+              Ranger selon le parcours
+            </button>
             <button
               onClick={addEchelon}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-indigo-200 bg-white text-indigo-700 font-medium hover:bg-indigo-50"
@@ -503,7 +534,15 @@ export default function HierarchiePage() {
                           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-50 text-rose-700">Validation finale</span>
                         )}
                         {row.kind === 'base' && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Sans échelon</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Déposent les demandes</span>
+                        )}
+                        {isEchelon && row.echelon.valide && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                            Étape {stepOfEchelon.get(row.echelon.id)} du parcours
+                          </span>
+                        )}
+                        {isEchelon && !row.echelon.valide && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Sauté dans le parcours</span>
                         )}
 
                         {isEchelon && (
@@ -558,7 +597,7 @@ export default function HierarchiePage() {
                             isSelected={selectedId === p.id}
                             isDragged={dragId === p.id}
                             isDropTarget={hoverTarget === `card:${p.id}` && dragId !== p.id}
-                            isInverted={inverted.has(p.id)}
+                            isInverted={inverted.has(p.id) || unranked.has(p.id)}
                             dimmed={
                               (searchMatches && !searchMatches.has(p.id)) ||
                               (related && selectedId !== p.id && !related.up.has(p.id) && !related.down.has(p.id))
@@ -630,6 +669,8 @@ export default function HierarchiePage() {
             ) : (
               <HelpPanel
                 inverted={[...inverted].map((id) => people[id])}
+                unranked={[...unranked].map((id) => people[id])}
+                onFix={autoGenerate}
                 people={people}
                 onSelect={setSelectedId}
               />
@@ -886,7 +927,7 @@ function Dot({ className }) {
   return <span className={`absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full ring-2 ring-white ${className}`} />;
 }
 
-function HelpPanel({ inverted, onSelect }) {
+function HelpPanel({ inverted, unranked = [], onFix, onSelect }) {
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4 space-y-4 text-sm text-gray-700">
       <p className="font-semibold text-gray-900">Mode d&apos;emploi</p>
@@ -900,6 +941,23 @@ function HelpPanel({ inverted, onSelect }) {
       <p className="text-xs text-gray-500">
         Les demandes déjà en cours conservent les étapes validées et suivent le nouveau parcours pour la suite.
       </p>
+
+      {unranked.length > 0 && (
+        <div>
+          <p className="font-semibold text-amber-700 mb-1">Valideurs hors pyramide ({unranked.length})</p>
+          <p className="text-xs text-gray-500 mb-2">Ils valident des demandes mais sont restés dans la rangée « Agents » :</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {unranked.map((p) => (
+              <button key={p.id} onClick={() => onSelect(p.id)} className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-800 hover:bg-amber-100">
+                {fullName(p)}
+              </button>
+            ))}
+          </div>
+          <button onClick={onFix} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+            Ranger selon le parcours
+          </button>
+        </div>
+      )}
 
       {inverted.length > 0 && (
         <div>

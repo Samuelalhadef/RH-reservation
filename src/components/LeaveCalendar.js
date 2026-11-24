@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
 import { parseSchedule, scheduleHasData, diffHeures } from '@/lib/horaires';
 import toast from 'react-hot-toast';
+import { findSchoolHoliday } from '@/lib/schoolHolidays';
+import SchoolHolidayBanner from './SchoolHolidayBanner';
 
 const LeaveCalendar = ({ onLeaveCreated }) => {
   const { isAlternant } = useAuth();
@@ -131,7 +133,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
   const isSchoolHoliday = (date) => {
     const dateStr = formatDateToYYYYMMDD(date);
-    return schoolHolidays.some(p => dateStr >= p.debut && dateStr <= p.fin);
+    return findSchoolHoliday(schoolHolidays, dateStr);
   };
 
   // Clé jour de semaine (dimanche=0 → samedi=6) pour l'emploi du temps hebdomadaire
@@ -635,6 +637,8 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
         </div>
       )}
 
+      <SchoolHolidayBanner periods={schoolHolidays} month={currentMonth} />
+
       {/* Légende */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <p className="text-xs font-semibold text-gray-700 mb-2">Légende :</p>
@@ -670,10 +674,10 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             </div>
           )}
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 bg-amber-50 border border-amber-200 rounded relative">
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"></span>
+            <div className="w-4 h-4 bg-amber-100 ring-2 ring-amber-300 rounded relative">
+              <span className="absolute bottom-0 inset-x-0.5 h-1 rounded-full bg-amber-400"></span>
             </div>
-            <span className="text-gray-600">Vacances scolaires</span>
+            <span className="text-gray-600">Vacances scolaires (Zone C)</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-gray-100 rounded"></div>
@@ -719,9 +723,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
             return (
               <div key={index} className="relative">
-                <div className={`w-full aspect-square relative ${
-                  isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-lg sm:rounded-xl' : ''
-                } ${schoolHol ? 'bg-amber-50 rounded-lg sm:rounded-xl' : ''}`}>
+                <div
+                  title={schoolHol ? `Vacances scolaires : ${schoolHol.nom}` : undefined}
+                  className={`w-full aspect-square relative ${
+                  isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-lg sm:rounded-xl' : schoolHol ? 'ring-2 ring-amber-300 rounded-lg sm:rounded-xl' : ''
+                } ${schoolHol ? 'bg-amber-100' : ''}`}>
                   {/* Deux moitiés avec gap */}
                   <div className="absolute inset-0 flex flex-col gap-1">
                     {/* Moitié haute - Matin */}
@@ -745,7 +751,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
                   </span>
                   {/* Indicateur vacances scolaires */}
                   {schoolHol && (
-                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
+                    <span className="absolute bottom-0 inset-x-1 h-1 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
                   )}
                 </div>
               </div>

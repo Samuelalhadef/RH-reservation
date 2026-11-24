@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
+import { findSchoolHoliday } from '@/lib/schoolHolidays';
+import SchoolHolidayBanner from './SchoolHolidayBanner';
 
 const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
@@ -88,7 +90,7 @@ const TeamCalendar = () => {
 
   const isSchoolHoliday = (date) => {
     const dateStr = formatDateToYYYYMMDD(date);
-    return schoolHolidays.some(p => dateStr >= p.debut && dateStr <= p.fin);
+    return findSchoolHoliday(schoolHolidays, dateStr);
   };
 
   // Récupérer les jours en cours pour une date
@@ -147,8 +149,9 @@ const TeamCalendar = () => {
     const leavesPM = getLeavesForHalfDay(dateStr, 'apres_midi');
     const isHoliday = holidays.find(h => h.date === dateStr);
     const coursForDate = getCoursForDate(dateStr);
+    const schoolHoliday = findSchoolHoliday(schoolHolidays, dateStr);
 
-    if (leavesAM.length > 0 || leavesPM.length > 0 || isHoliday || coursForDate.length > 0) {
+    if (leavesAM.length > 0 || leavesPM.length > 0 || isHoliday || coursForDate.length > 0 || schoolHoliday) {
       const rect = event.currentTarget.getBoundingClientRect();
       setTooltipPosition({
         x: rect.left + rect.width / 2,
@@ -159,14 +162,16 @@ const TeamCalendar = () => {
         leavesAM,
         leavesPM,
         holiday: isHoliday,
-        cours: coursForDate
+        cours: coursForDate,
+        schoolHoliday
       });
       setTooltipData({
         date: date,
         leavesAM,
         leavesPM,
         holiday: isHoliday,
-        cours: coursForDate
+        cours: coursForDate,
+        schoolHoliday
       });
       setShowTooltip(true);
     } else {
@@ -220,6 +225,9 @@ const TeamCalendar = () => {
           }}
         >
           <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-sm whitespace-nowrap">
+            {hoveredTooltip.schoolHoliday && (
+              <p className="text-xs text-amber-300 font-bold mb-1">Vacances scolaires : {hoveredTooltip.schoolHoliday.nom}</p>
+            )}
             {hoveredTooltip.cours?.length > 0 && (
               <div className="mb-1">
                 <p className="text-xs text-gray-400 font-bold">En cours :</p>
@@ -283,6 +291,8 @@ const TeamCalendar = () => {
         </div>
       </div>
 
+      <SchoolHolidayBanner periods={schoolHolidays} month={currentMonth} />
+
       {/* Légende */}
       <div className="mb-4 flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
@@ -311,8 +321,8 @@ const TeamCalendar = () => {
           <span className="text-gray-600">Période de fractionnement (nov. → avril)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-amber-50 border border-amber-200 rounded relative">
-            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"></span>
+          <div className="w-4 h-4 bg-amber-100 ring-2 ring-amber-300 rounded relative">
+            <span className="absolute bottom-0 inset-x-0.5 h-1 rounded-full bg-amber-400"></span>
           </div>
           <span className="text-gray-600">Vacances scolaires (Zone C)</span>
         </div>
@@ -362,7 +372,7 @@ const TeamCalendar = () => {
                 key={index}
                 className={`w-full aspect-square relative transition-all font-medium text-lg ${
                   isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-xl' : ''
-                } ${day.isCurrentMonth ? 'cursor-pointer' : ''} ${schoolHol ? 'bg-amber-50 rounded-xl' : ''}`}
+                } ${day.isCurrentMonth ? 'cursor-pointer' : ''} ${schoolHol ? `bg-amber-100 rounded-xl ${isToday && day.isCurrentMonth ? '' : 'ring-2 ring-amber-300'}` : ''}`}
                 onMouseEnter={(e) => handleDateHover(e, day.date, day.isCurrentMonth)}
                 onMouseLeave={handleMouseLeave}
               >
@@ -436,7 +446,7 @@ const TeamCalendar = () => {
                 </span>
                 {/* Indicateur vacances scolaires */}
                 {schoolHol && (
-                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
+                  <span className="absolute bottom-0 inset-x-1 h-1 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
                 )}
               </div>
             );

@@ -1,11 +1,14 @@
-version: "3.9"
-
+# Déploiement TrueNAS (Portainer / docker compose) — https://rh-chartrettes.mousequetaire.com
+# Les secrets sont lus dans le fichier .env placé à côté (jamais commité) :
+#   TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, JWT_SECRET, RESEND_API_KEY, FROM_EMAIL,
+#   NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, CLOUDFLARE_TUNNEL_TOKEN
 services:
   rh-reservations:
     build: .
+    image: rh-reservations:latest
     container_name: rh-reservations
     ports:
-      - "3002:3000"
+      - "3003:3000" # accès LAN / Tailscale (le cookie de session exige HTTPS : passer par le domaine)
     environment:
       - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
       - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
@@ -14,4 +17,23 @@ services:
       - FROM_EMAIL=${FROM_EMAIL}
       - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - TZ=Europe/Paris
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+  # Tunnel Cloudflare (Zero Trust) : aucun port à ouvrir sur la box.
+  # L'entrée publique rh-chartrettes.mousequetaire.com pointe vers http://rh-reservations:3000
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-rh-reservations
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - rh-reservations
     restart: unless-stopped

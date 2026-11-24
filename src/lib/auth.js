@@ -2,15 +2,23 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Ne jamais démarrer avec un secret par défaut : un secret connu permettrait
-// à n'importe qui de forger des tokens valides et d'usurper un compte RH.
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error(
-    'JWT_SECRET manquant ou trop court (>= 32 caractères requis). ' +
-    'Définissez une valeur aléatoire forte dans les variables d\'environnement.'
-  );
+/**
+ * Secret de signature des sessions.
+ * Ne jamais fonctionner avec un secret par défaut : un secret connu permettrait
+ * à n'importe qui de forger des tokens valides et d'usurper un compte RH.
+ * Vérifié à l'usage (et non au chargement du module) : pendant `next build`,
+ * notamment dans Docker, les secrets ne sont pas disponibles et le build
+ * importe quand même ce module.
+ */
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'JWT_SECRET manquant ou trop court (>= 32 caractères requis). ' +
+      'Définissez une valeur aléatoire forte dans les variables d\'environnement.'
+    );
+  }
+  return secret;
 }
 
 /**
@@ -19,18 +27,19 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
 export function generateToken(userId, type) {
   return jwt.sign(
     { userId, type },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '24h' }
   );
 }
 
 /**
- * Vérifie et décode un token JWT
+ * Vérifie et décode un token JWT (null si invalide, expiré ou secret absent)
  */
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (error) {
+    if (error?.message?.startsWith('JWT_SECRET')) console.error(error.message);
     return null;
   }
 }
