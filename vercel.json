@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://conges.mousequetaire.com/$1",
+      "permanent": false
+    }
+  ]
+}
