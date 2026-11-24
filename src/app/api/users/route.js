@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { db } from '@/lib/db';
+import { invalidateLoginUsers } from '@/lib/loginUsers';
 import { requireRH, generateTempPassword } from '@/lib/auth';
 
 import { calculateLeaveBalance } from '@/lib/contractUtils';
+import { syncNiveauxValidation } from '@/lib/hierarchy';
 
 // Rôles autorisés — empêche l'enregistrement d'un type_utilisateur arbitraire
 const TYPES_UTILISATEUR_VALIDES = [
@@ -154,25 +156,12 @@ export async function POST(request) {
       });
     }
 
-    // Auto-configurer niveau_validation du responsable assigné et de son supérieur
+    // Onglet « Validation » pour toute la chaîne des responsables (parcours à N étapes)
     if (responsable_id) {
-      await db.execute({
-        sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
-        args: [responsable_id]
-      });
-      // Si le responsable a lui-même un responsable, celui-ci devient niveau 2
-      const parentResp = await db.execute({
-        sql: 'SELECT responsable_id FROM users WHERE id = ?',
-        args: [responsable_id]
-      });
-      if (parentResp.rows.length > 0 && parentResp.rows[0].responsable_id) {
-        await db.execute({
-          sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 2) WHERE id = ?',
-          args: [parentResp.rows[0].responsable_id]
-        });
-      }
+      await syncNiveauxValidation();
     }
 
+    invalidateLoginUsers();
     return NextResponse.json({
       success: true,
       message: 'Utilisateur créé avec succès',

@@ -119,6 +119,16 @@ export async function PUT(request, { params }) {
               tag: `leave-${id}`
             });
           } catch (e) { /* ignore */ }
+        } else if (result.nextValidatorId) {
+          // Étape suivante du parcours : prévenir le validateur concerné
+          try {
+            await sendPushToUser(result.nextValidatorId, {
+              title: 'Demande de congés à valider',
+              body: `La demande de congés de ${leave.prenom} ${leave.nom} attend votre validation`,
+              url: '/validation',
+              tag: `leave-${id}`
+            });
+          } catch (e) { /* ignore */ }
         }
       }
 

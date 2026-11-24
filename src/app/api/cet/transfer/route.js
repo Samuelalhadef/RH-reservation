@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { notifyCetRequest } from '@/lib/pushNotifications';
+import { getSoldeDisponible } from '@/lib/soldes';
 
 export async function POST(request) {
   try {
@@ -13,9 +14,13 @@ export async function POST(request) {
       );
     }
 
-    const { jours, type = 'credit', motif } = await request.json();
+    const body = await request.json();
+    const { type = 'credit', motif } = body;
+    // Conversion explicite : une valeur texte ("2") était concaténée (58 + "2" = "582")
+    // et une valeur non numérique ("abc") passait tous les contrôles
+    const jours = Number(body.jours);
 
-    if (!jours || jours <= 0) {
+    if (!Number.isFinite(jours) || jours <= 0) {
       return NextResponse.json(
         { success: false, message: 'Nombre de jours invalide' },
         { status: 400 }
@@ -72,19 +77,19 @@ export async function POST(request) {
     if (type === 'credit') {
       // === Versement congés -> CET ===
 
-      const balanceResult = await db.execute({
-        sql: 'SELECT jours_restants, jours_pris FROM soldes_conges WHERE user_id = ? AND annee = ?',
-        args: [user.userId, currentYear]
-      });
+      // Solde recalculé, demandes de congé en attente déduites : on ne peut pas
+      // verser au CET des jours déjà demandés en congé
+      const solde = await getSoldeDisponible(user.userId, currentYear);
 
-      if (balanceResult.rows.length === 0 || balanceResult.rows[0].jours_restants < jours) {
+      if (!solde || solde.disponible < jours) {
+        const detail = solde && solde.enAttente > 0 ? ` (dont ${solde.enAttente} jour(s) déjà demandé(s) en congé)` : '';
         return NextResponse.json(
-          { success: false, message: 'Solde de congés insuffisant' },
+          { success: false, message: `Solde de congés insuffisant${detail}` },
           { status: 400 }
         );
       }
 
-      const joursPris = balanceResult.rows[0].jours_pris || 0;
+      const joursPris = solde.pris;
       if (joursPris < 20) {
         return NextResponse.json(
           { success: false, message: `Vous devez avoir pris au moins 20 jours de congé. Jours pris cette année : ${joursPris}.` },

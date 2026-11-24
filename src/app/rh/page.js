@@ -740,6 +740,10 @@ export default function RHPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
               Utilisateurs
             </MainTab>
+            <MainTab active={false} onClick={() => router.push('/rh/hierarchie')} color="violet">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l9 16H3L12 3zm0 6v4m-4 2h8" /></svg>
+              Hiérarchie
+            </MainTab>
             <MainTab active={activeTab === 'cet-requests'} onClick={() => setActiveTab('cet-requests')} color="amber" count={cetRequests.filter(r => r.statut === 'en_attente').length}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Demandes CET
@@ -873,26 +877,19 @@ export default function RHPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filtered.map((leave) => {
-                      // Déterminer où en est la validation
-                      const hasN1 = leave.responsable_nom != null;
-                      const hasN2 = leave.responsable_n2_nom != null;
-
-                      const n1Validated = leave.statut_niveau_1 === 'validee';
-                      const n2Validated = leave.statut_niveau_2 === 'validee';
+                      // Où en est la validation (parcours à N étapes)
+                      const etapes = leave.circuit_etapes || [];
                       const isFinalValidated = leave.statut === 'validee';
                       const isRefused = leave.statut === 'refusee';
-
-                      // Où est-ce que ça bloque ?
-                      let blockingAt = null;
-                      if (!isRefused && !isFinalValidated) {
-                        if (hasN1 && !n1Validated) {
-                          blockingAt = 'n1';
-                        } else if (hasN2 && !n2Validated) {
-                          blockingAt = 'n2';
-                        } else {
-                          blockingAt = 'rh';
-                        }
-                      }
+                      const etapeEnCours = etapes.find(e => e.statut === 'en_cours');
+                      const refusIntermediaire = etapes.some(e => e.statut === 'refusee');
+                      const blockingAt = isRefused || isFinalValidated || leave.statut === 'annulee'
+                        ? null
+                        : (etapeEnCours ? `n${etapeEnCours.niveau}` : 'rh');
+                      const stepColor = (e) =>
+                        e.statut === 'refusee' ? 'bg-red-500' :
+                        e.statut === 'validee' ? 'bg-green-500' :
+                        e.statut === 'en_cours' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300';
 
                       return (
                         <tr key={leave.id} className="hover:bg-gray-50">
@@ -906,62 +903,36 @@ export default function RHPage() {
                           <td className="px-4 py-3">{leave.nombre_jours_ouvres}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              {/* Niveau 1 - Responsable direct */}
-                              {hasN1 && (
-                                <div className="flex flex-col items-center">
-                                  <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                      isRefused && !n1Validated ? 'bg-red-500' :
-                                      n1Validated ? 'bg-green-500' :
-                                      blockingAt === 'n1' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
-                                    }`}
-                                    title={`N1: ${leave.responsable_prenom} ${leave.responsable_nom}`}
-                                  >
-                                    N1
-                                  </div>
-                                  <span className="text-xs text-gray-500 mt-1 max-w-[60px] truncate" title={`${leave.responsable_prenom} ${leave.responsable_nom}`}>
-                                    {leave.responsable_prenom?.charAt(0)}. {leave.responsable_nom}
-                                  </span>
-                                  {n1Validated && leave.validateur_n1_nom && (
-                                    <span className="text-xs text-green-600">✓</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {hasN1 && (
-                                <div className={`w-6 h-0.5 ${n1Validated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                              )}
-
-                              {/* Niveau 2 - Responsable hiérarchique */}
-                              {hasN2 && (
-                                <>
-                                  <div className="flex flex-col items-center">
-                                    <div
-                                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                        isRefused && n1Validated && !n2Validated ? 'bg-red-500' :
-                                        n2Validated ? 'bg-green-500' :
-                                        blockingAt === 'n2' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
-                                      }`}
-                                      title={`N2: ${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}`}
-                                    >
-                                      N2
+                              {etapes.map((e) => {
+                                const prevu = `${e.prevu_prenom || ''} ${e.prevu_nom || ''}`.trim();
+                                const valideur = e.valide_par_nom ? `${e.valide_par_prenom} ${e.valide_par_nom}` : null;
+                                const nom = valideur || prevu;
+                                return (
+                                  <div key={e.niveau} className="flex items-center gap-2">
+                                    <div className="flex flex-col items-center">
+                                      <div
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${stepColor(e)}`}
+                                        title={`N${e.niveau}${e.echelon_nom ? ` (${e.echelon_nom})` : ''}: ${nom}`}
+                                      >
+                                        N{e.niveau}
+                                      </div>
+                                      <span className="text-xs text-gray-500 mt-1 max-w-[60px] truncate" title={nom}>
+                                        {(e.valide_par_prenom || e.prevu_prenom || '').charAt(0)}. {e.valide_par_nom || e.prevu_nom}
+                                      </span>
+                                      {e.statut === 'validee' && (
+                                        <span className="text-xs text-green-600">✓</span>
+                                      )}
                                     </div>
-                                    <span className="text-xs text-gray-500 mt-1 max-w-[60px] truncate" title={`${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}`}>
-                                      {leave.responsable_n2_prenom?.charAt(0)}. {leave.responsable_n2_nom}
-                                    </span>
-                                    {n2Validated && leave.validateur_n2_nom && (
-                                      <span className="text-xs text-green-600">✓</span>
-                                    )}
+                                    <div className={`w-6 h-0.5 ${e.statut === 'validee' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                                   </div>
-                                  <div className={`w-6 h-0.5 ${n2Validated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                </>
-                              )}
+                                );
+                              })}
 
                               {/* RH - Validation finale */}
                               <div className="flex flex-col items-center">
                                 <div
                                   className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                                    isRefused && ((!hasN1) || (hasN1 && n1Validated && (!hasN2 || n2Validated))) ? 'bg-red-500' :
+                                    isRefused && !refusIntermediaire ? 'bg-red-500' :
                                     isFinalValidated ? 'bg-green-500' :
                                     blockingAt === 'rh' ? 'bg-yellow-400 animate-pulse' : 'bg-gray-300'
                                   }`}
@@ -980,9 +951,9 @@ export default function RHPage() {
                             {blockingAt && (
                               <p className="text-xs text-yellow-600 mt-2 font-medium">
                                 ⏳ En attente : {
-                                  blockingAt === 'n1' ? `${leave.responsable_prenom} ${leave.responsable_nom}` :
-                                  blockingAt === 'n2' ? `${leave.responsable_n2_prenom} ${leave.responsable_n2_nom}` :
-                                  'Validation RH'
+                                  etapeEnCours
+                                    ? `${etapeEnCours.prevu_prenom || ''} ${etapeEnCours.prevu_nom || ''}`.trim() + ` (N${etapeEnCours.niveau})`
+                                    : 'Validation RH'
                                 }
                               </p>
                             )}
@@ -3949,7 +3920,21 @@ const PARENTALITE_LABELS = {
   maternite: { label: 'Maternité', badge: 'bg-pink-100 text-pink-700' },
   paternite: { label: 'Paternité', badge: 'bg-sky-100 text-sky-700' },
   adoption:  { label: 'Adoption',  badge: 'bg-violet-100 text-violet-700' },
+  enfant_malade: { label: 'Enfant malade', badge: 'bg-teal-100 text-teal-700' },
 };
+
+const PARENTALITE_DEMI_JOURNEE = { matin: 'matin', apres_midi: 'après-midi' };
+
+/** Cumul des jours « enfant malade » validés par agent et par année civile. */
+function cumulEnfantMalade(demandes) {
+  const cumul = {};
+  for (const d of demandes) {
+    if (d.type !== 'enfant_malade' || d.statut !== 'validee') continue;
+    const key = `${d.user_id}-${String(d.date_debut).slice(0, 4)}`;
+    cumul[key] = (cumul[key] || 0) + (Number(d.nombre_jours) || 0);
+  }
+  return cumul;
+}
 
 function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRefresh }) {
   const [filter, setFilter] = useState('en_attente'); // en_attente | validee | refusee | toutes
@@ -3957,9 +3942,13 @@ function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRef
   const [commentModal, setCommentModal] = useState(null); // { demande, action }
   const [comment, setComment] = useState('');
   const [docModal, setDocModal] = useState(null); // demande
+  const [typeFilter, setTypeFilter] = useState('tous'); // tous | naissance | enfant_malade
+  const cumulEM = cumulEnfantMalade(demandes);
 
   const filtered = demandes.filter(d => {
     if (filter !== 'toutes' && d.statut !== filter) return false;
+    if (typeFilter === 'enfant_malade' && d.type !== 'enfant_malade') return false;
+    if (typeFilter === 'naissance' && d.type === 'enfant_malade') return false;
     if (search) {
       const q = search.toLowerCase();
       const name = `${d.prenom || ''} ${d.nom || ''}`.toLowerCase();
@@ -4010,7 +3999,7 @@ function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRef
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Parentalité</h1>
           <p className="text-white/80 text-sm mt-1.5 max-w-2xl">
-            Validez les demandes de congés maternité, paternité ou adoption.
+            Validez les demandes de congés maternité, paternité, adoption et les absences pour enfant malade.
           </p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
             <RecupHeroStat label="En attente" value={enAttenteCount} icon="bell" />
@@ -4039,6 +4028,15 @@ function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRef
             <option value="validee">Validées</option>
             <option value="refusee">Refusées</option>
             <option value="toutes">Toutes</option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm bg-white"
+          >
+            <option value="tous">Tous les types</option>
+            <option value="naissance">Naissance / adoption</option>
+            <option value="enfant_malade">Enfant malade</option>
           </select>
         </div>
 
@@ -4078,9 +4076,28 @@ function ParentaliteRHSection({ demandes, actionLoading, setActionLoading, onRef
                         )}
                       </div>
                       <p className="text-sm text-gray-700">
-                        Du <strong>{d.date_debut_fr}</strong> au <strong>{d.date_fin_fr}</strong>
-                        <span className="text-gray-500"> · {d.nombre_jours} jour(s) calendaires</span>
+                        {d.date_debut === d.date_fin ? (
+                          <>Le <strong>{d.date_debut_fr}</strong></>
+                        ) : (
+                          <>Du <strong>{d.date_debut_fr}</strong> au <strong>{d.date_fin_fr}</strong></>
+                        )}
+                        {d.type_debut && d.type_debut !== 'journee_complete' && (
+                          <span className="text-gray-500"> ({d.date_debut === d.date_fin ? '' : 'début '}{PARENTALITE_DEMI_JOURNEE[d.type_debut]})</span>
+                        )}
+                        {d.date_debut !== d.date_fin && d.type_fin && d.type_fin !== 'journee_complete' && (
+                          <span className="text-gray-500"> (fin {PARENTALITE_DEMI_JOURNEE[d.type_fin]})</span>
+                        )}
+                        <span className="text-gray-500">
+                          {' · '}{d.nombre_jours} jour(s) {d.type === 'enfant_malade' ? 'ouvrés' : 'calendaires'}
+                        </span>
                       </p>
+                      {d.type === 'enfant_malade' && (
+                        <p className="text-xs text-teal-700 mt-1">
+                          {d.enfant_prenom && <>Enfant : <strong>{d.enfant_prenom}</strong> · </>}
+                          Déjà validé en {String(d.date_debut).slice(0, 4)} : <strong>{cumulEM[`${d.user_id}-${String(d.date_debut).slice(0, 4)}`] || 0} j</strong>
+                          <span className="text-gray-500"> (6 j/an pour un temps plein, au prorata)</span>
+                        </p>
+                      )}
                       {d.motif && (
                         <p className="text-xs text-gray-600 mt-1 italic">« {d.motif} »</p>
                       )}

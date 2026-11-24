@@ -10,7 +10,6 @@ import toast from 'react-hot-toast';
 // Composant pour afficher le circuit de validation détaillé
 const ValidationCircuit = ({ leave }) => {
   const { statut, validation_info } = leave;
-  const circuit = validation_info?.circuit;
   const pendingValidation = validation_info?.pending_validation;
 
   // Construire les étapes basées sur le circuit réel
@@ -24,39 +23,27 @@ const ValidationCircuit = ({ leave }) => {
       }
     ];
 
-    // Ajouter les niveaux du circuit s'ils existent
-    if (circuit?.niveaux) {
-      const n1 = circuit.niveaux.find(n => n.niveau === 1);
-      const n2 = circuit.niveaux.find(n => n.niveau === 2);
-
-      if (n1) {
-        const isValidated = validation_info?.validated_n1;
-        const isPending = pendingValidation?.niveau === 1;
-        steps.push({
-          id: 'n1',
-          label: n1.validateur_prenom ? `${n1.validateur_prenom} ${n1.validateur_nom}` : 'Responsable',
-          sublabel: 'N+1',
-          status: statut === 'refusee' && !isValidated ? 'rejected' : isValidated ? 'completed' : isPending ? 'current' : 'pending',
-          icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-        });
-      }
-
-      if (n2) {
-        const isValidated = validation_info?.validated_n2;
-        const isPending = pendingValidation?.niveau === 2;
-        steps.push({
-          id: 'n2',
-          label: n2.validateur_prenom ? `${n2.validateur_prenom} ${n2.validateur_nom}` : 'Direction',
-          sublabel: 'N+2',
-          status: statut === 'refusee' && !isValidated && validation_info?.validated_n1 ? 'rejected' : isValidated ? 'completed' : isPending ? 'current' : 'pending',
-          icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
-        });
-      }
-    }
+    // Étapes intermédiaires du parcours (autant que d'échelons validants)
+    const etapes = validation_info?.etapes || [];
+    const STATUS = { validee: 'completed', en_cours: 'current', refusee: 'rejected', a_venir: 'pending' };
+    etapes.forEach((e) => {
+      const valideur = e.valide_par_nom ? `${e.valide_par_prenom} ${e.valide_par_nom}` : null;
+      const prevu = e.prevu_nom ? `${e.prevu_prenom} ${e.prevu_nom}` : 'Responsable';
+      steps.push({
+        id: `n${e.niveau}`,
+        label: valideur || prevu,
+        sublabel: `N+${e.niveau}${e.echelon_nom ? ` · ${e.echelon_nom}` : ''}`,
+        status: STATUS[e.statut] || 'pending',
+        icon: e.niveau === 1
+          ? 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+          : 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+      });
+    });
 
     // Toujours ajouter RH à la fin
     const isRHPending = pendingValidation?.niveau === 'rh';
-    const isRHStep = statut !== 'en_attente';
+    // Refus à la RH = refusée sans qu'aucune étape intermédiaire ne porte le refus
+    const isRHStep = statut !== 'en_attente' && !etapes.some(e => e.statut === 'refusee');
     steps.push({
       id: 'rh',
       label: 'Service RH',

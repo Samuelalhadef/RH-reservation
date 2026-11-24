@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getLoginUsers } from '@/lib/loginUsers';
 
 export async function GET() {
   try {
-    const result = await db.execute(
-      'SELECT id, nom, prenom FROM users WHERE actif = 1 ORDER BY nom, prenom'
-    );
+    const users = await getLoginUsers();
 
     return NextResponse.json({
       success: true,
-      users: result.rows
+      users
     });
   } catch (error) {
     console.error('Error fetching users:', error);

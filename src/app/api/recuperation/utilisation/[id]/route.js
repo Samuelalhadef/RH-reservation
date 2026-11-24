@@ -77,6 +77,16 @@ export async function PUT(request, { params }) {
               tag: `recup-util-${id}`
             });
           } catch (e) { /* ignore */ }
+        } else if (result.nextValidatorId) {
+          // Étape suivante du parcours : prévenir le validateur concerné
+          try {
+            await sendPushToUser(result.nextValidatorId, {
+              title: 'Récupération à valider',
+              body: `La demande d'utilisation de récupération de ${demande.prenom} ${demande.nom} attend votre validation`,
+              url: '/validation',
+              tag: `recup-util-${id}`
+            });
+          } catch (e) { /* ignore */ }
         }
       }
 

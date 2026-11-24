@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getMinimumStartDate, calculateBusinessDays, isAtLeast7DaysInAdvance } from '@/lib/clientDateUtils';
+import { getMinimumStartDate, isAtLeast7DaysInAdvance } from '@/lib/clientDateUtils';
+import { calculateLeaveDays } from '@/lib/dateUtils';
 import toast from 'react-hot-toast';
 
 const LeaveRequestForm = ({ onSuccess }) => {
@@ -61,27 +62,10 @@ const LeaveRequestForm = ({ onSuccess }) => {
   useEffect(() => {
     if (formData.date_debut && formData.date_fin) {
       const holidays_dates = holidays.map(h => h.date);
-      let days = calculateBusinessDays(formData.date_debut, formData.date_fin, holidays_dates);
+      // Même calcul que le serveur (demi-journées sur week-end/férié ignorées)
+      const days = calculateLeaveDays(formData.date_debut, formData.date_fin, holidays_dates, formData.type_debut, formData.type_fin);
 
-      // Ajuster pour les demi-journées
-      const isSameDay = formData.date_debut === formData.date_fin;
-
-      if (isSameDay) {
-        if (formData.type_debut === 'matin' && formData.type_fin === 'apres_midi') {
-          days = 1;
-        } else if (formData.type_debut === 'matin' || formData.type_debut === 'apres_midi') {
-          days = 0.5;
-        }
-      } else {
-        if (formData.type_debut === 'apres_midi') {
-          days -= 0.5;
-        }
-        if (formData.type_fin === 'matin') {
-          days -= 0.5;
-        }
-      }
-
-      setBusinessDays(Math.max(0, days));
+      setBusinessDays(days);
 
       // Calculer le fractionnement potentiel
       const fractionnement = calculateFractionnement(formData.date_debut, formData.date_fin, days);

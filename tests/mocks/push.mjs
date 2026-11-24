@@ -1,0 +1,12 @@
+export const sentPushes = (globalThis.__sentPushes ||= []);
+const rec = (kind) => async (...args) => { sentPushes.push({ kind, args }); };
+export const sendPushToUser = rec('user');
+export const sendPushToRH = rec('rh');
+export const notifyLeaveRequest = rec('leave-request');
+export const notifyLeaveDecision = rec('leave-decision');
+export const notifyLeaveProgress = rec('leave-progress');
+export const notifyCetRequest = rec('cet-request');
+export const notifyCetDecision = rec('cet-decision');
+export const notifyRecuperationRequest = rec('recup-request');
+export const notifyRecuperationDecision = rec('recup-decision');
+export const notifyLeaveCancelled = rec('leave-cancelled');

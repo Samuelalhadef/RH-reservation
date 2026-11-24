@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { invalidateLoginUsers } from '@/lib/loginUsers';
 import { requireRH } from '@/lib/auth';
 import { calculateLeaveBalance } from '@/lib/contractUtils';
 import { recalculateBalance } from '@/lib/soldes';
+import { syncNiveauxValidation } from '@/lib/hierarchy';
 
 export async function PUT(request, { params }) {
   try {
@@ -88,11 +90,15 @@ export async function PUT(request, { params }) {
     });
 
     // Si le type de contrat ou les dates ont changé, recalculer le solde
+    // Comparaison normalisée : '' vs NULL, "100" vs 100 ou un type_contrat NULL
+    // (anciens comptes) déclenchaient un recalcul à chaque enregistrement de la
+    // fiche, ce qui écrasait les ajustements manuels de jours_acquis.
+    const normDate = (v) => v || null;
     const contractChanged =
-      oldUser.type_contrat !== (type_contrat || 'CDI') ||
-      oldUser.date_debut_contrat !== date_debut_contrat ||
-      oldUser.date_fin_contrat !== date_fin_contrat ||
-      oldUser.quotite_travail !== (quotite_travail || 100);
+      (oldUser.type_contrat || 'CDI') !== (type_contrat || 'CDI') ||
+      normDate(oldUser.date_debut_contrat) !== normDate(date_debut_contrat) ||
+      normDate(oldUser.date_fin_contrat) !== normDate(date_fin_contrat) ||
+      Number(oldUser.quotite_travail || 100) !== Number(quotite_travail || 100);
 
     if (contractChanged) {
       const currentYear = new Date().getFullYear();
@@ -131,24 +137,12 @@ export async function PUT(request, { params }) {
       });
     }
 
-    // Auto-configurer niveau_validation du responsable assigné et de son supérieur
+    // Onglet « Validation » pour toute la chaîne des responsables (parcours à N étapes)
     if (responsable_id) {
-      await db.execute({
-        sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 1) WHERE id = ?',
-        args: [responsable_id]
-      });
-      const parentResp = await db.execute({
-        sql: 'SELECT responsable_id FROM users WHERE id = ?',
-        args: [responsable_id]
-      });
-      if (parentResp.rows.length > 0 && parentResp.rows[0].responsable_id) {
-        await db.execute({
-          sql: 'UPDATE users SET niveau_validation = MAX(COALESCE(niveau_validation, 0), 2) WHERE id = ?',
-          args: [parentResp.rows[0].responsable_id]
-        });
-      }
+      await syncNiveauxValidation();
     }
 
+    invalidateLoginUsers();
     return NextResponse.json({
       success: true,
       message: 'Utilisateur mis à jour avec succès'
@@ -197,6 +191,7 @@ export async function DELETE(request, { params }) {
 
     console.log(`User deleted: ${user.prenom} ${user.nom} (ID: ${id})`);
 
+    invalidateLoginUsers();
     return NextResponse.json({
       success: true,
       message: 'Utilisateur supprimé avec succès'

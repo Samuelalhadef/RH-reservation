@@ -16,6 +16,52 @@ export function totalDroits(s) {
 }
 
 /**
+ * Solde réellement disponible pour une nouvelle demande ou une validation :
+ * droits − congés validés − congés encore en attente.
+ * Lecture seule (n'écrit rien en base).
+ *
+ * Sans la déduction des demandes en attente, un agent peut poser plusieurs
+ * demandes qui passent chacune le contrôle, puis être validées et faire
+ * passer le solde en négatif.
+ *
+ * @param {number} userId
+ * @param {number} year
+ * @param {number[]} [excludeIds] - demandes à ignorer (celle qu'on valide,
+ *   ou des demandes en attente qui vont être remplacées)
+ * @returns {Promise<{pris: number, restants: number, enAttente: number, disponible: number}|null>}
+ *   null si aucune ligne soldes_conges pour cette année
+ */
+export async function getSoldeDisponible(userId, year, excludeIds = []) {
+  const soldeResult = await db.execute({
+    sql: `SELECT jours_acquis, jours_reportes, jours_fractionnement, jours_compensateurs, jours_cet
+          FROM soldes_conges WHERE user_id = ? AND annee = ?`,
+    args: [userId, year]
+  });
+  if (soldeResult.rows.length === 0) return null;
+
+  const exclude = excludeIds.map(Number).filter(Number.isFinite);
+  const excludeSql = exclude.length ? ` AND id NOT IN (${exclude.map(() => '?').join(',')})` : '';
+
+  const sumsResult = await db.execute({
+    sql: `
+      SELECT
+        COALESCE(SUM(CASE WHEN statut = 'validee' THEN nombre_jours_ouvres END), 0) as pris,
+        COALESCE(SUM(CASE WHEN statut = 'en_attente' THEN nombre_jours_ouvres END), 0) as en_attente
+      FROM demandes_conges
+      WHERE user_id = ? AND statut IN ('validee', 'en_attente')
+        AND strftime('%Y', date_debut) = ?${excludeSql}
+    `,
+    args: [userId, String(year), ...exclude]
+  });
+
+  const pris = sumsResult.rows[0]?.pris || 0;
+  const enAttente = sumsResult.rows[0]?.en_attente || 0;
+  const restants = totalDroits(soldeResult.rows[0]) - pris;
+
+  return { pris, restants, enAttente, disponible: restants - enAttente };
+}
+
+/**
  * Recalcule jours_pris (à partir des congés validés) et jours_restants
  * (à partir de tous les droits, CET inclus) pour un utilisateur sur une année.
  *

@@ -4,11 +4,14 @@ import { requireAuth, requireRH } from '@/lib/auth';
 import { getFrenchHolidaysRange } from '@/lib/holidays';
 import {
   calculateBusinessDays,
+  calculateLeaveDays,
   isAtLeast7DaysInAdvance,
   formatDateFR
 } from '@/lib/dateUtils';
 import { sendNewLeaveRequestEmail } from '@/lib/email';
 import { notifyLeaveRequest, sendPushToRH } from '@/lib/pushNotifications';
+import { getSoldeDisponible } from '@/lib/soldes';
+import { loadHierarchyContext, loadValidationHistory, describeEtapes } from '@/lib/hierarchy';
 
 export async function GET(request) {
   try {
@@ -63,11 +66,21 @@ export async function GET(request) {
 
     sql += ' ORDER BY dc.date_demande DESC';
 
-    const result = await db.execute({ sql, args });
+    const [result, ctx, history] = await Promise.all([
+      db.execute({ sql, args }),
+      loadHierarchyContext(),
+      loadValidationHistory('demandes_conges'),
+    ]);
+
+    // Étapes du parcours (N niveaux) pour le suivi visuel de l'interface RH
+    const leaves = result.rows.map((leave) => ({
+      ...leave,
+      circuit_etapes: describeEtapes(leave, ctx, history.get(Number(leave.id)) || []),
+    }));
 
     return NextResponse.json({
       success: true,
-      leaves: result.rows
+      leaves
     });
   } catch (error) {
     console.error('Error fetching leaves:', error);
@@ -126,27 +139,10 @@ export async function POST(request) {
 
     let businessDays = calculateBusinessDays(date_debut, date_fin, holidays);
 
-    // Ajuster pour les demi-journées
-    const isSameDay = date_debut === date_fin;
+    // Demi-journées comprises (voir calculateLeaveDays)
     const typeDebutValue = type_debut || 'journee_complete';
     const typeFinValue = type_fin || 'journee_complete';
-
-    if (isSameDay) {
-      if (typeDebutValue === 'matin' && typeFinValue === 'apres_midi') {
-        businessDays = 1;
-      } else if (typeDebutValue === 'matin' || typeDebutValue === 'apres_midi') {
-        businessDays = 0.5;
-      }
-    } else {
-      if (typeDebutValue === 'apres_midi') {
-        businessDays -= 0.5;
-      }
-      if (typeFinValue === 'matin') {
-        businessDays -= 0.5;
-      }
-    }
-
-    businessDays = Math.max(0, businessDays);
+    businessDays = calculateLeaveDays(date_debut, date_fin, holidays, typeDebutValue, typeFinValue);
 
     if (businessDays === 0) {
       return NextResponse.json(
@@ -179,34 +175,6 @@ export async function POST(request) {
       }
     }
 
-    const currentYear = new Date().getFullYear();
-    const balanceResult = await db.execute({
-      sql: 'SELECT jours_restants FROM soldes_conges WHERE user_id = ? AND annee = ?',
-      args: [userId, currentYear]
-    });
-
-    let joursRestants = 25;
-
-    if (!balanceResult.rows || balanceResult.rows.length === 0) {
-      await db.execute({
-        sql: `
-          INSERT INTO soldes_conges (user_id, annee, jours_acquis, jours_pris, jours_restants)
-          VALUES (?, ?, 25, 0, 25)
-        `,
-        args: [userId, currentYear]
-      });
-      joursRestants = 25;
-    } else {
-      joursRestants = balanceResult.rows[0].jours_restants;
-    }
-
-    if (businessDays > joursRestants) {
-      return NextResponse.json(
-        { success: false, message: `Solde insuffisant. Vous avez ${joursRestants} jour(s) disponible(s)` },
-        { status: 400 }
-      );
-    }
-
     // Vérifier les chevauchements (validées + en attente) en une seule requête
     const overlapResult = await db.execute({
       sql: `
@@ -227,8 +195,35 @@ export async function POST(request) {
       );
     }
 
-    // Supprimer en batch les demandes en attente qui chevauchent
+    // Les demandes en attente qui chevauchent seront remplacées par celle-ci
     const pendingIds = overlapResult.rows.filter(r => r.statut === 'en_attente').map(r => r.id);
+
+    // Vérifier le solde disponible : droits − congés validés − autres demandes en attente
+    const currentYear = new Date().getFullYear();
+    let solde = await getSoldeDisponible(userId, currentYear, pendingIds);
+
+    if (!solde) {
+      await db.execute({
+        sql: `
+          INSERT INTO soldes_conges (user_id, annee, jours_acquis, jours_pris, jours_restants)
+          VALUES (?, ?, 25, 0, 25)
+        `,
+        args: [userId, currentYear]
+      });
+      solde = await getSoldeDisponible(userId, currentYear, pendingIds);
+    }
+
+    if (businessDays > solde.disponible) {
+      const detail = solde.enAttente > 0
+        ? ` (${solde.restants} restant(s) dont ${solde.enAttente} déjà demandé(s) en attente de validation)`
+        : '';
+      return NextResponse.json(
+        { success: false, message: `Solde insuffisant. Vous avez ${Math.max(0, solde.disponible)} jour(s) disponible(s)${detail}` },
+        { status: 400 }
+      );
+    }
+
+    // Supprimer en batch les demandes en attente qui chevauchent
     let deletedCount = 0;
     if (pendingIds.length > 0) {
       const placeholders = pendingIds.map(() => '?').join(',');
@@ -302,7 +297,7 @@ export async function POST(request) {
       } else {
         // Pas de responsable direct, envoyer à la RH
         const rhResult = await db.execute({
-          sql: 'SELECT email FROM users WHERE type_utilisateur IN ("RH", "Direction", "DG") AND actif = 1'
+          sql: "SELECT email FROM users WHERE type_utilisateur IN ('RH', 'Direction', 'DG') AND actif = 1"
         });
 
         if (rhResult.rows && rhResult.rows.length > 0) {

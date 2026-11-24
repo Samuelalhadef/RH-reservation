@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { formatDateFR } from '@/lib/clientDateUtils';
+import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
 
 const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
@@ -307,6 +307,10 @@ const TeamCalendar = () => {
           <span className="text-gray-600">2+ personnes</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-teal-50 border border-teal-200 rounded"></div>
+          <span className="text-gray-600">Période de fractionnement (nov. → avril)</span>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-amber-50 border border-amber-200 rounded relative">
             <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400"></span>
           </div>
@@ -350,6 +354,8 @@ const TeamCalendar = () => {
 
             const hasAnyLeave = leavesAM.length > 0 || leavesPM.length > 0;
             const schoolHol = day.isCurrentMonth && isSchoolHoliday(day.date);
+            // Teinte légère des jours en période de fractionnement (nov. → avril)
+            const fractionnementBg = day.isCurrentMonth && isPeriodeFractionnement(day.date) ? 'bg-teal-50' : '';
 
             return (
               <div
@@ -365,7 +371,7 @@ const TeamCalendar = () => {
                   {day.isCurrentMonth && !isWeekend(day.date) && !isHoliday ? (
                     <>
                       {/* Moitié haute - Matin */}
-                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesAM.length > 0 || hasCours ? '' : ''}`}>
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesAM.length > 0 || hasCours ? '' : fractionnementBg}`}>
                         {hasCours && leavesAM.length === 0 ? (
                           <div className="flex-1 bg-violet-300"></div>
                         ) : leavesAM.length > 0 ? (
@@ -383,7 +389,7 @@ const TeamCalendar = () => {
                         ) : null}
                       </div>
                       {/* Moitié basse - Après-midi */}
-                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesPM.length > 0 || hasCours ? '' : ''}`}>
+                      <div className={`flex-1 rounded-lg overflow-hidden flex ${leavesPM.length > 0 || hasCours ? '' : fractionnementBg}`}>
                         {hasCours && leavesPM.length === 0 ? (
                           <div className="flex-1 bg-violet-300"></div>
                         ) : leavesPM.length > 0 ? (

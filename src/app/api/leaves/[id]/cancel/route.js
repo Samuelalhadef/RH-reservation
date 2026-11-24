@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { notifyLeaveCancelled } from '@/lib/pushNotifications';
-import { recalculateFractionnement } from '@/lib/fractionnement';
-import { recalculateBalance } from '@/lib/soldes';
+import { recalculateSoldeComplet } from '@/lib/fractionnement';
 
 export async function PUT(request, { params }) {
   try {
@@ -62,10 +61,7 @@ export async function PUT(request, { params }) {
       const currentYear = new Date().getFullYear();
 
       // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
-      await recalculateBalance(leave.user_id, currentYear);
-
-      // Recalculer le fractionnement après annulation
-      await recalculateFractionnement(leave.user_id, currentYear);
+      await recalculateSoldeComplet(leave.user_id, currentYear);
     }
 
     // Notifier l'agent par push

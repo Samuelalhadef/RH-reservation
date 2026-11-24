@@ -3,8 +3,29 @@ import { createClient } from '@libsql/client';
 let _db = null;
 let _initialized = false;
 let _initPromise = null;
-let _migrationVersion = 10; // Incrémenter pour forcer re-migration
+let _migrationVersion = 12; // Incrémenter pour forcer re-migration
 let _lastMigrationVersion = 0;
+
+// Tables du parcours de validation (partagées entre runMigrations et initDatabase)
+const ECHELONS_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS echelons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    ordre INTEGER NOT NULL DEFAULT 0,
+    valide INTEGER NOT NULL DEFAULT 1,
+    date_creation DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`;
+const VALIDATIONS_ETAPES_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS validations_etapes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    demande_table TEXT NOT NULL,
+    demande_id INTEGER NOT NULL,
+    niveau INTEGER NOT NULL,
+    validateur_id INTEGER,
+    date_validation DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`;
 
 export function getDb() {
   if (!_db) {
@@ -66,22 +87,51 @@ async function runMigrations() {
     { table: 'demandes_utilisation_recup', column: 'statut_niveau_2', type: 'TEXT DEFAULT NULL' },
     { table: 'demandes_utilisation_recup', column: 'validateur_niveau_2_id', type: 'INTEGER' },
     { table: 'demandes_utilisation_recup', column: 'date_validation_niveau_2', type: 'DATETIME' },
+    // Congé enfant malade (demi-journées + prénom de l'enfant)
+    { table: 'demandes_parentalite', column: 'type_debut', type: "TEXT DEFAULT 'journee_complete'" },
+    { table: 'demandes_parentalite', column: 'type_fin', type: "TEXT DEFAULT 'journee_complete'" },
+    { table: 'demandes_parentalite', column: 'enfant_prenom', type: 'TEXT' },
+    // Parcours de validation à N étapes (pyramide /rh/hierarchie)
+    { table: 'users', column: 'echelon_id', type: 'INTEGER' },
+    { table: 'demandes_conges', column: 'niveau_valide', type: 'INTEGER DEFAULT 0' },
+    { table: 'demandes_recuperation', column: 'niveau_valide', type: 'INTEGER DEFAULT 0' },
+    { table: 'demandes_utilisation_recup', column: 'niveau_valide', type: 'INTEGER DEFAULT 0' },
   ];
-  for (const migration of migrations) {
-    try {
-      await client.execute(`ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.type}`);
-      console.log(`Column ${migration.column} added to ${migration.table}`);
-    } catch (error) {
-      // Column already exists, ignore
-    }
+  // Lecture unique du schéma : au lieu d'envoyer ~55 requêtes séquentielles à
+  // Turso à chaque démarrage (ce qui bloquait la 1re requête, typiquement la
+  // liste des comptes sur l'écran de connexion), on ne lance que ce qui manque.
+  const schema = await client.execute(`SELECT type, name, sql FROM sqlite_master WHERE type IN ('table', 'index')`);
+  const tableSql = new Map();
+  const existingIndexes = new Set();
+  for (const row of schema.rows) {
+    if (row.type === 'table') tableSql.set(row.name, row.sql || '');
+    else existingIndexes.add(row.name);
   }
+  const hasColumn = (table, column) =>
+    new RegExp(`\\b${column}\\b`).test(tableSql.get(table) || '');
+
+  const addMissingColumns = async (onlyMissingTables) => {
+    for (const migration of migrations) {
+      const tableExisted = tableSql.has(migration.table);
+      if (onlyMissingTables ? tableExisted : !tableExisted) continue;
+      if (tableExisted && hasColumn(migration.table, migration.column)) continue;
+      try {
+        await client.execute(`ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.type}`);
+        console.log(`Column ${migration.column} added to ${migration.table}`);
+      } catch (error) {
+        // Column already exists, ignore
+      }
+    }
+  };
+
+  // Colonnes des tables déjà existantes (les tables absentes sont traitées après leur création)
+  await addMissingColumns(false);
 
   // Migration: Rendre email nullable dans users (migration déjà appliquée, ne plus ré-exécuter)
 
   // Migration: Recréer demandes_conges pour ajouter 'annulee' dans la contrainte CHECK du statut
   try {
-    const schemaResult = await client.execute(`SELECT sql FROM sqlite_master WHERE type='table' AND name='demandes_conges'`);
-    const schemaSql = schemaResult.rows[0]?.sql || '';
+    const schemaSql = tableSql.get('demandes_conges') || '';
     if (schemaSql && !schemaSql.includes('annulee')) {
       console.log('Migration: Ajout du statut annulee à demandes_conges...');
 
@@ -110,6 +160,7 @@ async function runMigrations() {
         statut_niveau_2 TEXT,
         validateur_niveau_2_id INTEGER,
         date_validation_niveau_2 DATETIME,
+        niveau_valide INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (validateur_id) REFERENCES users(id)
       )`);
@@ -128,7 +179,7 @@ async function runMigrations() {
   }
 
   // Create cet table if not exists
-  try {
+  if (!tableSql.has('cet')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS cet (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,7 +192,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create cet_historique table if not exists
-  try {
+  if (!tableSql.has('cet_historique')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS cet_historique (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,7 +207,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create demandes_cet table if not exists
-  try {
+  if (!tableSql.has('demandes_cet')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS demandes_cet (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,7 +227,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create push_subscriptions table if not exists
-  try {
+  if (!tableSql.has('push_subscriptions')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,7 +242,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create jours_cours table for alternants school days
-  try {
+  if (!tableSql.has('jours_cours')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS jours_cours (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,7 +256,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create demandes_recuperation table if not exists
-  try {
+  if (!tableSql.has('demandes_recuperation')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS demandes_recuperation (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -228,7 +279,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create soldes_recuperation table if not exists
-  try {
+  if (!tableSql.has('soldes_recuperation')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS soldes_recuperation (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +292,7 @@ async function runMigrations() {
   } catch (error) { /* already exists */ }
 
   // Create demandes_utilisation_recup table if not exists
-  try {
+  if (!tableSql.has('demandes_utilisation_recup')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS demandes_utilisation_recup (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -262,15 +313,15 @@ async function runMigrations() {
   } catch (e) { /* table already exists */ }
 
   // Create demandes_parentalite table if not exists (congés maternité / paternité)
-  try {
+  if (!tableSql.has('demandes_parentalite')) try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS demandes_parentalite (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption')),
+        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption', 'enfant_malade')),
         date_debut DATE NOT NULL,
         date_fin DATE NOT NULL,
-        nombre_jours INTEGER,
+        nombre_jours REAL,
         motif TEXT,
         document_data TEXT,
         statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee', 'annulee')),
@@ -283,6 +334,59 @@ async function runMigrations() {
       )
     `);
   } catch (e) { /* table already exists */ }
+
+  // Migration : autoriser le type 'enfant_malade' dans demandes_parentalite
+  // (contrainte CHECK non modifiable en SQLite → recréation de la table, dans une transaction)
+  try {
+    const parentSql = tableSql.get('demandes_parentalite') || '';
+    if (parentSql && !parentSql.includes('enfant_malade')) {
+      console.log("Migration: ajout du type enfant_malade à demandes_parentalite...");
+      const baseCols = ['id', 'user_id', 'type', 'date_debut', 'date_fin', 'nombre_jours', 'motif', 'document_data', 'statut', 'date_demande', 'date_validation', 'validateur_id', 'commentaire_rh', 'type_debut', 'type_fin', 'enfant_prenom'];
+      const colList = baseCols.filter((c) => hasColumn('demandes_parentalite', c)).join(', ');
+      await client.batch([
+        'DROP TABLE IF EXISTS demandes_parentalite_backup',
+        'ALTER TABLE demandes_parentalite RENAME TO demandes_parentalite_backup',
+        `CREATE TABLE demandes_parentalite (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption', 'enfant_malade')),
+          date_debut DATE NOT NULL,
+          date_fin DATE NOT NULL,
+          nombre_jours REAL,
+          motif TEXT,
+          document_data TEXT,
+          statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee', 'annulee')),
+          date_demande DATETIME DEFAULT CURRENT_TIMESTAMP,
+          date_validation DATETIME,
+          validateur_id INTEGER,
+          commentaire_rh TEXT,
+          type_debut TEXT DEFAULT 'journee_complete',
+          type_fin TEXT DEFAULT 'journee_complete',
+          enfant_prenom TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (validateur_id) REFERENCES users(id)
+        )`,
+        `INSERT INTO demandes_parentalite (${colList}) SELECT ${colList} FROM demandes_parentalite_backup`,
+        'DROP TABLE demandes_parentalite_backup',
+      ], 'write');
+      console.log('Migration: type enfant_malade ajouté avec succès');
+    }
+  } catch (migrationError) {
+    console.error('Migration demandes_parentalite enfant_malade failed:', migrationError);
+  }
+
+  // Échelons de la pyramide hiérarchique (ordre 1 = juste sous la RH/DGS)
+  if (!tableSql.has('echelons')) try {
+    await client.execute(ECHELONS_TABLE_SQL);
+  } catch (e) { /* table already exists */ }
+
+  // Historique des étapes intermédiaires validées (niveau 1, 2, 3, …)
+  if (!tableSql.has('validations_etapes')) try {
+    await client.execute(VALIDATIONS_ETAPES_TABLE_SQL);
+  } catch (e) { /* table already exists */ }
+
+  // Colonnes des tables qui viennent d'être créées ci-dessus
+  await addMissingColumns(true);
 
   // Performance indexes
   const indexes = [
@@ -300,8 +404,11 @@ async function runMigrations() {
     'CREATE INDEX IF NOT EXISTS idx_soldes_recup_user ON soldes_recuperation(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_demandes_parentalite_user ON demandes_parentalite(user_id)',
     'CREATE INDEX IF NOT EXISTS idx_demandes_parentalite_statut ON demandes_parentalite(statut)',
+    'CREATE INDEX IF NOT EXISTS idx_validations_etapes_demande ON validations_etapes(demande_table, demande_id)',
   ];
   for (const idx of indexes) {
+    const name = idx.match(/IF NOT EXISTS (\w+)/)[1];
+    if (existingIndexes.has(name)) continue;
     try { await client.execute(idx); } catch (e) { /* ignore */ }
   }
 }
@@ -416,6 +523,10 @@ export const initDatabase = async () => {
       )
     `);
 
+    // Pyramide hiérarchique + historique des étapes de validation
+    await db.execute(ECHELONS_TABLE_SQL);
+    await db.execute(VALIDATIONS_ETAPES_TABLE_SQL);
+
     // Table jours_feries
     await db.execute(`
       CREATE TABLE IF NOT EXISTS jours_feries (
@@ -505,10 +616,10 @@ export const initDatabase = async () => {
       CREATE TABLE IF NOT EXISTS demandes_parentalite (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption')),
+        type TEXT NOT NULL CHECK(type IN ('maternite', 'paternite', 'adoption', 'enfant_malade')),
         date_debut DATE NOT NULL,
         date_fin DATE NOT NULL,
-        nombre_jours INTEGER,
+        nombre_jours REAL,
         motif TEXT,
         document_data TEXT,
         statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'validee', 'refusee', 'annulee')),

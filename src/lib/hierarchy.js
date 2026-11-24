@@ -1,239 +1,224 @@
 import { db } from './db.js';
-import { recalculateFractionnement } from './fractionnement.js';
-import { recalculateBalance } from './soldes.js';
+import { recalculateSoldeComplet } from './fractionnement.js';
+import { getSoldeDisponible } from './soldes.js';
+import {
+  isRHType,
+  buildHierarchyContext,
+  computeCircuit,
+  computeIntermediateSteps,
+} from './circuit.js';
+
+export { isRHType, computeCircuit } from './circuit.js';
+
+const VALIDATION_TABLES = ['demandes_conges', 'demandes_recuperation', 'demandes_utilisation_recup'];
+
+/**
+ * Empêche la validation définitive d'un congé si le solde ne le couvre pas
+ * (sinon jours_restants passe en négatif). Seuls les congés déjà validés
+ * sont déduits : la première demande validée est prioritaire.
+ */
+async function assertSoldeSuffisant(leave) {
+  // Un congé déjà validé sur la même période (ex. saisi directement par la RH
+  // pendant que cette demande attendait) : valider décompterait les jours deux fois
+  const overlap = await db.execute({
+    sql: `SELECT date_debut, date_fin FROM demandes_conges
+          WHERE user_id = ? AND id != ? AND statut = 'validee'
+            AND date_debut <= ? AND date_fin >= ?
+          LIMIT 1`,
+    args: [leave.user_id, leave.id, leave.date_fin, leave.date_debut]
+  });
+  if (overlap.rows.length > 0) {
+    const o = overlap.rows[0];
+    throw new Error(
+      `Un congé est déjà validé sur cette période (du ${o.date_debut} au ${o.date_fin}). Refusez cette demande.`
+    );
+  }
+
+  const currentYear = new Date().getFullYear();
+  // Le solde recalculé est celui de l'année en cours : un congé d'une autre année n'y est pas imputé
+  if (String(leave.date_debut).slice(0, 4) !== String(currentYear)) return;
+
+  const solde = await getSoldeDisponible(leave.user_id, currentYear, [leave.id]);
+  if (!solde) return;
+
+  const demandes = Number(leave.nombre_jours_ouvres) || 0;
+  if (demandes > solde.restants + 1e-9) {
+    throw new Error(
+      `Solde insuffisant : l'agent n'a plus que ${solde.restants} jour(s) restant(s) pour ${demandes} jour(s) demandé(s). Refusez la demande ou ajustez le solde avant de valider.`
+    );
+  }
+}
+
+// ============================================================
+// Contexte hiérarchique (2 requêtes, puis tout se calcule en mémoire)
+// ============================================================
+
+/**
+ * Charge utilisateurs + échelons une seule fois. À passer aux fonctions
+ * ci-dessous quand on traite plusieurs demandes (évite N requêtes par demande).
+ */
+export async function loadHierarchyContext() {
+  const [usersRes, echelonsRes] = await Promise.all([
+    db.execute(
+      'SELECT id, nom, prenom, type_utilisateur, responsable_id, niveau_validation, actif, echelon_id FROM users'
+    ),
+    db.execute('SELECT id, nom, ordre, valide FROM echelons ORDER BY ordre'),
+  ]);
+  return buildHierarchyContext(usersRes.rows, echelonsRes.rows);
+}
 
 /**
  * Détermine le circuit de validation pour un utilisateur
  * @param {number} userId - ID de l'utilisateur qui fait la demande
- * @returns {Promise<Object>} Circuit de validation avec les validateurs requis
+ * @param {Object} [ctx] - contexte déjà chargé (optionnel)
+ * @returns {Promise<Object>} { niveaux: [{ niveau, validateur_id, validateur_nom, validateur_prenom, echelon_nom, type }, ..., { type: 'rh', isFinal }] }
  */
-export async function getValidationCircuit(userId) {
-  const user = await db.execute({
-    sql: `
-      SELECT u.id, u.nom, u.prenom, u.type_utilisateur, u.responsable_id, u.niveau_validation,
-             r.id as resp_id, r.nom as resp_nom, r.prenom as resp_prenom, r.responsable_id as resp_responsable_id
-      FROM users u
-      LEFT JOIN users r ON u.responsable_id = r.id
-      WHERE u.id = ?
-    `,
-    args: [userId]
-  });
+export async function getValidationCircuit(userId, ctx = null) {
+  return computeCircuit(userId, ctx || (await loadHierarchyContext()));
+}
 
-  if (user.rows.length === 0) {
-    throw new Error('Utilisateur non trouvé');
-  }
-
-  const userData = user.rows[0];
-  const circuit = {
-    niveaux: [],
-    requiresRH: true
-  };
-
-  // Vérifier le type du responsable direct
-  const isRespRH = userData.responsable_id ? await (async () => {
-    const resp = await db.execute({
-      sql: 'SELECT type_utilisateur FROM users WHERE id = ?',
-      args: [userData.responsable_id]
-    });
-    if (resp.rows.length === 0) return false;
-    const t = resp.rows[0].type_utilisateur;
-    return t === 'RH' || t === 'Direction' || t === 'DG';
-  })() : false;
-
-  // Si l'utilisateur a un responsable direct qui n'est PAS RH/DGS (niveau 1)
-  // Les responsables RH/DGS valident directement en tant que RH (étape finale)
-  if (userData.responsable_id && !isRespRH) {
-    circuit.niveaux.push({
-      niveau: 1,
-      validateur_id: userData.responsable_id,
-      validateur_nom: userData.resp_nom,
-      validateur_prenom: userData.resp_prenom,
-      type: 'responsable_direct'
-    });
-
-    // Si le responsable direct a lui-même un responsable non-RH (niveau 2)
-    if (userData.resp_responsable_id) {
-      const resp2 = await db.execute({
-        sql: 'SELECT id, nom, prenom, type_utilisateur FROM users WHERE id = ?',
-        args: [userData.resp_responsable_id]
-      });
-
-      if (resp2.rows.length > 0) {
-        const t2 = resp2.rows[0].type_utilisateur;
-        const isResp2RH = t2 === 'RH' || t2 === 'Direction' || t2 === 'DG';
-        // Ne pas ajouter comme niveau intermédiaire si c'est RH/DGS
-        if (!isResp2RH) {
-          circuit.niveaux.push({
-            niveau: 2,
-            validateur_id: resp2.rows[0].id,
-            validateur_nom: resp2.rows[0].nom,
-            validateur_prenom: resp2.rows[0].prenom,
-            type: 'responsable_hierarchique'
-          });
-        }
-      }
-    }
-  }
-
-  // Toujours finir par la RH/DGS
-  circuit.niveaux.push({
-    niveau: circuit.niveaux.length + 1,
-    type: 'rh',
-    isFinal: true
-  });
-
-  return circuit;
+/**
+ * Nombre d'étapes intermédiaires déjà validées, quel que soit le statut.
+ * Lit la colonne générique niveau_valide, et les anciennes colonnes
+ * statut_niveau_1/2 pour les demandes antérieures au parcours à N étapes.
+ */
+export function getValidatedStepsCount(demande) {
+  const generic = Number(demande.niveau_valide) || 0;
+  const legacy = demande.statut_niveau_2 === 'validee' ? 2 : demande.statut_niveau_1 === 'validee' ? 1 : 0;
+  return Math.max(generic, legacy);
 }
 
 /**
  * Obtient le niveau de validation actuel d'une demande
- * @param {Object} leave - Demande de congés
- * @returns {number} Niveau actuel (0 = en attente, 1 = validé niveau 1, etc.)
+ * @returns {number} -1 = refusée, 999 = validée, sinon nombre d'étapes intermédiaires validées
  */
 export function getCurrentValidationLevel(leave) {
-  if (leave.statut === 'refusee') {
-    return -1; // Refusée
-  }
-  if (leave.statut === 'validee') {
-    return 999; // Complètement validée
-  }
-
-  // En attente - déterminer le niveau
-  if (leave.statut_niveau_2 === 'validee') {
-    return 2; // Niveau 2 validé, en attente RH
-  }
-  if (leave.statut_niveau_1 === 'validee') {
-    return 1; // Niveau 1 validé, en attente niveau 2 ou RH
-  }
-
-  return 0; // En attente de validation niveau 1 ou direct RH
+  if (leave.statut === 'refusee') return -1;
+  if (leave.statut === 'validee') return 999;
+  return getValidatedStepsCount(leave);
 }
 
 /**
  * Vérifie si un utilisateur peut valider une demande
  * @param {number} validatorId - ID du validateur
- * @param {Object} leave - Demande de congés
- * @returns {Promise<Object>} { canValidate: boolean, level: number, reason: string }
+ * @param {Object} leave - Demande (congé ou récupération)
+ * @param {Object} [ctx] - contexte hiérarchique déjà chargé (optionnel)
+ * @returns {Promise<Object>} { canValidate, level, isFinal, reason }
  */
-export async function canUserValidateLeave(validatorId, leave) {
-  // Récupérer les infos du validateur
-  const validator = await db.execute({
-    sql: 'SELECT id, type_utilisateur, niveau_validation FROM users WHERE id = ?',
-    args: [validatorId]
-  });
+export async function canUserValidateLeave(validatorId, leave, ctx = null) {
+  ctx = ctx || (await loadHierarchyContext());
 
-  if (validator.rows.length === 0) {
-    return { canValidate: false, reason: 'Validateur non trouvé' };
-  }
+  const validator = ctx.users.get(Number(validatorId));
+  if (!validator) return { canValidate: false, reason: 'Validateur non trouvé' };
+  if (!ctx.users.has(Number(leave.user_id))) return { canValidate: false, reason: 'Agent non trouvé' };
 
-  const validatorData = validator.rows[0];
-  const isRH = validatorData.type_utilisateur === 'RH' || validatorData.type_utilisateur === 'Direction' || validatorData.type_utilisateur === 'DG';
-  const validatorLevel = validatorData.niveau_validation || 0;
-
-  // Récupérer les infos de l'agent qui a fait la demande
-  const requester = await db.execute({
-    sql: 'SELECT responsable_id FROM users WHERE id = ?',
-    args: [leave.user_id]
-  });
-
-  if (requester.rows.length === 0) {
-    return { canValidate: false, reason: 'Agent non trouvé' };
-  }
-
-  const requesterData = requester.rows[0];
-  const currentLevel = getCurrentValidationLevel(leave);
-
-  // Si la demande est déjà traitée
-  if (currentLevel === -1 || currentLevel === 999) {
+  if (leave.statut && leave.statut !== 'en_attente') {
     return { canValidate: false, reason: 'Demande déjà traitée' };
   }
 
-  // Vérifier d'abord si le validateur est responsable direct (niveau 1) — sauf si RH/DGS (valide en final)
-  // Accepte aussi si le responsable assigné a le même type_utilisateur que le validateur
-  let isLevel1Validator = false;
-  if (!isRH && validatorLevel >= 1) {
-    if (requesterData.responsable_id === validatorId) {
-      isLevel1Validator = true;
-    } else if (requesterData.responsable_id) {
-      const assignedResp = await db.execute({
-        sql: 'SELECT type_utilisateur FROM users WHERE id = ?',
-        args: [requesterData.responsable_id]
-      });
-      if (assignedResp.rows.length > 0 && assignedResp.rows[0].type_utilisateur === validatorData.type_utilisateur) {
-        isLevel1Validator = true;
-      }
-    }
-  }
+  const currentLevel = getValidatedStepsCount(leave);
+  const etapes = computeIntermediateSteps(leave.user_id, ctx);
+  const isRH = isRHType(validator.type_utilisateur);
 
-  if (isLevel1Validator) {
-    if (currentLevel === 0) {
+  if (!isRH && currentLevel < etapes.length) {
+    const next = etapes[currentLevel];
+    if (next.validateur_id === validator.id) {
       return {
         canValidate: true,
-        level: 1,
-        reason: 'Validation responsable direct'
+        level: next.niveau,
+        reason: next.niveau === 1 ? 'Validation responsable direct' : `Validation niveau ${next.niveau}`,
       };
     }
-    // Niveau 1 déjà validé — on continue pour vérifier les niveaux suivants
-  }
-
-  // Vérifier ensuite si le validateur est responsable niveau 2 (sauf si RH/DGS)
-  if (!isRH && validatorLevel >= 2) {
-    const agent = await db.execute({
-      sql: `
-        SELECT u.id, r.responsable_id as resp_resp_id
-        FROM users u
-        LEFT JOIN users r ON u.responsable_id = r.id
-        WHERE u.id = ?
-      `,
-      args: [leave.user_id]
-    });
-
-    if (agent.rows.length > 0 && agent.rows[0].resp_resp_id === validatorId) {
-      if (currentLevel === 1) {
-        return {
-          canValidate: true,
-          level: 2,
-          reason: 'Validation responsable hiérarchique'
-        };
+    // Co-responsables : un validateur de même fonction que le responsable direct
+    // peut valider la 1re étape à sa place (comportement historique conservé).
+    if (currentLevel === 0 && (Number(validator.niveau_validation) || 0) >= 1) {
+      const assigned = ctx.users.get(next.validateur_id);
+      if (assigned && assigned.type_utilisateur === validator.type_utilisateur) {
+        return { canValidate: true, level: 1, reason: 'Validation responsable direct' };
       }
-      if (currentLevel === 0) {
-        return {
-          canValidate: false,
-          reason: 'En attente validation niveau 1'
-        };
-      }
-      // Niveau 2 déjà validé — si aussi RH, on continue pour vérifier la validation finale
     }
   }
 
-  // RH peut valider uniquement en dernier (après tous les niveaux)
+  // La RH valide uniquement en dernier, une fois toutes les étapes passées
   if (isRH) {
-    // Vérifier si tous les niveaux précédents sont validés
-    if (requesterData.responsable_id) {
-      const circuit = await getValidationCircuit(leave.user_id);
-      const requiredLevels = circuit.niveaux.filter(n => n.type !== 'rh').length;
-
-      if (currentLevel < requiredLevels) {
-        return {
-          canValidate: false,
-          reason: `En attente de validation niveau ${currentLevel + 1}`
-        };
-      }
+    if (currentLevel < etapes.length) {
+      const next = etapes[currentLevel];
+      return {
+        canValidate: false,
+        reason: `En attente de validation niveau ${next.niveau} (${next.validateur_prenom} ${next.validateur_nom})`,
+      };
     }
+    return { canValidate: true, level: 'rh', isFinal: true, reason: 'Validation finale RH' };
+  }
 
+  const ownStep = etapes.find((e) => e.validateur_id === validator.id);
+  if (ownStep) {
     return {
-      canValidate: true,
-      level: 'rh',
-      isFinal: true,
-      reason: 'Validation finale RH'
+      canValidate: false,
+      reason: ownStep.niveau <= currentLevel ? 'Étape déjà validée' : `En attente de validation niveau ${currentLevel + 1}`,
     };
   }
 
-  return {
-    canValidate: false,
-    reason: 'Vous n\'êtes pas le validateur pour cette demande'
-  };
+  return { canValidate: false, reason: 'Vous n\'êtes pas le validateur pour cette demande' };
 }
+
+// ============================================================
+// Enregistrement des étapes
+// ============================================================
+
+/**
+ * Marque l'étape intermédiaire `level` comme validée. Alimente la colonne
+ * générique niveau_valide + l'historique, et les anciennes colonnes
+ * statut_niveau_1/2 (toujours lues par certains écrans).
+ */
+async function recordIntermediateStep(table, demandeId, level, validatorId, now) {
+  if (!VALIDATION_TABLES.includes(table)) throw new Error('Table non supportée');
+
+  let legacySql = '';
+  const args = [level];
+  if (level === 1 || level === 2) {
+    legacySql = `, statut_niveau_${level} = 'validee', validateur_niveau_${level}_id = ?, date_validation_niveau_${level} = ?`;
+    args.push(validatorId, now);
+  }
+  args.push(demandeId);
+
+  await db.execute({
+    sql: `UPDATE ${table} SET niveau_valide = ?${legacySql} WHERE id = ?`,
+    args,
+  });
+  await db.execute({
+    sql: `INSERT INTO validations_etapes (demande_table, demande_id, niveau, validateur_id, date_validation)
+          VALUES (?, ?, ?, ?, ?)`,
+    args: [table, demandeId, level, validatorId, now],
+  });
+}
+
+/** Valide toutes les étapes intermédiaires restantes au nom de la RH (validation forcée). */
+async function recordRemainingStepsAsRH(table, demande, validatorId, now, ctx) {
+  const etapes = computeIntermediateSteps(demande.user_id, ctx);
+  const done = getValidatedStepsCount(demande);
+  for (let level = done + 1; level <= etapes.length; level++) {
+    await recordIntermediateStep(table, demande.id, level, validatorId, now);
+  }
+}
+
+/** Ce qui suit l'étape `level` dans le circuit de l'agent. */
+function describeNextStep(userId, level, ctx) {
+  const etapes = computeIntermediateSteps(userId, ctx);
+  const next = etapes[level]; // index 0-based = étape level+1
+  if (next) {
+    return {
+      message: `Demande validée - En attente validation niveau ${next.niveau} (${next.validateur_prenom} ${next.validateur_nom})`,
+      nextLevel: next.niveau,
+      nextValidatorId: next.validateur_id,
+    };
+  }
+  return { message: 'Demande validée - En attente validation RH', nextLevel: 'rh', nextValidatorId: null };
+}
+
+// ============================================================
+// Congés
+// ============================================================
 
 /**
  * Valide une demande à un niveau donné
@@ -244,7 +229,6 @@ export async function canUserValidateLeave(validatorId, leave) {
  * @returns {Promise<Object>} Résultat de la validation
  */
 export async function validateLeaveAtLevel(leaveId, validatorId, decision, commentaire = '') {
-  // Récupérer la demande
   const leaveResult = await db.execute({
     sql: 'SELECT * FROM demandes_conges WHERE id = ?',
     args: [leaveId]
@@ -255,10 +239,9 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
   }
 
   const leave = leaveResult.rows[0];
+  const ctx = await loadHierarchyContext();
 
-  // Vérifier les permissions
-  const validation = await canUserValidateLeave(validatorId, leave);
-
+  const validation = await canUserValidateLeave(validatorId, leave, ctx);
   if (!validation.canValidate) {
     throw new Error(validation.reason);
   }
@@ -279,30 +262,20 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
       args: [now, validatorId, commentaire, leaveId]
     });
 
-    return {
-      success: true,
-      message: 'Demande refusée',
-      newStatus: 'refusee',
-      isFinal: true
-    };
+    return { success: true, message: 'Demande refusée', newStatus: 'refusee', isFinal: true };
   }
 
-  // Si validation finale RH
+  // Validation finale RH
   if (validation.isFinal) {
-    // Vérifier que la demande n'a pas déjà été validée (protection double-décompte)
+    // Protection double-décompte
     if (leave.statut === 'validee') {
-      return {
-        success: true,
-        message: 'Demande déjà validée',
-        newStatus: 'validee',
-        isFinal: true
-      };
+      return { success: true, message: 'Demande déjà validée', newStatus: 'validee', isFinal: true };
     }
 
-    // Recalculer le solde à partir des congés validés plutôt qu'incrémenter
+    await assertSoldeSuffisant(leave);
+
     const currentYear = new Date().getFullYear();
 
-    // D'abord marquer la demande comme validée
     await db.execute({
       sql: `
         UPDATE demandes_conges
@@ -316,64 +289,16 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
     });
 
     // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
-    await recalculateBalance(leave.user_id, currentYear);
+    await recalculateSoldeComplet(leave.user_id, currentYear);
 
-    // Recalculer les jours de fractionnement
-    await recalculateFractionnement(leave.user_id, currentYear);
-
-    return {
-      success: true,
-      message: 'Demande validée définitivement',
-      newStatus: 'validee',
-      isFinal: true
-    };
+    return { success: true, message: 'Demande validée définitivement', newStatus: 'validee', isFinal: true };
   }
 
-  // Validation intermédiaire
-  if (validation.level === 1) {
-    await db.execute({
-      sql: `
-        UPDATE demandes_conges
-        SET statut_niveau_1 = 'validee',
-            validateur_niveau_1_id = ?,
-            date_validation_niveau_1 = ?
-        WHERE id = ?
-      `,
-      args: [validatorId, now, leaveId]
-    });
-
-    // Vérifier s'il y a un niveau 2
-    const circuit = await getValidationCircuit(leave.user_id);
-    const hasLevel2 = circuit.niveaux.some(n => n.niveau === 2);
-
-    return {
-      success: true,
-      message: hasLevel2
-        ? 'Demande validée - En attente validation niveau 2'
-        : 'Demande validée - En attente validation RH',
-      newStatus: 'en_attente',
-      nextLevel: hasLevel2 ? 2 : 'rh'
-    };
-  }
-
-  if (validation.level === 2) {
-    await db.execute({
-      sql: `
-        UPDATE demandes_conges
-        SET statut_niveau_2 = 'validee',
-            validateur_niveau_2_id = ?,
-            date_validation_niveau_2 = ?
-        WHERE id = ?
-      `,
-      args: [validatorId, now, leaveId]
-    });
-
-    return {
-      success: true,
-      message: 'Demande validée - En attente validation RH',
-      newStatus: 'en_attente',
-      nextLevel: 'rh'
-    };
+  // Validation intermédiaire (niveau 1, 2, 3, …)
+  if (typeof validation.level === 'number') {
+    await recordIntermediateStep('demandes_conges', leaveId, validation.level, validatorId, now);
+    const next = describeNextStep(leave.user_id, validation.level, ctx);
+    return { success: true, newStatus: 'en_attente', ...next };
   }
 
   throw new Error('Niveau de validation invalide');
@@ -382,14 +307,8 @@ export async function validateLeaveAtLevel(leaveId, validatorId, decision, comme
 /**
  * Validation/refus en force par la RH (bypass de la hiérarchie).
  * À utiliser uniquement quand un responsable est absent/malade et ne peut pas valider.
- * @param {number} leaveId - ID de la demande
- * @param {number} validatorId - ID du validateur RH
- * @param {string} decision - 'validee' ou 'refusee'
- * @param {string} commentaire - Commentaire optionnel
- * @returns {Promise<Object>}
  */
 export async function forceValidateLeaveByRH(leaveId, validatorId, decision, commentaire = '') {
-  // Vérifier que le validateur est bien RH/Direction/DG
   const validator = await db.execute({
     sql: 'SELECT id, type_utilisateur FROM users WHERE id = ?',
     args: [validatorId]
@@ -397,8 +316,7 @@ export async function forceValidateLeaveByRH(leaveId, validatorId, decision, com
   if (validator.rows.length === 0) {
     throw new Error('Validateur non trouvé');
   }
-  const t = validator.rows[0].type_utilisateur;
-  if (t !== 'RH' && t !== 'Direction' && t !== 'DG') {
+  if (!isRHType(validator.rows[0].type_utilisateur)) {
     throw new Error('Seuls les utilisateurs RH/Direction/DG peuvent forcer une validation');
   }
 
@@ -417,9 +335,7 @@ export async function forceValidateLeaveByRH(leaveId, validatorId, decision, com
 
   const now = new Date().toISOString();
   const noteForce = '[RH - Validation directe (responsable absent)]';
-  const fullComment = commentaire
-    ? `${noteForce} ${commentaire}`
-    : noteForce;
+  const fullComment = commentaire ? `${noteForce} ${commentaire}` : noteForce;
 
   if (decision === 'refusee') {
     await db.execute({
@@ -433,45 +349,15 @@ export async function forceValidateLeaveByRH(leaveId, validatorId, decision, com
       `,
       args: [now, validatorId, fullComment, leaveId]
     });
-    return {
-      success: true,
-      message: 'Demande refusée directement par la RH',
-      newStatus: 'refusee',
-      isFinal: true
-    };
+    return { success: true, message: 'Demande refusée directement par la RH', newStatus: 'refusee', isFinal: true };
   }
 
-  // Marquer les niveaux intermédiaires non validés comme validés par la RH
-  const circuit = await getValidationCircuit(leave.user_id);
-  const hasN1 = circuit.niveaux.some(n => n.niveau === 1);
-  const hasN2 = circuit.niveaux.some(n => n.niveau === 2);
+  await assertSoldeSuffisant(leave);
 
-  if (hasN1 && leave.statut_niveau_1 !== 'validee') {
-    await db.execute({
-      sql: `
-        UPDATE demandes_conges
-        SET statut_niveau_1 = 'validee',
-            validateur_niveau_1_id = ?,
-            date_validation_niveau_1 = ?
-        WHERE id = ?
-      `,
-      args: [validatorId, now, leaveId]
-    });
-  }
-  if (hasN2 && leave.statut_niveau_2 !== 'validee') {
-    await db.execute({
-      sql: `
-        UPDATE demandes_conges
-        SET statut_niveau_2 = 'validee',
-            validateur_niveau_2_id = ?,
-            date_validation_niveau_2 = ?
-        WHERE id = ?
-      `,
-      args: [validatorId, now, leaveId]
-    });
-  }
+  // Marquer les étapes intermédiaires restantes comme validées par la RH
+  const ctx = await loadHierarchyContext();
+  await recordRemainingStepsAsRH('demandes_conges', leave, validatorId, now, ctx);
 
-  // Validation finale
   await db.execute({
     sql: `
       UPDATE demandes_conges
@@ -484,34 +370,41 @@ export async function forceValidateLeaveByRH(leaveId, validatorId, decision, com
     args: [now, validatorId, fullComment, leaveId]
   });
 
-  // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
   const currentYear = new Date().getFullYear();
-  await recalculateBalance(leave.user_id, currentYear);
+  await recalculateSoldeComplet(leave.user_id, currentYear);
 
-  await recalculateFractionnement(leave.user_id, currentYear);
-
-  return {
-    success: true,
-    message: 'Demande validée directement par la RH',
-    newStatus: 'validee',
-    isFinal: true
-  };
+  return { success: true, message: 'Demande validée directement par la RH', newStatus: 'validee', isFinal: true };
 }
 
-/**
- * Vérifie si un utilisateur peut valider une demande de récupération.
- * Réutilise canUserValidateLeave car la logique est identique (basée sur user_id, statut, statut_niveau_1, statut_niveau_2).
- */
-export async function canUserValidateRecuperation(validatorId, demande) {
-  return canUserValidateLeave(validatorId, demande);
+// ============================================================
+// Récupération (déclarations d'heures sup / utilisations)
+// ============================================================
+
+export async function canUserValidateRecuperation(validatorId, demande, ctx = null) {
+  return canUserValidateLeave(validatorId, demande, ctx);
+}
+
+async function recalculateSoldeRecuperation(userId) {
+  const totalResult = await db.execute({
+    sql: `SELECT COALESCE(SUM(nombre_heures), 0) as total
+          FROM demandes_recuperation
+          WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'`,
+    args: [userId]
+  });
+  const totalHeures = totalResult.rows[0]?.total || 0;
+
+  await db.execute({
+    sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
+    args: [userId]
+  });
+  await db.execute({
+    sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
+    args: [totalHeures, userId]
+  });
 }
 
 /**
  * Valide une demande de récupération (déclaration d'heures sup OU utilisation) à un niveau donné.
- * @param {number} demandeId
- * @param {number} validatorId
- * @param {string} decision - 'validee' ou 'refusee'
- * @param {string} commentaire
  * @param {string} table - 'demandes_recuperation' ou 'demandes_utilisation_recup'
  */
 export async function validateRecuperationAtLevel(demandeId, validatorId, decision, commentaire = '', table = 'demandes_recuperation') {
@@ -523,14 +416,13 @@ export async function validateRecuperationAtLevel(demandeId, validatorId, decisi
     sql: `SELECT * FROM ${table} WHERE id = ?`,
     args: [demandeId]
   });
-
   if (demandeResult.rows.length === 0) {
     throw new Error('Demande non trouvée');
   }
 
   const demande = demandeResult.rows[0];
-  const validation = await canUserValidateLeave(validatorId, demande);
-
+  const ctx = await loadHierarchyContext();
+  const validation = await canUserValidateLeave(validatorId, demande, ctx);
   if (!validation.canValidate) {
     throw new Error(validation.reason);
   }
@@ -540,10 +432,7 @@ export async function validateRecuperationAtLevel(demandeId, validatorId, decisi
   if (decision === 'refusee') {
     await db.execute({
       sql: `UPDATE ${table}
-            SET statut = 'refusee',
-                date_validation = ?,
-                validateur_id = ?,
-                commentaire = ?
+            SET statut = 'refusee', date_validation = ?, validateur_id = ?, commentaire = ?
             WHERE id = ?`,
       args: [now, validatorId, commentaire, demandeId]
     });
@@ -557,73 +446,22 @@ export async function validateRecuperationAtLevel(demandeId, validatorId, decisi
 
     await db.execute({
       sql: `UPDATE ${table}
-            SET statut = 'validee',
-                date_validation = ?,
-                validateur_id = ?,
-                commentaire = ?
+            SET statut = 'validee', date_validation = ?, validateur_id = ?, commentaire = ?
             WHERE id = ?`,
       args: [now, validatorId, commentaire, demandeId]
     });
 
-    // Si déclaration validée et type récupération, recalculer le solde
     if (table === 'demandes_recuperation' && demande.type_compensation === 'recuperation') {
-      const totalResult = await db.execute({
-        sql: `SELECT COALESCE(SUM(nombre_heures), 0) as total
-              FROM demandes_recuperation
-              WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'`,
-        args: [demande.user_id]
-      });
-      const totalHeures = totalResult.rows[0]?.total || 0;
-
-      await db.execute({
-        sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
-        args: [demande.user_id]
-      });
-      await db.execute({
-        sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
-        args: [totalHeures, demande.user_id]
-      });
+      await recalculateSoldeRecuperation(demande.user_id);
     }
 
     return { success: true, message: 'Demande validée définitivement', newStatus: 'validee', isFinal: true };
   }
 
-  if (validation.level === 1) {
-    await db.execute({
-      sql: `UPDATE ${table}
-            SET statut_niveau_1 = 'validee',
-                validateur_niveau_1_id = ?,
-                date_validation_niveau_1 = ?
-            WHERE id = ?`,
-      args: [validatorId, now, demandeId]
-    });
-
-    const circuit = await getValidationCircuit(demande.user_id);
-    const hasLevel2 = circuit.niveaux.some(n => n.niveau === 2);
-
-    return {
-      success: true,
-      message: hasLevel2 ? 'Demande validée - En attente validation niveau 2' : 'Demande validée - En attente validation RH',
-      newStatus: 'en_attente',
-      nextLevel: hasLevel2 ? 2 : 'rh'
-    };
-  }
-
-  if (validation.level === 2) {
-    await db.execute({
-      sql: `UPDATE ${table}
-            SET statut_niveau_2 = 'validee',
-                validateur_niveau_2_id = ?,
-                date_validation_niveau_2 = ?
-            WHERE id = ?`,
-      args: [validatorId, now, demandeId]
-    });
-    return {
-      success: true,
-      message: 'Demande validée - En attente validation RH',
-      newStatus: 'en_attente',
-      nextLevel: 'rh'
-    };
+  if (typeof validation.level === 'number') {
+    await recordIntermediateStep(table, demandeId, validation.level, validatorId, now);
+    const next = describeNextStep(demande.user_id, validation.level, ctx);
+    return { success: true, newStatus: 'en_attente', ...next };
   }
 
   throw new Error('Niveau de validation invalide');
@@ -645,8 +483,7 @@ export async function forceValidateRecuperationByRH(demandeId, validatorId, deci
   if (validator.rows.length === 0) {
     throw new Error('Validateur non trouvé');
   }
-  const t = validator.rows[0].type_utilisateur;
-  if (t !== 'RH' && t !== 'Direction' && t !== 'DG') {
+  if (!isRHType(validator.rows[0].type_utilisateur)) {
     throw new Error('Seuls les utilisateurs RH/Direction/DG peuvent forcer une validation');
   }
 
@@ -670,68 +507,147 @@ export async function forceValidateRecuperationByRH(demandeId, validatorId, deci
   if (decision === 'refusee') {
     await db.execute({
       sql: `UPDATE ${table}
-            SET statut = 'refusee',
-                date_validation = ?,
-                validateur_id = ?,
-                commentaire = ?
+            SET statut = 'refusee', date_validation = ?, validateur_id = ?, commentaire = ?
             WHERE id = ?`,
       args: [now, validatorId, fullComment, demandeId]
     });
     return { success: true, message: 'Demande refusée directement par la RH', newStatus: 'refusee', isFinal: true };
   }
 
-  const circuit = await getValidationCircuit(demande.user_id);
-  const hasN1 = circuit.niveaux.some(n => n.niveau === 1);
-  const hasN2 = circuit.niveaux.some(n => n.niveau === 2);
-
-  if (hasN1 && demande.statut_niveau_1 !== 'validee') {
-    await db.execute({
-      sql: `UPDATE ${table}
-            SET statut_niveau_1 = 'validee',
-                validateur_niveau_1_id = ?,
-                date_validation_niveau_1 = ?
-            WHERE id = ?`,
-      args: [validatorId, now, demandeId]
-    });
-  }
-  if (hasN2 && demande.statut_niveau_2 !== 'validee') {
-    await db.execute({
-      sql: `UPDATE ${table}
-            SET statut_niveau_2 = 'validee',
-                validateur_niveau_2_id = ?,
-                date_validation_niveau_2 = ?
-            WHERE id = ?`,
-      args: [validatorId, now, demandeId]
-    });
-  }
+  const ctx = await loadHierarchyContext();
+  await recordRemainingStepsAsRH(table, demande, validatorId, now, ctx);
 
   await db.execute({
     sql: `UPDATE ${table}
-          SET statut = 'validee',
-              date_validation = ?,
-              validateur_id = ?,
-              commentaire = ?
+          SET statut = 'validee', date_validation = ?, validateur_id = ?, commentaire = ?
           WHERE id = ?`,
     args: [now, validatorId, fullComment, demandeId]
   });
 
   if (table === 'demandes_recuperation' && demande.type_compensation === 'recuperation') {
-    const totalResult = await db.execute({
-      sql: `SELECT COALESCE(SUM(nombre_heures), 0) as total
-            FROM demandes_recuperation
-            WHERE user_id = ? AND statut = 'validee' AND type_compensation = 'recuperation'`,
-      args: [demande.user_id]
-    });
-    const totalHeures = totalResult.rows[0]?.total || 0;
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO soldes_recuperation (user_id, heures_acquises) VALUES (?, 0)',
-      args: [demande.user_id]
-    });
-    await db.execute({
-      sql: 'UPDATE soldes_recuperation SET heures_acquises = ?, date_maj = CURRENT_TIMESTAMP WHERE user_id = ?',
-      args: [totalHeures, demande.user_id]
-    });
+    await recalculateSoldeRecuperation(demande.user_id);
   }
 
   return { success: true, message: 'Demande validée directement par la RH', newStatus: 'validee', isFinal: true };
+}
+
+// ============================================================
+// Affichage : état de chaque étape d'une demande
+// ============================================================
+
+/**
+ * Charge l'historique des étapes d'une table : Map(demande_id → [{ niveau, validateur_id, date_validation }])
+ */
+export async function loadValidationHistory(table) {
+  const res = await db.execute({
+    sql: 'SELECT demande_id, niveau, validateur_id, date_validation FROM validations_etapes WHERE demande_table = ? ORDER BY id',
+    args: [table],
+  });
+  const map = new Map();
+  for (const row of res.rows) {
+    const id = Number(row.demande_id);
+    if (!map.has(id)) map.set(id, []);
+    map.get(id).push(row);
+  }
+  return map;
+}
+
+/**
+ * Décrit les étapes intermédiaires d'une demande pour l'affichage.
+ * @returns {Array<{ niveau, echelon_nom, prevu_prenom, prevu_nom, statut: 'validee'|'en_cours'|'refusee'|'a_venir', valide_par_prenom, valide_par_nom, date_validation }>}
+ * La validation finale RH n'est pas incluse (déductible du statut de la demande).
+ */
+export function describeEtapes(demande, ctx, history = []) {
+  const done = getValidatedStepsCount(demande);
+
+  // Dernière validation connue par niveau (l'historique peut contenir un ancien passage)
+  const byLevel = new Map();
+  for (const h of history) byLevel.set(Number(h.niveau), h);
+  for (const lvl of [1, 2]) {
+    if (demande[`statut_niveau_${lvl}`] === 'validee' && !byLevel.has(lvl)) {
+      byLevel.set(lvl, {
+        validateur_id: demande[`validateur_niveau_${lvl}_id`],
+        date_validation: demande[`date_validation_niveau_${lvl}`],
+      });
+    }
+  }
+
+  let planned = [];
+  try {
+    planned = computeIntermediateSteps(demande.user_id, ctx);
+  } catch (e) { /* agent supprimé */ }
+
+  // Une demande terminée montre ce qui a réellement eu lieu, pas le parcours actuel
+  const total = demande.statut === 'en_attente' || demande.statut === 'refusee'
+    ? Math.max(done, planned.length)
+    : done;
+
+  const etapes = [];
+  for (let n = 1; n <= total; n++) {
+    const h = byLevel.get(n);
+    const p = planned[n - 1];
+    const who = h?.validateur_id != null ? ctx.users.get(Number(h.validateur_id)) : null;
+
+    let statut = 'a_venir';
+    if (n <= done) statut = 'validee';
+    else if (n === done + 1 && demande.statut === 'refusee') statut = 'refusee';
+    else if (n === done + 1 && demande.statut === 'en_attente') statut = 'en_cours';
+
+    etapes.push({
+      niveau: n,
+      echelon_nom: p?.echelon_nom || null,
+      prevu_prenom: p?.validateur_prenom || null,
+      prevu_nom: p?.validateur_nom || null,
+      statut,
+      valide_par_prenom: who?.prenom || null,
+      valide_par_nom: who?.nom || null,
+      date_validation: h?.date_validation || null,
+    });
+  }
+  return etapes;
+}
+
+// ============================================================
+// Droits d'accès à l'onglet « Validation »
+// ============================================================
+
+/**
+ * Recalcule users.niveau_validation (= étape la plus haute qu'occupe la personne
+ * dans un parcours) — c'est ce qui affiche l'onglet « Validation » dans le menu.
+ * @param {boolean} allowDecrease - false : ne fait que relever les niveaux (création/édition d'un agent) ;
+ *                                  true : aligne exactement sur la hiérarchie (enregistrement de la pyramide).
+ */
+export async function syncNiveauxValidation({ allowDecrease = false } = {}) {
+  const ctx = await loadHierarchyContext();
+  const computed = new Map();
+  const step1Types = new Set();
+
+  for (const u of ctx.users.values()) {
+    if (u.actif === 0) continue;
+    const etapes = computeIntermediateSteps(u.id, ctx);
+    etapes.forEach((e, i) => {
+      computed.set(e.validateur_id, Math.max(computed.get(e.validateur_id) || 0, e.niveau));
+      if (i === 0) step1Types.add(ctx.users.get(e.validateur_id)?.type_utilisateur);
+    });
+  }
+
+  const updates = [];
+  for (const u of ctx.users.values()) {
+    const current = Number(u.niveau_validation) || 0;
+    let target = computed.get(u.id) || 0;
+    if (allowDecrease) {
+      // Garder l'accès des co-responsables (même fonction qu'un responsable direct)
+      if (target === 0 && current >= 1 && !isRHType(u.type_utilisateur) && step1Types.has(u.type_utilisateur)) {
+        target = 1;
+      }
+    } else {
+      target = Math.max(current, target);
+    }
+    if (target !== current) {
+      updates.push({ sql: 'UPDATE users SET niveau_validation = ? WHERE id = ?', args: [target, u.id] });
+    }
+  }
+
+  if (updates.length > 0) await db.batch(updates, 'write');
+  return updates.length;
 }

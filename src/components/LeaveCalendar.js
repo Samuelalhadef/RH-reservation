@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDateFR } from '@/lib/clientDateUtils';
+import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
 import { parseSchedule, scheduleHasData, diffHeures } from '@/lib/horaires';
 import toast from 'react-hot-toast';
 
@@ -481,9 +481,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (isCours) return 'bg-violet-200';
     if (isNonWorkingHalfDay(date, period)) return 'bg-gray-100';
 
+    const fractionnement = isPeriodeFractionnement(date);
+
     if (isPast || isTooSoon) {
-      if (leaveStatus && leaveStatus.statut === 'validee') return 'bg-green-200 opacity-60';
-      if (leaveStatus && leaveStatus.statut === 'en_attente') return 'bg-orange-200 opacity-60';
+      if (leaveStatus && leaveStatus.statut === 'validee') return fractionnement ? 'bg-teal-300 opacity-60' : 'bg-green-200 opacity-60';
+      if (leaveStatus && leaveStatus.statut === 'en_attente') return fractionnement ? 'bg-teal-100 ring-2 ring-inset ring-orange-300 opacity-60' : 'bg-orange-200 opacity-60';
       if (recupStatus && recupStatus.statut === 'validee') return 'bg-cyan-200 opacity-60';
       if (recupStatus && recupStatus.statut === 'en_attente') return 'bg-cyan-100 opacity-60';
       return 'bg-gray-100';
@@ -493,14 +495,18 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (inRange) return 'bg-blue-100';
 
     if (leaveStatus) {
-      if (leaveStatus.statut === 'validee') return 'bg-green-100';
-      if (leaveStatus.statut === 'en_attente') return 'bg-orange-100';
+      // Congé posé en période de fractionnement : couleur dédiée (sarcelle)
+      if (leaveStatus.statut === 'validee') return fractionnement ? 'bg-teal-300' : 'bg-green-100';
+      if (leaveStatus.statut === 'en_attente') return fractionnement ? 'bg-teal-100 ring-2 ring-inset ring-orange-300' : 'bg-orange-100';
     }
 
     if (recupStatus) {
       if (recupStatus.statut === 'validee') return 'bg-cyan-200';
       if (recupStatus.statut === 'en_attente') return 'bg-cyan-100';
     }
+
+    // Jour libre en période de fractionnement : teinte légère
+    if (fractionnement && !coursMode) return 'bg-teal-50 ring-1 ring-inset ring-teal-100';
 
     return '';
   };
@@ -523,7 +529,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
     if (isPast || isTooSoon) {
       const lsAM = getHalfDayLeaveStatus(date, 'matin');
       const lsPM = getHalfDayLeaveStatus(date, 'apres_midi');
-      if ((lsAM && lsAM.statut === 'validee') || (lsPM && lsPM.statut === 'validee')) return 'text-green-600 font-semibold';
+      if ((lsAM && lsAM.statut === 'validee') || (lsPM && lsPM.statut === 'validee')) return isPeriodeFractionnement(date) ? 'text-teal-800 font-semibold' : 'text-green-600 font-semibold';
       if ((lsAM && lsAM.statut === 'en_attente') || (lsPM && lsPM.statut === 'en_attente')) return 'text-orange-600 font-semibold';
       const rsAM = getHalfDayRecupStatus(date, 'matin');
       const rsPM = getHalfDayRecupStatus(date, 'apres_midi');
@@ -544,7 +550,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
 
     const lsAM = getHalfDayLeaveStatus(date, 'matin');
     const lsPM = getHalfDayLeaveStatus(date, 'apres_midi');
-    if (lsAM && lsAM.statut === 'validee' && lsPM && lsPM.statut === 'validee') return 'text-green-800 font-semibold';
+    if (lsAM && lsAM.statut === 'validee' && lsPM && lsPM.statut === 'validee') return isPeriodeFractionnement(date) ? 'text-teal-900 font-semibold' : 'text-green-800 font-semibold';
     if (lsAM && lsAM.statut === 'en_attente' && lsPM && lsPM.statut === 'en_attente') return 'text-orange-800 font-semibold';
 
     const rsAM = getHalfDayRecupStatus(date, 'matin');
@@ -640,6 +646,14 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-orange-100 border-2 border-orange-300 rounded"></div>
             <span className="text-gray-600">En attente</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-teal-300 border-2 border-teal-500 rounded"></div>
+            <span className="text-gray-600">Congé en période de fractionnement</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-teal-50 border border-teal-200 rounded"></div>
+            <span className="text-gray-600">Période de fractionnement (nov. → avril)</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 bg-cyan-200 border-2 border-cyan-400 rounded"></div>

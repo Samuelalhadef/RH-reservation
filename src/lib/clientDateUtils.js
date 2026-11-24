@@ -2,6 +2,11 @@
  * Client-side date utilities
  */
 
+import { toDayUTC } from './dateUtils.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayKey = (t) => new Date(t).toISOString().slice(0, 10);
+
 export const formatDateFR = (date) => {
   if (!date) return '';
   const d = new Date(date);
@@ -21,17 +26,15 @@ export const formatDateForInput = (date) => {
 };
 
 export const calculateBusinessDays = (startDate, endDate, holidays = []) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = toDayUTC(startDate);
+  const end = toDayUTC(endDate);
   let count = 0;
 
-  const holidaySet = new Set(holidays.map(h => new Date(h).toISOString().split('T')[0]));
+  const holidaySet = new Set(holidays.map(h => dayKey(toDayUTC(h))));
 
-  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-    const dayOfWeek = date.getDay();
-    const dateStr = date.toISOString().split('T')[0];
-
-    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dateStr)) {
+  for (let t = start; t <= end; t += DAY_MS) {
+    const dayOfWeek = new Date(t).getUTCDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(dayKey(t))) {
       count++;
     }
   }
@@ -40,13 +43,8 @@ export const calculateBusinessDays = (startDate, endDate, holidays = []) => {
 };
 
 export const isAtLeast7DaysInAdvance = (date) => {
-  const targetDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const diffTime = targetDate - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+  // Comparaison en jours calendaires (sinon J+6 passait grâce au décalage horaire)
+  const diffDays = Math.round((toDayUTC(date) - toDayUTC(new Date())) / DAY_MS);
   return diffDays >= 7;
 };
 
@@ -74,4 +72,14 @@ export const getStatusColor = (status) => {
     annulee: 'bg-gray-100 text-gray-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
+};
+
+/**
+ * Période de fractionnement = hors période principale (1er mai → 31 octobre),
+ * soit janvier-avril et novembre-décembre. Même règle que src/lib/fractionnement.js.
+ * @param {Date} date - date locale (cases des calendriers)
+ */
+export const isPeriodeFractionnement = (date) => {
+  const month = date.getMonth(); // 0-11
+  return month < 4 || month > 9;
 };

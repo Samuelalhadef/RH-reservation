@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
-import { calculateBusinessDays } from '@/lib/dateUtils';
+import { calculateBusinessDays, calculateLeaveDays } from '@/lib/dateUtils';
 import { getFrenchHolidaysRange } from '@/lib/holidays';
-import { recalculateFractionnement } from '@/lib/fractionnement';
-import { recalculateBalance } from '@/lib/soldes';
+import { recalculateSoldeComplet } from '@/lib/fractionnement';
+import { getSoldeDisponible } from '@/lib/soldes';
 
 export async function POST(request) {
   try {
@@ -32,6 +32,24 @@ export async function POST(request) {
       );
     }
 
+    const targetUser = await db.execute({
+      sql: 'SELECT id FROM users WHERE id = ?',
+      args: [user_id]
+    });
+    if (targetUser.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Agent introuvable' },
+        { status: 404 }
+      );
+    }
+
+    if (isNaN(new Date(date_debut).getTime()) || isNaN(new Date(date_fin).getTime())) {
+      return NextResponse.json(
+        { success: false, message: 'Dates invalides' },
+        { status: 400 }
+      );
+    }
+
     // Récupérer les jours fériés
     const startYear = new Date(date_debut).getFullYear();
     const endYear = new Date(date_fin).getFullYear();
@@ -50,27 +68,10 @@ export async function POST(request) {
       );
     }
 
-    // Ajustement pour les demi-journées
-    const isSameDay = date_debut === date_fin;
+    // Demi-journées comprises (voir calculateLeaveDays)
     const typeDebutValue = type_debut || 'journee_complete';
     const typeFinValue = type_fin || 'journee_complete';
-
-    if (isSameDay) {
-      if (typeDebutValue === 'matin' && typeFinValue === 'apres_midi') {
-        businessDays = 1;
-      } else if (typeDebutValue === 'matin' || typeDebutValue === 'apres_midi') {
-        businessDays = 0.5;
-      }
-    } else {
-      if (typeDebutValue === 'apres_midi') {
-        businessDays -= 0.5;
-      }
-      if (typeFinValue === 'matin') {
-        businessDays -= 0.5;
-      }
-    }
-
-    businessDays = Math.max(0, businessDays);
+    businessDays = calculateLeaveDays(date_debut, date_fin, holidays, typeDebutValue, typeFinValue);
 
     if (businessDays === 0) {
       return NextResponse.json(
@@ -95,7 +96,9 @@ export async function POST(request) {
         args: [user_id, currentYear]
       });
     } else {
-      joursRestants = balanceResult.rows[0].jours_restants;
+      // Recalcul à partir des congés validés (jours_restants en base peut être périmé)
+      const solde = await getSoldeDisponible(user_id, currentYear);
+      joursRestants = solde ? solde.restants : balanceResult.rows[0].jours_restants;
     }
 
     if (businessDays > joursRestants) {
@@ -141,10 +144,7 @@ export async function POST(request) {
     });
 
     // Recalculer le solde (jours pris + jours restants, mouvements CET inclus)
-    await recalculateBalance(user_id, currentYear);
-
-    // Recalculer les jours de fractionnement
-    await recalculateFractionnement(user_id, currentYear);
+    await recalculateSoldeComplet(user_id, currentYear);
 
     return NextResponse.json({
       success: true,

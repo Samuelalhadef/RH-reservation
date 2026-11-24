@@ -38,13 +38,9 @@ export default function RecuperationPage() {
   // États pour la parentalité (maternité / paternité / adoption)
   const [demandesParentalite, setDemandesParentalite] = useState([]);
   const [showParentaliteForm, setShowParentaliteForm] = useState(false);
-  const [parentaliteData, setParentaliteData] = useState({
-    type: 'maternite',
-    date_debut: '',
-    date_fin: '',
-    motif: '',
-    document_data: ''
-  });
+  const [parentaliteData, setParentaliteData] = useState(emptyParentalite('maternite'));
+  const [parentaliteSousOnglet, setParentaliteSousOnglet] = useState('naissance'); // 'naissance' | 'enfant_malade'
+  const [enfantMaladeInfo, setEnfantMaladeInfo] = useState(null); // { annee, plafond, pris, en_attente }
 
   // Nouveaux states UI
   const [activeTab, setActiveTab] = useState('acquises'); // 'acquises' | 'utilisation' | 'parentalite'
@@ -78,6 +74,7 @@ export default function RecuperationPage() {
       setDemandesUtil(utilRes.demandes || []);
       setHeuresUtilisees(utilRes.heures_utilisees || 0);
       setDemandesParentalite(parentaliteRes.demandes || []);
+      setEnfantMaladeInfo(parentaliteRes.enfant_malade || null);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erreur lors du chargement des données');
@@ -106,7 +103,7 @@ export default function RecuperationPage() {
       if (!res.ok) throw new Error(data.message);
       toast.success('Demande envoyée à la RH');
       setShowParentaliteForm(false);
-      setParentaliteData({ type: 'maternite', date_debut: '', date_fin: '', motif: '', document_data: '' });
+      setParentaliteData(emptyParentalite(parentaliteData.type === 'enfant_malade' ? 'enfant_malade' : 'maternite'));
       fetchData();
     } catch (err) {
       toast.error(err.message);
@@ -588,7 +585,13 @@ export default function RecuperationPage() {
                 demandes={demandesParentalite}
                 filterStatut={filterStatut}
                 sortOrder={sortOrder}
-                onNewRequest={() => setShowParentaliteForm(true)}
+                sousOnglet={parentaliteSousOnglet}
+                setSousOnglet={setParentaliteSousOnglet}
+                enfantMaladeInfo={enfantMaladeInfo}
+                onNewRequest={(type) => {
+                  setParentaliteData(emptyParentalite(type));
+                  setShowParentaliteForm(true);
+                }}
                 onCancel={handleCancelParentalite}
               />
             )}
@@ -596,7 +599,17 @@ export default function RecuperationPage() {
         </div>
 
         {/* ===== Formulaire parentalité ===== */}
-        {showParentaliteForm && (
+        {showParentaliteForm && parentaliteData.type === 'enfant_malade' && (
+          <EnfantMaladeForm
+            data={parentaliteData}
+            setData={setParentaliteData}
+            info={enfantMaladeInfo}
+            submitting={submitting}
+            onSubmit={handleSubmitParentalite}
+            onClose={() => setShowParentaliteForm(false)}
+          />
+        )}
+        {showParentaliteForm && parentaliteData.type !== 'enfant_malade' && (
           <ParentaliteForm
             data={parentaliteData}
             setData={setParentaliteData}
@@ -1588,10 +1601,45 @@ const PARENTALITE_TYPES = {
     badge: 'bg-violet-100 text-violet-700',
     btnActive: 'border-violet-500 bg-violet-50 text-violet-700',
   },
+  enfant_malade: {
+    label: 'Enfant malade',
+    duree: '6 jours ouvrés / an pour un temps plein (au prorata de la quotité)',
+    badge: 'bg-teal-100 text-teal-700',
+    btnActive: 'border-teal-500 bg-teal-50 text-teal-700',
+  },
 };
 
-function DemandesParentalite({ demandes, filterStatut, sortOrder, onNewRequest, onCancel }) {
+// Types proposés dans le formulaire « Naissance / adoption »
+const TYPES_NAISSANCE = ['maternite', 'paternite', 'adoption'];
+
+function emptyParentalite(type) {
+  return {
+    type,
+    date_debut: '',
+    date_fin: '',
+    motif: '',
+    document_data: '',
+    type_debut: 'journee_complete',
+    type_fin: 'journee_complete',
+    enfant_prenom: '',
+  };
+}
+
+const DEMI_JOURNEE_LABELS = { matin: 'matin', apres_midi: 'après-midi' };
+
+/** « Du 03/02/2026 (après-midi) au 04/02/2026 (matin) » */
+function periodeLabel(d) {
+  const debut = d.type_debut && d.type_debut !== 'journee_complete' ? ` (${DEMI_JOURNEE_LABELS[d.type_debut]})` : '';
+  const fin = d.type_fin && d.type_fin !== 'journee_complete' ? ` (${DEMI_JOURNEE_LABELS[d.type_fin]})` : '';
+  if (d.date_debut === d.date_fin) return `Le ${d.date_debut_fr}${debut}`;
+  return `Du ${d.date_debut_fr}${debut} au ${d.date_fin_fr}${fin}`;
+}
+
+function DemandesParentalite({ demandes, filterStatut, sortOrder, sousOnglet, setSousOnglet, enfantMaladeInfo, onNewRequest, onCancel }) {
+  const isEnfantMalade = sousOnglet === 'enfant_malade';
+  const nbEnfantMalade = demandes.filter(d => d.type === 'enfant_malade').length;
   const filtered = demandes
+    .filter(d => (d.type === 'enfant_malade') === isEnfantMalade)
     .filter(d => filterStatut === 'toutes' ? true : d.statut === filterStatut)
     .sort((a, b) => {
       const da = new Date(a.date_debut).getTime();
@@ -1601,37 +1649,85 @@ function DemandesParentalite({ demandes, filterStatut, sortOrder, onNewRequest, 
 
   return (
     <div>
-      <div className="mb-5 flex items-start justify-between gap-3 bg-gradient-to-r from-pink-50 to-violet-50 border border-pink-100 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-pink-600 rounded-lg text-white flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-800">Congé maternité, paternité ou adoption</p>
-            <p className="text-xs text-gray-600 mt-1">
-              Faites votre demande à la RH avec les dates prévues. Vous pouvez joindre un justificatif (certificat médical, acte de naissance…) maintenant ou plus tard.
-            </p>
-          </div>
-        </div>
+      {/* Sous-onglets */}
+      <div className="mb-4 inline-flex p-1 bg-gray-100 rounded-xl">
         <button
-          onClick={onNewRequest}
-          className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition"
+          onClick={() => setSousOnglet('naissance')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${!isEnfantMalade ? 'bg-white text-pink-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          Nouvelle demande
+          Naissance / adoption
+          <span className="ml-1.5 text-xs text-gray-400">{demandes.length - nbEnfantMalade}</span>
+        </button>
+        <button
+          onClick={() => setSousOnglet('enfant_malade')}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${isEnfantMalade ? 'bg-white text-teal-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+        >
+          Enfant malade
+          <span className="ml-1.5 text-xs text-gray-400">{nbEnfantMalade}</span>
         </button>
       </div>
+
+      {isEnfantMalade ? (
+        <div className="mb-5 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-100 rounded-xl p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-teal-600 rounded-lg text-white flex-shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-800">Garde d&apos;enfant malade</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Autorisation d&apos;absence pour soigner ou garder un enfant malade (moins de 16 ans, sans limite d&apos;âge en cas de handicap). Joignez un certificat médical. Ces jours ne sont pas décomptés de vos congés.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onNewRequest('enfant_malade')}
+              className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Nouvelle demande
+            </button>
+          </div>
+          {enfantMaladeInfo && <EnfantMaladeCompteur info={enfantMaladeInfo} />}
+        </div>
+      ) : (
+        <div className="mb-5 flex items-start justify-between gap-3 bg-gradient-to-r from-pink-50 to-violet-50 border border-pink-100 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-pink-600 rounded-lg text-white flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">Congé maternité, paternité ou adoption</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Faites votre demande à la RH avec les dates prévues. Vous pouvez joindre un justificatif (certificat médical, acte de naissance…) maintenant ou plus tard.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNewRequest('maternite')}
+            className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            Nouvelle demande
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
-          <p className="text-sm">Aucune demande de parentalité</p>
+          <p className="text-sm">{isEnfantMalade ? 'Aucune demande enfant malade' : 'Aucune demande de parentalité'}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -1660,9 +1756,14 @@ function DemandesParentalite({ demandes, filterStatut, sortOrder, onNewRequest, 
                       </span>
                     </div>
                     <p className="text-sm text-gray-900 font-medium">
-                      Du {d.date_debut_fr} au {d.date_fin_fr}
-                      <span className="text-gray-500 font-normal"> · {d.nombre_jours} jour(s)</span>
+                      {periodeLabel(d)}
+                      <span className="text-gray-500 font-normal">
+                        {' · '}{d.nombre_jours} jour(s){d.type === 'enfant_malade' ? ' ouvré(s)' : ''}
+                      </span>
                     </p>
+                    {d.enfant_prenom && (
+                      <p className="text-xs text-gray-600 mt-0.5">Enfant : {d.enfant_prenom}</p>
+                    )}
                     {d.motif && (
                       <p className="text-xs text-gray-600 mt-1 italic">« {d.motif} »</p>
                     )}
@@ -1747,7 +1848,7 @@ function ParentaliteForm({ data, setData, submitting, onSubmit, onClose }) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Type de congé *</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {Object.entries(PARENTALITE_TYPES).map(([key, t]) => (
+              {TYPES_NAISSANCE.map((key) => [key, PARENTALITE_TYPES[key]]).map(([key, t]) => (
                 <button
                   key={key}
                   type="button"
@@ -1836,6 +1937,231 @@ function ParentaliteForm({ data, setData, submitting, onSubmit, onClose }) {
               onClick={onSubmit}
               disabled={submitting}
               className="flex-1 px-4 py-2.5 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition font-semibold disabled:opacity-50"
+            >
+              {submitting ? 'Envoi…' : 'Envoyer à la RH'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Enfant malade
+// =============================================================
+
+function EnfantMaladeCompteur({ info }) {
+  const utilise = info.pris + info.en_attente;
+  const pct = info.plafond > 0 ? Math.min(100, (utilise / info.plafond) * 100) : 0;
+  const depasse = utilise > info.plafond;
+  return (
+    <div className="mt-4 bg-white/70 rounded-lg p-3">
+      <div className="flex items-center justify-between text-sm mb-1.5">
+        <span className="text-gray-700">
+          <strong>{info.pris}</strong> jour(s) pris en {info.annee}
+          {info.en_attente > 0 && <span className="text-amber-600"> (+ {info.en_attente} en attente)</span>}
+        </span>
+        <span className="text-gray-500">sur {info.plafond} jours</span>
+      </div>
+      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${depasse ? 'bg-rose-500' : 'bg-teal-500'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {depasse && (
+        <p className="text-xs text-rose-600 mt-1.5">
+          Plafond indicatif dépassé : la RH vérifiera si vous pouvez bénéficier du doublement (parent seul, conjoint sans autorisation d&apos;absence…).
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Estimation côté client (week-ends exclus ; les jours fériés sont déduits par le serveur). */
+function estimerJoursOuvres(data) {
+  if (!data.date_debut || !data.date_fin || data.date_fin < data.date_debut) return 0;
+  if (data.date_debut === data.date_fin) {
+    const day = new Date(data.date_debut + 'T12:00:00').getDay();
+    if (day === 0 || day === 6) return 0;
+    return data.type_debut === 'journee_complete' ? 1 : 0.5;
+  }
+  let jours = 0;
+  const end = new Date(data.date_fin + 'T12:00:00');
+  for (let d = new Date(data.date_debut + 'T12:00:00'); d <= end; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) jours++;
+  }
+  if (jours === 0) return 0;
+  if (data.type_debut === 'apres_midi') jours -= 0.5;
+  if (data.type_fin === 'matin') jours -= 0.5;
+  return Math.max(0.5, jours);
+}
+
+function DemiJourneeSelect({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+    >
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>{l}</option>
+      ))}
+    </select>
+  );
+}
+
+function EnfantMaladeForm({ data, setData, info, submitting, onSubmit, onClose }) {
+  const memeJour = data.date_debut && data.date_debut === data.date_fin;
+  const jours = estimerJoursOuvres(data);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setData({ ...data, document_data: '' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Le fichier ne doit pas dépasser 5 Mo');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setData({ ...data, document_data: ev.target.result });
+    reader.readAsDataURL(file);
+  };
+
+  const apresDemande = info ? info.pris + info.en_attente + jours : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 px-6 py-4 border-b border-teal-100 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-teal-600 rounded-lg text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-800">Absence pour enfant malade</h2>
+                <p className="text-xs text-gray-500">La RH validera votre demande directement</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1.5 hover:bg-white rounded-lg text-gray-500 hover:text-gray-700 transition">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Prénom de l&apos;enfant</label>
+            <input
+              type="text"
+              value={data.enfant_prenom}
+              onChange={(e) => setData({ ...data, enfant_prenom: e.target.value })}
+              maxLength={100}
+              placeholder="Ex. : Léa"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début *</label>
+              <input
+                type="date"
+                value={data.date_debut}
+                onChange={(e) => setData({
+                  ...data,
+                  date_debut: e.target.value,
+                  date_fin: !data.date_fin || data.date_fin < e.target.value ? e.target.value : data.date_fin,
+                })}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+              />
+              <DemiJourneeSelect
+                value={data.type_debut}
+                onChange={(v) => setData({ ...data, type_debut: v })}
+                options={memeJour
+                  ? [['journee_complete', 'Journée entière'], ['matin', 'Matin uniquement'], ['apres_midi', 'Après-midi uniquement']]
+                  : [['journee_complete', 'Dès le matin'], ['apres_midi', "À partir de l'après-midi"]]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de fin *</label>
+              <input
+                type="date"
+                value={data.date_fin}
+                onChange={(e) => setData({ ...data, date_fin: e.target.value })}
+                min={data.date_debut || undefined}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition"
+              />
+              {!memeJour && (
+                <DemiJourneeSelect
+                  value={data.type_fin}
+                  onChange={(v) => setData({ ...data, type_fin: v })}
+                  options={[['journee_complete', "Jusqu'au soir"], ['matin', 'Le matin seulement']]}
+                />
+              )}
+            </div>
+          </div>
+
+          {jours > 0 && (
+            <div className="bg-teal-50 border-l-4 border-teal-500 p-3 rounded text-sm text-teal-800">
+              Durée : <strong>{jours} jour(s) ouvré(s)</strong>
+              <span className="text-teal-700/80"> (les jours fériés seront déduits automatiquement)</span>
+              {info && (
+                <p className={`mt-1 text-xs ${apresDemande > info.plafond ? 'text-rose-600 font-medium' : 'text-teal-700'}`}>
+                  Après cette demande : {apresDemande} / {info.plafond} jours en {info.annee}
+                  {apresDemande > info.plafond && ' — au-delà du plafond indicatif, la RH étudiera votre situation.'}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Précisions (optionnel)</label>
+            <textarea
+              value={data.motif}
+              onChange={(e) => setData({ ...data, motif: e.target.value })}
+              rows={2}
+              placeholder="Informations utiles pour la RH…"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Certificat médical</label>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              PDF ou photo, 5 Mo max. Peut être transmis plus tard à la RH.
+            </p>
+            {data.document_data && (
+              <p className="text-xs text-emerald-600 mt-1 font-medium">✓ Document joint</p>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold disabled:opacity-50"
             >
               {submitting ? 'Envoi…' : 'Envoyer à la RH'}
             </button>

@@ -147,7 +147,7 @@ export default function DashboardPage() {
             </p>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
-              <DashStat label="Jours restants" value={profile?.jours_restants || 25} icon="balance" />
+              <DashStat label="Jours restants" value={profile?.jours_restants ?? 0} icon="balance" />
               <DashStat label="Jours pris" value={profile?.jours_pris || 0} icon="check" />
               <DashStat label="En attente" value={pendingCount} icon="clock" highlight={pendingCount > 0} />
               <DashStat label="Récup. acquises" value={`${profile?.heures_recuperation || 0}h`} icon="hourglass" />

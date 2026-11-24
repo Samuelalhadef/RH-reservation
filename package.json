@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node src/utils/seed.js"
+    "seed": "node src/utils/seed.js",
+    "test": "node --import ./tests/setup/register.mjs --test \"tests/**/*.test.mjs\"",
+    "test:fuzz": "node --import ./tests/setup/register.mjs --test tests/api/invariants.fuzz.test.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

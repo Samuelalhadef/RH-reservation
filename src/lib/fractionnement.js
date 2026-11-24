@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { totalDroits } from './soldes.js';
+import { toDayUTC } from './dateUtils.js';
 
 /**
  * Calcule le nombre de jours ouvrés hors période principale (mai-octobre)
@@ -9,16 +10,17 @@ import { totalDroits } from './soldes.js';
  * @returns {number} Nombre de jours ouvrés hors période principale
  */
 function countDaysOutsideMainPeriod(dateDebut, dateFin) {
-  const start = new Date(dateDebut);
-  const end = new Date(dateFin);
+  const start = toDayUTC(dateDebut);
+  const end = toDayUTC(dateFin);
   let count = 0;
 
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dayOfWeek = d.getDay();
+  for (let t = start; t <= end; t += 24 * 60 * 60 * 1000) {
+    const d = new Date(t);
+    const dayOfWeek = d.getUTCDay();
     // Exclure weekends
     if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-    const month = d.getMonth(); // 0-11
+    const month = d.getUTCMonth(); // 0-11
     // Hors période principale (mai=4, octobre=9) → mois 0-3 et 10-11
     if (month < 4 || month > 9) {
       count++;
@@ -94,4 +96,55 @@ export async function recalculateFractionnement(userId, year) {
   }
 
   return fractionnement;
+}
+
+/**
+ * Recalcul complet du solde d'une année : jours_pris, jours_fractionnement et
+ * jours_restants en 3 requêtes (au lieu de 6 pour recalculateBalance() suivi de
+ * recalculateFractionnement()). À utiliser après toute validation, annulation
+ * ou création de congé.
+ *
+ * @param {number} userId - ID de l'utilisateur
+ * @param {number} year - Année concernée
+ * @returns {Promise<{jours_pris: number, jours_fractionnement: number, jours_restants: number}|null>}
+ *   null si aucune ligne soldes_conges pour cette année
+ */
+export async function recalculateSoldeComplet(userId, year) {
+  const [leavesResult, soldeResult] = await Promise.all([
+    db.execute({
+      sql: `
+        SELECT date_debut, date_fin, nombre_jours_ouvres
+        FROM demandes_conges
+        WHERE user_id = ? AND statut = 'validee'
+          AND strftime('%Y', date_debut) = ?
+      `,
+      args: [userId, String(year)]
+    }),
+    db.execute({
+      sql: 'SELECT jours_acquis, jours_reportes, jours_compensateurs, jours_cet FROM soldes_conges WHERE user_id = ? AND annee = ?',
+      args: [userId, year]
+    }),
+  ]);
+
+  if (soldeResult.rows.length === 0) return null;
+
+  let joursPris = 0;
+  let totalDaysOutside = 0;
+  for (const leave of leavesResult.rows) {
+    joursPris += Number(leave.nombre_jours_ouvres) || 0;
+    totalDaysOutside += countDaysOutsideMainPeriod(leave.date_debut, leave.date_fin);
+  }
+  const fractionnement = applyFractionnementRules(totalDaysOutside);
+  const restants = totalDroits({ ...soldeResult.rows[0], jours_fractionnement: fractionnement }) - joursPris;
+
+  await db.execute({
+    sql: `
+      UPDATE soldes_conges
+      SET jours_pris = ?, jours_fractionnement = ?, jours_restants = ?
+      WHERE user_id = ? AND annee = ?
+    `,
+    args: [joursPris, fractionnement, restants, userId, year]
+  });
+
+  return { jours_pris: joursPris, jours_fractionnement: fractionnement, jours_restants: restants };
 }

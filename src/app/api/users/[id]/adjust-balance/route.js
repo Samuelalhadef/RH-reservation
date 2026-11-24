@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
+import { getSoldeDisponible, recalculateBalance } from '@/lib/soldes';
 
 export async function POST(request, { params }) {
   try {
@@ -60,7 +61,9 @@ export async function POST(request, { params }) {
     }
 
     const balance = balanceResult.rows[0];
-    const newRestants = parseFloat(balance.jours_restants) + adjustmentNum;
+    // Partir du solde recalculé (jours_restants stocké peut être périmé)
+    const actuel = await getSoldeDisponible(id, currentYear);
+    const newRestants = actuel.restants + adjustmentNum;
 
     if (newRestants < 0) {
       return NextResponse.json(
@@ -85,8 +88,8 @@ export async function POST(request, { params }) {
       }
 
       await db.execute({
-        sql: 'UPDATE soldes_conges SET jours_compensateurs = ?, jours_acquis = ?, jours_restants = ? WHERE user_id = ? AND annee = ?',
-        args: [newCompensateurs, newAcquis, newRestants, id, currentYear]
+        sql: 'UPDATE soldes_conges SET jours_compensateurs = ?, jours_acquis = ? WHERE user_id = ? AND annee = ?',
+        args: [newCompensateurs, newAcquis, id, currentYear]
       });
 
       const detail = currentComp + adjustmentNum < 0
@@ -105,19 +108,22 @@ export async function POST(request, { params }) {
       }
 
       await db.execute({
-        sql: 'UPDATE soldes_conges SET jours_acquis = ?, jours_restants = ? WHERE user_id = ? AND annee = ?',
-        args: [newAcquis, newRestants, id, currentYear]
+        sql: 'UPDATE soldes_conges SET jours_acquis = ? WHERE user_id = ? AND annee = ?',
+        args: [newAcquis, id, currentYear]
       });
 
       message = `Jours de congés ajustés : ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} jour(s)`;
       console.log(`Leave days adjusted for ${user.prenom} ${user.nom}: ${adjustmentNum > 0 ? '+' : ''}${adjustmentNum} days (motif: ${motif || 'non spécifié'})`);
     }
 
+    // jours_restants est toujours dérivé (voir src/lib/soldes.js)
+    const recalc = await recalculateBalance(id, currentYear);
+
     return NextResponse.json({
       success: true,
       message,
       newBalance: {
-        jours_restants: newRestants
+        jours_restants: recalc ? recalc.jours_restants : newRestants
       }
     });
   } catch (error) {

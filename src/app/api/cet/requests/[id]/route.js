@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
 import { notifyCetDecision } from '@/lib/pushNotifications';
-import { recalculateBalance } from '@/lib/soldes';
+import { recalculateBalance, getSoldeDisponible } from '@/lib/soldes';
 
 export async function PUT(request, { params }) {
   try {
@@ -46,11 +46,9 @@ export async function PUT(request, { params }) {
     // Sans ce contrôle, le solde (congés ou CET) pourrait devenir négatif.
     if (action === 'valider') {
       if (demande.type === 'credit') {
-        const soldeRes = await db.execute({
-          sql: 'SELECT jours_restants FROM soldes_conges WHERE user_id = ? AND annee = ?',
-          args: [demande.user_id, currentYear]
-        });
-        const dispo = soldeRes.rows[0]?.jours_restants ?? 0;
+        // Solde recalculé depuis les congés validés (jours_restants stocké peut être périmé)
+        const solde = await getSoldeDisponible(demande.user_id, currentYear);
+        const dispo = solde ? solde.restants : 0;
         if (dispo < demande.jours) {
           return NextResponse.json(
             { success: false, message: `Solde congés insuffisant (${dispo} jour(s) disponible(s)). Validation impossible.` },

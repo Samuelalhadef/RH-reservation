@@ -1,3 +1,5 @@
+import { toDayUTC } from './dateUtils.js';
+
 /**
  * Calcule le nombre de jours de congés acquis pour un CDD
  * Formule : 2.08 jours ouvrables par mois travaillé
@@ -13,13 +15,15 @@ export function calculateCDDLeaveBalance(dateDebut, dateFin, annee) {
     return 0;
   }
 
-  const debut = new Date(dateDebut);
-  const fin = new Date(dateFin);
+  // Jours calendaires UTC : mélanger dates UTC ('YYYY-MM-DD') et locales
+  // faisait perdre une heure (24,94 jours au lieu de 25 pour une année complète)
+  const debut = toDayUTC(dateDebut);
+  const fin = toDayUTC(dateFin);
   const currentYear = annee || new Date().getFullYear();
 
   // Dates de début et fin de l'année de référence
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear, 11, 31);
+  const yearStart = Date.UTC(currentYear, 0, 1);
+  const yearEnd = Date.UTC(currentYear, 11, 31);
 
   // On prend la date la plus tardive entre le début du contrat et le début de l'année
   const effectiveStart = debut > yearStart ? debut : yearStart;
@@ -74,8 +78,8 @@ export function calculateCDDTotalLeaveBalance(dateDebut, dateFin) {
     return 0;
   }
 
-  const debut = new Date(dateDebut);
-  const fin = new Date(dateFin);
+  const debut = toDayUTC(dateDebut);
+  const fin = toDayUTC(dateFin);
 
   // Calculer le nombre de jours travaillés (inclure le premier et dernier jour)
   const diffInMs = fin - debut + (1000 * 60 * 60 * 24); // +1 jour pour inclure le dernier jour

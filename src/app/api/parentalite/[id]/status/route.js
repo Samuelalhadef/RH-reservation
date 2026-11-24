@@ -60,11 +60,12 @@ export async function PUT(request, { params }) {
       args: [statut, validatorId || null, commentaire || null, id]
     });
 
-    const typeLabel = demande.type === 'maternite'
-      ? 'maternité'
-      : demande.type === 'paternite'
-      ? 'paternité'
-      : 'adoption';
+    const typeLabel = {
+      maternite: 'maternité',
+      paternite: 'paternité',
+      adoption: 'adoption',
+      enfant_malade: 'enfant malade',
+    }[demande.type] || demande.type;
 
     try {
       await sendPushToUser(demande.user_id, {

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRH } from '@/lib/auth';
-import { recalculateFractionnement } from '@/lib/fractionnement';
-import { recalculateBalance } from '@/lib/soldes';
+import { recalculateSoldeComplet } from '@/lib/fractionnement';
 
 export async function POST(request) {
   try {
@@ -22,14 +21,12 @@ export async function POST(request) {
       args: [currentYear]
     });
 
-    let corrected = 0;
-
-    for (const solde of soldes.rows) {
-      // D'abord recalculer le fractionnement, puis le solde (CET inclus)
-      await recalculateFractionnement(solde.user_id, currentYear);
-      const result = await recalculateBalance(solde.user_id, currentYear);
-      if (result) corrected++;
-    }
+    // Recalcul complet (pris + fractionnement + restants) de tous les agents en
+    // parallèle : 3 requêtes par agent au lieu de 6 exécutées l'une après l'autre
+    const results = await Promise.all(
+      soldes.rows.map((solde) => recalculateSoldeComplet(solde.user_id, currentYear))
+    );
+    const corrected = results.filter(Boolean).length;
 
     return NextResponse.json({
       success: true,

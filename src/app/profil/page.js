@@ -534,7 +534,7 @@ export default function ProfilPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
                     <p className="text-xs text-gray-500">Acquis</p>
-                    <p className="text-xl font-bold text-gray-800">{profile?.jours_acquis || 25}</p>
+                    <p className="text-xl font-bold text-gray-800">{profile?.jours_acquis ?? 0}</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
                     <p className="text-xs text-gray-500">Pris</p>

@@ -249,12 +249,7 @@ export default function ValidationPage() {
                               ) : (
                                 <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">Niveau {leave.validation_info?.level}</span>
                               )}
-                              {leave.statut_niveau_1 === 'validee' && leave.validateur_n1_nom && (
-                                <p className="text-xs text-gray-500 mt-1">✓ N1: {leave.validateur_n1_prenom} {leave.validateur_n1_nom}</p>
-                              )}
-                              {leave.statut_niveau_2 === 'validee' && leave.validateur_n2_nom && (
-                                <p className="text-xs text-gray-500 mt-1">✓ N2: {leave.validateur_n2_prenom} {leave.validateur_n2_nom}</p>
-                              )}
+                              <EtapesValidees demande={leave} />
                             </td>
                             <td className="px-4 py-3">
                               <button onClick={() => setSelectedLeave(leave)} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
@@ -371,27 +366,7 @@ export default function ValidationPage() {
                   </div>
                 )}
 
-                {(selectedLeave.statut_niveau_1 === 'validee' || selectedLeave.statut_niveau_2 === 'validee') && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-blue-900 mb-2">Validations précédentes</h4>
-                    {selectedLeave.statut_niveau_1 === 'validee' && (
-                      <p className="text-sm text-blue-800">
-                        ✓ Niveau 1: {selectedLeave.validateur_n1_prenom} {selectedLeave.validateur_n1_nom}
-                        {selectedLeave.date_validation_niveau_1 && (
-                          <span className="text-xs ml-2">({formatDateFR(selectedLeave.date_validation_niveau_1)})</span>
-                        )}
-                      </p>
-                    )}
-                    {selectedLeave.statut_niveau_2 === 'validee' && (
-                      <p className="text-sm text-blue-800 mt-1">
-                        ✓ Niveau 2: {selectedLeave.validateur_n2_prenom} {selectedLeave.validateur_n2_nom}
-                        {selectedLeave.date_validation_niveau_2 && (
-                          <span className="text-xs ml-2">({formatDateFR(selectedLeave.date_validation_niveau_2)})</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <ValidationsPrecedentes demande={selectedLeave} color="blue" />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Commentaire (optionnel)</label>
@@ -476,27 +451,7 @@ export default function ValidationPage() {
                   </>
                 )}
 
-                {(selectedRecup.statut_niveau_1 === 'validee' || selectedRecup.statut_niveau_2 === 'validee') && (
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <h4 className="font-semibold text-orange-900 mb-2">Validations précédentes</h4>
-                    {selectedRecup.statut_niveau_1 === 'validee' && (
-                      <p className="text-sm text-orange-800">
-                        ✓ Niveau 1: {selectedRecup.validateur_n1_prenom} {selectedRecup.validateur_n1_nom}
-                        {selectedRecup.date_validation_niveau_1 && (
-                          <span className="text-xs ml-2">({formatDateFR(selectedRecup.date_validation_niveau_1)})</span>
-                        )}
-                      </p>
-                    )}
-                    {selectedRecup.statut_niveau_2 === 'validee' && (
-                      <p className="text-sm text-orange-800 mt-1">
-                        ✓ Niveau 2: {selectedRecup.validateur_n2_prenom} {selectedRecup.validateur_n2_nom}
-                        {selectedRecup.date_validation_niveau_2 && (
-                          <span className="text-xs ml-2">({formatDateFR(selectedRecup.date_validation_niveau_2)})</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <ValidationsPrecedentes demande={selectedRecup} color="orange" />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Commentaire (optionnel)</label>
@@ -604,12 +559,7 @@ function RecupRow({ demande, onClick }) {
         ) : (
           <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">Niveau {demande.validation_info?.level}</span>
         )}
-        {demande.statut_niveau_1 === 'validee' && demande.validateur_n1_nom && (
-          <p className="text-xs text-gray-500 mt-1">✓ N1: {demande.validateur_n1_prenom} {demande.validateur_n1_nom}</p>
-        )}
-        {demande.statut_niveau_2 === 'validee' && demande.validateur_n2_nom && (
-          <p className="text-xs text-gray-500 mt-1">✓ N2: {demande.validateur_n2_prenom} {demande.validateur_n2_nom}</p>
-        )}
+        <EtapesValidees demande={demande} />
       </td>
       <td className="px-4 py-3">
         <button onClick={() => onClick(demande)} className="text-orange-600 hover:text-orange-700 text-sm font-medium">
@@ -617,5 +567,52 @@ function RecupRow({ demande, onClick }) {
         </button>
       </td>
     </tr>
+  );
+}
+
+// Étapes déjà validées (parcours à N niveaux), avec repli sur les anciennes colonnes N1/N2
+function etapesValidees(demande) {
+  if (Array.isArray(demande.circuit_etapes)) {
+    return demande.circuit_etapes
+      .filter((e) => e.statut === 'validee')
+      .map((e) => ({
+        niveau: e.niveau,
+        nom: e.valide_par_nom ? `${e.valide_par_prenom} ${e.valide_par_nom}` : `${e.prevu_prenom || ''} ${e.prevu_nom || ''}`.trim(),
+        echelon: e.echelon_nom,
+        date: e.date_validation,
+      }));
+  }
+  return [1, 2]
+    .filter((n) => demande[`statut_niveau_${n}`] === 'validee')
+    .map((n) => ({
+      niveau: n,
+      nom: `${demande[`validateur_n${n}_prenom`] || ''} ${demande[`validateur_n${n}_nom`] || ''}`.trim(),
+      echelon: null,
+      date: demande[`date_validation_niveau_${n}`],
+    }));
+}
+
+function EtapesValidees({ demande }) {
+  return etapesValidees(demande).map((e) => (
+    <p key={e.niveau} className="text-xs text-gray-500 mt-1">✓ N{e.niveau}: {e.nom}</p>
+  ));
+}
+
+function ValidationsPrecedentes({ demande, color }) {
+  const etapes = etapesValidees(demande);
+  if (etapes.length === 0) return null;
+  const styles = color === 'orange'
+    ? { box: 'bg-orange-50', title: 'text-orange-900', text: 'text-orange-800' }
+    : { box: 'bg-blue-50', title: 'text-blue-900', text: 'text-blue-800' };
+  return (
+    <div className={`${styles.box} p-4 rounded-lg`}>
+      <h4 className={`font-semibold ${styles.title} mb-2`}>Validations précédentes</h4>
+      {etapes.map((e, i) => (
+        <p key={e.niveau} className={`text-sm ${styles.text} ${i > 0 ? 'mt-1' : ''}`}>
+          ✓ Niveau {e.niveau}{e.echelon ? ` (${e.echelon})` : ''}: {e.nom}
+          {e.date && <span className="text-xs ml-2">({formatDateFR(e.date)})</span>}
+        </p>
+      ))}
+    </div>
   );
 }

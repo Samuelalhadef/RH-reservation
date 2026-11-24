@@ -133,6 +133,16 @@ export async function PUT(request, { params }) {
               tag: `recup-${id}`
             });
           } catch (e) { /* ignore */ }
+        } else if (result.nextValidatorId) {
+          // Étape suivante du parcours : prévenir le validateur concerné
+          try {
+            await sendPushToUser(result.nextValidatorId, {
+              title: 'Heures sup à valider',
+              body: `La demande d'heures sup de ${demande.prenom} ${demande.nom} attend votre validation`,
+              url: '/validation',
+              tag: `recup-${id}`
+            });
+          } catch (e) { /* ignore */ }
         }
       }
 
