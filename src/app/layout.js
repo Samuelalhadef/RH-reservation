@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import ChatbotLazy from '@/components/ChatbotLazy';
+import ChristmasTheme from '@/components/ChristmasTheme';
 import './globals.css';
 
 const inter = Inter({
@@ -49,6 +50,7 @@ export default function RootLayout({ children }) {
           {children}
           <ServiceWorkerRegister />
           <ChatbotLazy />
+          <ChristmasTheme />
           <Toaster
             position="top-right"
             toastOptions={{

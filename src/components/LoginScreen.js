@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { ChristmasHat, ChristmasGreeting } from './ChristmasTheme';
 
 export default function LoginScreen({ initialUsers = null }) {
   // La liste arrive directement dans le HTML (rendu serveur) : pas d'attente
@@ -76,6 +77,8 @@ export default function LoginScreen({ initialUsers = null }) {
             <div className="absolute -bottom-16 -left-12 w-72 h-72 bg-indigo-300/20 rounded-full blur-3xl"></div>
 
             <div className="relative flex items-center gap-4">
+              <div className="relative flex-shrink-0">
+              <ChristmasHat className="-top-5 -left-4 w-12 h-9 sm:w-14 sm:h-11 -rotate-12" />
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-white shadow-xl ring-4 ring-white/20 flex-shrink-0">
                 <Image
                   src="/images/logo.png"
@@ -87,6 +90,7 @@ export default function LoginScreen({ initialUsers = null }) {
                   className="w-full h-full object-cover"
                 />
               </div>
+              </div>
               <div>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-sm rounded-full text-[11px] font-medium uppercase tracking-wider mb-1.5">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +99,7 @@ export default function LoginScreen({ initialUsers = null }) {
                   Mairie de Chartrettes
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Mon Portail Agent</h1>
-                <p className="text-white/80 text-sm mt-0.5">Gestion des congés et récupérations</p>
+                <p className="text-white/80 text-sm mt-0.5">Gestion des congés et récupérations<ChristmasGreeting className="ml-2 font-semibold text-white" /></p>
               </div>
             </div>
           </div>

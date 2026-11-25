@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { prefetch } from '@/lib/dataCache';
+import { ChristmasGarland, ChristmasHat, ChristmasGreeting } from './ChristmasTheme';
 
 const NotificationButton = dynamic(() => import('./NotificationButton'), {
   ssr: false,
@@ -75,6 +76,8 @@ const Navbar = () => {
         <div className="flex justify-between items-center py-3 sm:py-4">
           {/* Logo + titre */}
           <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative">
+            <ChristmasHat className="-top-3.5 -left-2.5 w-8 h-6 sm:w-9 sm:h-7 -rotate-12" />
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm ring-1 ring-gray-100">
               <Image
                 src="/images/logo.png"
@@ -86,9 +89,10 @@ const Navbar = () => {
                 className="w-full h-full object-cover"
               />
             </div>
+            </div>
             <div>
               <h1 className="text-base sm:text-lg font-bold bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent">Mon Portail Agent</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Chartrettes</p>
+              <p className="text-xs text-gray-500 hidden sm:block">Chartrettes<ChristmasGreeting className="ml-1.5 text-red-600 font-medium before:content-['·'] before:mr-1.5 before:text-gray-400" /></p>
             </div>
           </div>
 
@@ -168,6 +172,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+      <ChristmasGarland />
     </nav>
 
     {/* Overlay + Drawer mobile - hors du <nav> pour éviter le containing block créé par backdrop-blur */}
