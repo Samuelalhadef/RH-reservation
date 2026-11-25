@@ -76,6 +76,6 @@ export function SchoolHolidayRibbon({ date, period, gap = 'sm' }) {
  * déjà une couleur de texte spécifique (congé posé, férié…).
  */
 export function schoolHolidayTextClass(textClass, schoolHol) {
-  if (!schoolHol || !/text-gray-(?:400|700)/.test(textClass)) return textClass;
-  return textClass.replace(/text-gray-(?:400|700)/, 'text-amber-700');
+  if (!schoolHol || !/\btext-gray-(?:400|700)\b/.test(textClass)) return textClass;
+  return textClass.replace(/\btext-gray-(?:400|700)\b/, 'text-amber-700');
 }
