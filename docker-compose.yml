@@ -7,6 +7,12 @@ services:
     build: .
     image: rh-reservations:latest
     container_name: rh-reservations
+    # DNS publics explicites : le résolveur Docker interrogeait d'abord 192.168.1.4
+    # (qui ne répond pas), soit ~2,5 s par résolution du nom Turso ; avec 4
+    # résolutions DNS simultanées max côté Node, le tableau de bord attendait ~10 s.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "3003:3000" # accès LAN / Tailscale (le cookie de session exige HTTPS : passer par le domaine)
     environment:
