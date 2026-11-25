@@ -6,7 +6,7 @@ import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
 import { parseSchedule, scheduleHasData, diffHeures } from '@/lib/horaires';
 import toast from 'react-hot-toast';
 import { findSchoolHoliday } from '@/lib/schoolHolidays';
-import SchoolHolidayBanner from './SchoolHolidayBanner';
+import SchoolHolidayBanner, { SchoolHolidayRibbon, schoolHolidayTextClass } from './SchoolHolidayBanner';
 import { fetchJson, invalidate } from '@/lib/dataCache';
 
 const LeaveCalendar = ({ onLeaveCreated }) => {
@@ -679,9 +679,7 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
             </div>
           )}
           <div className="flex items-center gap-1">
-            <div className="w-4 h-4 bg-amber-100 ring-2 ring-amber-300 rounded relative">
-              <span className="absolute bottom-0 inset-x-0.5 h-1 rounded-full bg-amber-400"></span>
-            </div>
+            <div className="w-4 h-4 flex items-center"><span className="w-4 h-[3px] rounded-full bg-amber-400" /></div>
             <span className="text-gray-600">Vacances scolaires (Zone C)</span>
           </div>
           <div className="flex items-center gap-1">
@@ -731,8 +729,8 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
                 <div
                   title={schoolHol ? `Vacances scolaires : ${schoolHol.nom}` : undefined}
                   className={`w-full aspect-square relative ${
-                  isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-lg sm:rounded-xl' : schoolHol ? 'ring-2 ring-amber-300 rounded-lg sm:rounded-xl' : ''
-                } ${schoolHol ? 'bg-amber-100' : ''}`}>
+                  isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-lg sm:rounded-xl' : ''
+                }`}>
                   {/* Deux moitiés avec gap */}
                   <div className="absolute inset-0 flex flex-col gap-1">
                     {/* Moitié haute - Matin */}
@@ -751,13 +749,11 @@ const LeaveCalendar = ({ onLeaveCreated }) => {
                     />
                   </div>
                   {/* Numéro du jour */}
-                  <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none font-medium text-sm sm:text-lg ${textClass}`}>
+                  <span className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none font-medium text-sm sm:text-lg ${schoolHolidayTextClass(textClass, schoolHol)}`}>
                     {day.date.getDate()}
                   </span>
-                  {/* Indicateur vacances scolaires */}
-                  {schoolHol && (
-                    <span className="absolute bottom-0 inset-x-1 h-1 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
-                  )}
+                  {/* Ruban vacances scolaires */}
+                  {schoolHol && <SchoolHolidayRibbon date={day.date} period={schoolHol} gap="sm" />}
                 </div>
               </div>
             );

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { formatDateFR, isPeriodeFractionnement } from '@/lib/clientDateUtils';
 import { findSchoolHoliday } from '@/lib/schoolHolidays';
-import SchoolHolidayBanner from './SchoolHolidayBanner';
+import SchoolHolidayBanner, { SchoolHolidayRibbon } from './SchoolHolidayBanner';
 
 const TeamCalendar = () => {
   const [leaves, setLeaves] = useState([]);
@@ -321,9 +321,7 @@ const TeamCalendar = () => {
           <span className="text-gray-600">Période de fractionnement (nov. → avril)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-amber-100 ring-2 ring-amber-300 rounded relative">
-            <span className="absolute bottom-0 inset-x-0.5 h-1 rounded-full bg-amber-400"></span>
-          </div>
+          <div className="w-4 h-4 flex items-center"><span className="w-4 h-[3px] rounded-full bg-amber-400" /></div>
           <span className="text-gray-600">Vacances scolaires (Zone C)</span>
         </div>
         <div className="flex items-center gap-2">
@@ -372,7 +370,7 @@ const TeamCalendar = () => {
                 key={index}
                 className={`w-full aspect-square relative transition-all font-medium text-lg ${
                   isToday && day.isCurrentMonth ? 'ring-2 ring-blue-500 rounded-xl' : ''
-                } ${day.isCurrentMonth ? 'cursor-pointer' : ''} ${schoolHol ? `bg-amber-100 rounded-xl ${isToday && day.isCurrentMonth ? '' : 'ring-2 ring-amber-300'}` : ''}`}
+                } ${day.isCurrentMonth ? 'cursor-pointer' : ''}`}
                 onMouseEnter={(e) => handleDateHover(e, day.date, day.isCurrentMonth)}
                 onMouseLeave={handleMouseLeave}
               >
@@ -439,15 +437,13 @@ const TeamCalendar = () => {
                     : day.isCurrentMonth && (hasAnyLeave || hasCours)
                     ? 'text-white font-bold drop-shadow-md'
                     : day.isCurrentMonth
-                      ? isWeekend(day.date) ? 'text-gray-400' : 'text-gray-700'
+                      ? schoolHol ? 'text-amber-700' : isWeekend(day.date) ? 'text-gray-400' : 'text-gray-700'
                       : 'text-gray-300'
                 }`}>
                   {day.date.getDate()}
                 </span>
-                {/* Indicateur vacances scolaires */}
-                {schoolHol && (
-                  <span className="absolute bottom-0 inset-x-1 h-1 sm:h-1.5 rounded-full bg-amber-400 z-10 pointer-events-none"></span>
-                )}
+                {/* Ruban vacances scolaires */}
+                {schoolHol && <SchoolHolidayRibbon date={day.date} period={schoolHol} gap="md" />}
               </div>
             );
           })}
