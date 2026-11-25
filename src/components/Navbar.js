@@ -77,7 +77,7 @@ const Navbar = () => {
           {/* Logo + titre */}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative">
-            <ChristmasHat className="-top-3.5 -left-2.5 w-8 h-6 sm:w-9 sm:h-7 -rotate-12" />
+            <ChristmasHat className="-top-3 -left-2 w-7 h-5 sm:w-8 sm:h-6 -rotate-12" />
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm ring-1 ring-gray-100">
               <Image
                 src="/images/logo.png"
