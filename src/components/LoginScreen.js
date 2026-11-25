@@ -99,7 +99,7 @@ export default function LoginScreen({ initialUsers = null }) {
                   Mairie de Chartrettes
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Mon Portail Agent</h1>
-                <p className="text-white/80 text-sm mt-0.5">Gestion des congés et récupérations<ChristmasGreeting className="ml-2 font-semibold text-white" /></p>
+                <p className="text-white/80 text-sm mt-0.5">Gestion des congés et récupérations<ChristmasGreeting className="block sm:inline sm:ml-2 font-semibold text-white whitespace-nowrap" /></p>
               </div>
             </div>
           </div>
